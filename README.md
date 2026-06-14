@@ -182,8 +182,6 @@ This captures:
 - optional leak-budget checks in benchmark phase (`session_benchmark` passes `--check-leaks` when configured)
 - optional peak RSS sampling in benchmark phase (`session_benchmark` passes `--sample-memory` when configured)
 
-See [session_benchmarking.md](benchmarks/results/session_benchmarking.md).
-
 One-command routine (recommended each session):
 
 ```bash
@@ -200,10 +198,8 @@ Routine defaults:
 - strict verifier (`--preset strict`)
 - god-object audit
 - automatic compare report against previous routine snapshot
-- automatic update of `benchmarks/results/session_benchmarking.md`
+- automatic update of session benchmarking results
 - plus release manifest + release checklist gate in routine output
-
-Release checklist policy is documented in [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
 
 ## Current Backend Posture
 
@@ -234,16 +230,11 @@ python ailang.py --llvm-pgo-probe
 
 ## Compatibility Contract
 
-- Support posture: [SUPPORT_MATRIX.md](SUPPORT_MATRIX.md)
 - Language policy: `1.8.0` is the current final line for now. Keep new work on
   `1.8.x` unless a release review proves that the compatibility contract needs
-  a new numbered line. See [LANGUAGE_FREEZE.md](LANGUAGE_FREEZE.md).
+  a new numbered line.
 - Review builds should keep the `1.8.x` line and add a prerelease/build label
   outside source, such as `1.8.0-review.1` or `1.8.0-rc.1`.
-- C interoperability roadmap: [C_COMPAT.MD](C_COMPAT.MD)
-- Current final release stamp: [RELEASE_1_8.md](RELEASE_1_8.md)
-- Historical compatibility milestone: [RELEASE_1_6.md](RELEASE_1_6.md)
-- Historical optimizer milestone: [RELEASE_1_7.md](RELEASE_1_7.md)
 
 ## Class Cleanup Contract
 
