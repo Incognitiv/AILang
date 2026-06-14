@@ -13,7 +13,7 @@ real product requirement proves that a new numbered release line is necessary.
 ## Repository Layout
 
 ```text
-AILang-Pure/
+AILang/
   ailang.py                 # Main CLI entrypoint
   source/                   # Active compiler/runtime code
     lexer/
