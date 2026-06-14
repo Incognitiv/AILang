@@ -1,4 +1,4 @@
-# AILang-Pure
+# AILang
 
 Active direction: Python-hosted AILang compiler with explicit backends and
 strict verification gates. The previous self-hosted AILang-in-AILang work is
