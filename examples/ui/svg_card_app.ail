@@ -1,0 +1,234 @@
+window svg_card_app:
+    width -> 720 px
+    height -> 420 px
+    title -> "AILang UI"
+    background -> #f5f7fb
+    layout -> "absolute"
+
+    body:
+        layout -> "absolute"
+        x -> 0 px
+        y -> 0 px
+        width -> 720 px
+        height -> 420 px
+        background -> #f5f7fb
+
+        panel shell:
+            x -> 32 px
+            y -> 28 px
+            width -> 656 px
+            height -> 364 px
+            right -> 32 px
+            bottom -> 28 px
+            background -> #ffffff
+            border -> #d8dee9
+            radius -> 8 px
+            shadow -> #d1d5db
+            shadow_x -> 3 px
+            shadow_y -> 4 px
+        end
+
+        text:
+            x -> 62 px
+            y -> 58 px
+            text -> "AILang UI"
+            color -> #111827
+            font_size -> 26 px
+            font_weight -> 700
+        end
+        text:
+            x -> 62 px
+            y -> 92 px
+            text -> "A declarative graphics seed written in AILang"
+            color -> #4b5563
+            font_size -> 14 px
+            font_weight -> 400
+        end
+
+        panel badge:
+            y -> 58 px
+            right -> 72 px
+            width -> 96 px
+            height -> 26 px
+            background -> #dbeafe
+            radius -> 13 px
+
+            text:
+                x -> 14 px
+                y -> 6 px
+                text -> "native .ail"
+                color -> #1d4ed8
+                font_size -> 12 px
+                font_weight -> 600
+            end
+        end
+
+        grid cards:
+            x -> 62 px
+            y -> 138 px
+            width -> 596 px
+            height -> 96 px
+            right -> 62 px
+            columns -> 3
+            rows -> 1
+            gap -> 28 px
+
+            panel layout_card:
+                background -> #f8fafc
+                border -> #e5e7eb
+                radius -> 8 px
+                shadow -> #d1d5db
+                shadow_x -> 3 px
+                shadow_y -> 4 px
+
+                text:
+                    x -> 22 px
+                    y -> 28 px
+                    text -> "Layout"
+                    color -> #0f172a
+                    font_size -> 18 px
+                    font_weight -> 700
+                end
+                text:
+                    x -> 22 px
+                    y -> 62 px
+                    text -> "Composable views"
+                    color -> #64748b
+                    font_size -> 13 px
+                    font_weight -> 400
+                end
+            end
+
+            panel graphics_card:
+                background -> #f8fafc
+                border -> #e5e7eb
+                radius -> 8 px
+                shadow -> #d1d5db
+                shadow_x -> 3 px
+                shadow_y -> 4 px
+
+                text:
+                    x -> 22 px
+                    y -> 28 px
+                    text -> "Graphics"
+                    color -> #0f172a
+                    font_size -> 18 px
+                    font_weight -> 700
+                end
+                text:
+                    x -> 22 px
+                    y -> 62 px
+                    text -> "SVG renderer first"
+                    color -> #64748b
+                    font_size -> 13 px
+                    font_weight -> 400
+                end
+            end
+
+            panel backends_card:
+                background -> #f8fafc
+                border -> #e5e7eb
+                radius -> 8 px
+                shadow -> #d1d5db
+                shadow_x -> 3 px
+                shadow_y -> 4 px
+
+                text:
+                    x -> 22 px
+                    y -> 28 px
+                    text -> "Backends"
+                    color -> #0f172a
+                    font_size -> 18 px
+                    font_weight -> 700
+                end
+                text:
+                    x -> 22 px
+                    y -> 62 px
+                    text -> "SDL later"
+                    color -> #64748b
+                    font_size -> 13 px
+                    font_weight -> 400
+                end
+            end
+        end
+
+        panel progress_track:
+            x -> 82 px
+            y -> 276 px
+            width -> 556 px
+            height -> 2 px
+            right -> 82 px
+            background -> #d1d5db
+        end
+        grid progress_markers:
+            x -> 82 px
+            y -> 269 px
+            width -> 556 px
+            height -> 14 px
+            right -> 82 px
+            columns -> 3
+            rows -> 1
+            gap -> 0 px
+
+            circle:
+                radius -> 7 px
+                fill -> #2563eb
+                align -> "start"
+            end
+            circle:
+                radius -> 7 px
+                fill -> #10b981
+                align -> "center"
+            end
+            circle:
+                radius -> 7 px
+                fill -> #f59e0b
+                align -> "end"
+            end
+        end
+
+        panel preview_button:
+            x -> 62 px
+            y -> 316 px
+            width -> 150 px
+            height -> 42 px
+            background -> #111827
+            border -> #000000
+            radius -> 6 px
+            shadow -> #b8c0cc
+            shadow_x -> 2 px
+            shadow_y -> 3 px
+
+            text:
+                x -> 16 px
+                y -> 12 px
+                text -> "Preview"
+                color -> #ffffff
+                font_size -> 14 px
+                font_weight -> 600
+            end
+        end
+
+        panel export_button:
+            x -> 228 px
+            y -> 316 px
+            width -> 164 px
+            height -> 42 px
+            background -> #e0f2fe
+            border -> #9cc6e8
+            radius -> 6 px
+            shadow -> #b8c0cc
+            shadow_x -> 2 px
+            shadow_y -> 3 px
+
+            text:
+                x -> 16 px
+                y -> 12 px
+                text -> "Export SVG"
+                color -> #075985
+                font_size -> 14 px
+                font_weight -> 600
+            end
+        end
+    end
+end

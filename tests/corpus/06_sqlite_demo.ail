@@ -1,0 +1,32 @@
+def main():
+    print("Opening database...")
+    db = sql_open("test.db")
+
+    if db != 0 then
+        print("Database opened successfully")
+
+        create_table = "CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT, age INTEGER)"
+        result = sql_exec(db, create_table)
+
+        if result == 0 then
+            print("Table created")
+        else
+            print("Error creating table")
+        end
+
+        insert1 = "INSERT INTO users (name, age) VALUES ('Alice', 30)"
+        sql_exec(db, insert1)
+
+        insert2 = "INSERT INTO users (name, age) VALUES ('Bob', 25)"
+        sql_exec(db, insert2)
+
+        print("Data inserted")
+
+        sql_close(db)
+        print("Database closed")
+    else
+        print("Failed to open database")
+    end
+
+    return 0
+end

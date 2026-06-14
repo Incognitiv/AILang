@@ -1,0 +1,81 @@
+@library("ui_platform")
+
+// UI platform contract for live UI backends.
+//
+// This file is intentionally only declarations and neutral records. The pure
+// UI engine should depend on these shapes, while platform backends provide the
+// C/OS implementation behind the extern functions.
+
+enum UiPlatformKind then
+    Unknown = 0
+    Windows = 1
+    Linux = 2
+    FreeBSD = 3
+end
+
+
+enum UiEventKind then
+    None = 0
+    Close = 1
+    Resize = 2
+    MouseMove = 3
+    MouseDown = 4
+    MouseUp = 5
+    KeyDown = 6
+    KeyUp = 7
+end
+
+
+record UiEnv then
+    int platform
+    int width_px
+    int height_px
+    int scale_milli
+    int text_scale_milli
+end
+
+
+record UiEvent then
+    int kind
+    int x
+    int y
+    int key
+    int width_px
+    int height_px
+end
+
+
+extern fn ail_ui_init(): int
+extern fn ail_ui_shutdown(): void
+
+extern fn ail_ui_open_window(title: string, width: int, height: int): int
+extern fn ail_ui_open_borderless_window(title: string, width: int, height: int): int
+extern fn ail_ui_close_window(window: int): void
+extern fn ail_ui_minimize_window(window: int): void
+extern fn ail_ui_toggle_maximize_window(window: int): void
+extern fn ail_ui_window_alive(window: int): int
+
+extern fn ail_ui_platform(): int
+extern fn ail_ui_window_width_px(window: int): int
+extern fn ail_ui_window_height_px(window: int): int
+extern fn ail_ui_window_scale_milli(window: int): int
+extern fn ail_ui_window_text_scale_milli(window: int): int
+extern fn ail_ui_window_maximized(window: int): int
+
+extern fn ail_ui_poll_event(window: int): int
+extern fn ail_ui_event_x(): int
+extern fn ail_ui_event_y(): int
+extern fn ail_ui_event_key(): int
+extern fn ail_ui_event_width_px(): int
+extern fn ail_ui_event_height_px(): int
+
+extern fn ail_ui_begin_frame(window: int, color: int): void
+extern fn ail_ui_draw_rect(window: int, x: int, y: int, width: int, height: int, color: int): void
+extern fn ail_ui_draw_text(window: int, x: int, y: int, scale: int, color: int, text: string): void
+extern fn ail_ui_set_font(font_name: string): void
+extern fn ail_ui_draw_text_font(window: int, x: int, y: int, size_px: int, weight: int, color: int, font_name: string, text: string): void
+extern fn ail_ui_set_clip(window: int, x: int, y: int, width: int, height: int): void
+extern fn ail_ui_clear_clip(window: int): void
+extern fn ail_ui_end_frame(window: int): void
+extern fn ail_ui_sleep_ms(ms: int): void
+extern fn ail_ui_wait_event_ms(ms: int): void

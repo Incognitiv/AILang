@@ -1,0 +1,12 @@
+
+def main():
+    hello = "Hello"
+    world = "World"
+    space = " "
+    exclaim = "!"
+
+    message = hello + space + world + exclaim
+    print(message)
+
+    return 0
+end

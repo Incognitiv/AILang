@@ -1,0 +1,26 @@
+def slice_sum_bench(iterations):
+    arr = [3, 1, 4, 1, 5, 9, 2, 6]
+    slice[int] view = arr
+    acc = 0
+    i = 0
+    while i < iterations then
+        j := 0..7 = 0
+        while true then
+            acc = acc + view[j]
+            if j == 7 then
+                break
+            end
+            j = j + 1
+        end
+        i = i + 1
+    end
+    return acc
+end
+
+
+def main(): int
+    iterations = 250000
+    result = slice_sum_bench(iterations)
+    print(result)
+    return 0
+end

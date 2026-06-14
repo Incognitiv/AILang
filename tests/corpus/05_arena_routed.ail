@@ -1,0 +1,12 @@
+def main(): int
+    i = 0
+    sink = 0
+    while i < 20000000 then
+        c = chr(65 + (i % 26))
+        sink = sink + strlen(c)
+        i = i + 1
+    end
+    print "sink="
+    print sink
+    return 0
+end

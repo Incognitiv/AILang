@@ -1,0 +1,605 @@
+"""Runtime emitter helpers for string-runtime auxiliary helpers."""
+
+from __future__ import annotations
+
+from transpiler.runtime_emit_string_aux_extra import (
+    emit_arena_helper,
+    emit_dynamic_array_helpers,
+    emit_input_helper,
+)
+
+__all__ = [
+    "emit_arena_helper",
+    "emit_dynamic_array_helpers",
+    "emit_file_io_helpers",
+    "emit_input_helper",
+]
+
+
+def emit_file_io_helpers(self) -> None:
+    """Emit file I/O helper functions."""
+    self._output.append("/* Current working directory helper. */")
+    self._output.append("#if defined(_WIN32) || defined(_WIN64)")
+    self._output.append("#include <direct.h>")
+    self._output.append("#else")
+    self._output.append("#include <unistd.h>")
+    self._output.append("#endif")
+    self._output.append("AILANG_UNUSED static char *current_dir(void) {")
+    self._output.append("#ifndef AILANG_FREESTANDING")
+    self._output.append("    char tmp[4096];")
+    self._output.append("#if defined(_WIN32) || defined(_WIN64)")
+    self._output.append("    if (_getcwd(tmp, (int)sizeof(tmp)) == NULL) {")
+    self._output.append("#else")
+    self._output.append("    if (getcwd(tmp, sizeof(tmp)) == NULL) {")
+    self._output.append("#endif")
+    self._output.append("        char *empty = (char *)ailang_safe_malloc(1);")
+    self._output.append("        if (empty) empty[0] = '\\0';")
+    self._output.append("        return empty;")
+    self._output.append("    }")
+    self._output.append("    size_t len = strlen(tmp);")
+    self._output.append("    char *out = (char *)ailang_safe_malloc(len + 1);")
+    self._output.append("    if (out) memcpy(out, tmp, len + 1);")
+    self._output.append("    return out;")
+    self._output.append("#else")
+    self._output.append("    return NULL;")
+    self._output.append("#endif")
+    self._output.append("}")
+    self._output.append("")
+    self._output.append("AILANG_UNUSED static int64_t change_dir(const char *path) {")
+    self._output.append("#ifndef AILANG_FREESTANDING")
+    self._output.append("#if defined(_WIN32) || defined(_WIN64)")
+    self._output.append("    return (int64_t)_chdir(path);")
+    self._output.append("#else")
+    self._output.append("    return (int64_t)chdir(path);")
+    self._output.append("#endif")
+    self._output.append("#else")
+    self._output.append("    (void)path;")
+    self._output.append("    return -1;")
+    self._output.append("#endif")
+    self._output.append("}")
+    self._output.append("")
+
+    self._output.append(
+        "/* Directory listing helper: newline-separated entry names. */"
+    )
+    self._output.append("#if defined(_WIN32) || defined(_WIN64)")
+    self._output.append("#include <io.h>")
+    self._output.append("#else")
+    self._output.append("#include <dirent.h>")
+    self._output.append("#endif")
+    self._output.append(
+        "AILANG_UNUSED static char *__ailang_append_line(char *out, size_t *len, size_t *cap, const char *name) {"
+    )
+    self._output.append("    size_t got = strlen(name);")
+    self._output.append("    if (got > AILANG_MAX_ALLOC_SIZE - *len - 2) {")
+    self._output.append("        ailang_safe_free(out);")
+    self._output.append(
+        '        __ailang_safety_trap("list_dir: output exceeds allocation cap");'
+    )
+    self._output.append("    }")
+    self._output.append("    size_t need = *len + got + 2;")
+    self._output.append("    if (need > *cap) {")
+    self._output.append("        while (*cap < need) {")
+    self._output.append(
+        "            if (*cap > (size_t)AILANG_MAX_ALLOC_SIZE / 2U) { *cap = need; break; }"
+    )
+    self._output.append("            *cap *= 2U;")
+    self._output.append("        }")
+    self._output.append("        out = (char *)ailang_safe_realloc(out, *cap);")
+    self._output.append("    }")
+    self._output.append("    memcpy(out + *len, name, got);")
+    self._output.append("    *len += got;")
+    self._output.append("    out[*len] = '\\n';")
+    self._output.append("    *len += 1;")
+    self._output.append("    out[*len] = '\\0';")
+    self._output.append("    return out;")
+    self._output.append("}")
+    self._output.append("")
+    self._output.append("AILANG_UNUSED static char *list_dir(const char *path) {")
+    self._output.append("#ifndef AILANG_FREESTANDING")
+    self._output.append('    const char *dir = (path && path[0]) ? path : ".";')
+    self._output.append("    size_t cap = 256;")
+    self._output.append("    size_t len = 0;")
+    self._output.append("    char *out = (char *)ailang_safe_malloc(cap);")
+    self._output.append("    if (!out) return NULL;")
+    self._output.append("    out[0] = '\\0';")
+    self._output.append("#if defined(_WIN32) || defined(_WIN64)")
+    self._output.append("    char pattern[4096];")
+    self._output.append('    snprintf(pattern, sizeof(pattern), "%s\\\\*", dir);')
+    self._output.append("    struct _finddata_t data;")
+    self._output.append("    intptr_t handle = _findfirst(pattern, &data);")
+    self._output.append("    if (handle == -1) return out;")
+    self._output.append("    do {")
+    self._output.append(
+        '        if (strcmp(data.name, ".") != 0 && strcmp(data.name, "..") != 0) {'
+    )
+    self._output.append(
+        "            out = __ailang_append_line(out, &len, &cap, data.name);"
+    )
+    self._output.append("        }")
+    self._output.append("    } while (_findnext(handle, &data) == 0);")
+    self._output.append("    _findclose(handle);")
+    self._output.append("#else")
+    self._output.append("    DIR *d = opendir(dir);")
+    self._output.append("    if (!d) return out;")
+    self._output.append("    struct dirent *entry;")
+    self._output.append("    while ((entry = readdir(d)) != NULL) {")
+    self._output.append(
+        '        if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {'
+    )
+    self._output.append(
+        "            out = __ailang_append_line(out, &len, &cap, entry->d_name);"
+    )
+    self._output.append("        }")
+    self._output.append("    }")
+    self._output.append("    closedir(d);")
+    self._output.append("#endif")
+    self._output.append("    return out;")
+    self._output.append("#else")
+    self._output.append("    (void)path;")
+    self._output.append("    return NULL;")
+    self._output.append("#endif")
+    self._output.append("}")
+    self._output.append("")
+
+    # Platform-correct 64-bit file size: long is 32-bit on Windows
+    # (LLP64), so a plain ftell() overflows on files > 2 GB and
+    # silently returns -1. Use _ftelli64 on Windows, ftello on
+    # POSIX -- both 64-bit clean.
+    self._output.append(
+        "/* 64-bit-safe file size (avoids ftell/long overflow on Win) */"
+    )
+    self._output.append("AILANG_UNUSED static int64_t __ailang_file_size(FILE *f) {")
+    self._output.append("#if defined(_WIN32) || defined(_WIN64)")
+    self._output.append("    if (_fseeki64(f, 0, SEEK_END) != 0) return -1;")
+    self._output.append("    long long sz = _ftelli64(f);")
+    self._output.append("    if (_fseeki64(f, 0, SEEK_SET) != 0) return -1;")
+    self._output.append("#else")
+    self._output.append("    if (fseeko(f, 0, SEEK_END) != 0) return -1;")
+    self._output.append("    off_t sz = ftello(f);")
+    self._output.append("    if (fseeko(f, 0, SEEK_SET) != 0) return -1;")
+    self._output.append("#endif")
+    self._output.append("    return (int64_t)sz;")
+    self._output.append("}")
+    self._output.append("")
+    self._output.append("static char *read_file(const char *path) {")
+    self._output.append("#ifndef AILANG_FREESTANDING")
+    self._output.append('    FILE *f = fopen(path, "rb");')
+    self._output.append("    if (!f) return NULL;")
+    self._output.append("    int64_t len = __ailang_file_size(f);")
+    self._output.append("    if (len < 0) {")
+    self._output.append(
+        '        fprintf(stderr, "Error: read_file(\\"%s\\"): could not'
+        ' determine file size\\n", path);'
+    )
+    self._output.append("        fclose(f);")
+    self._output.append("        return NULL;")
+    self._output.append("    }")
+    # Loud trap if file exceeds the per-allocation cap. Without
+    # this check, a 16 GB file silently returns "" because (size_t)
+    # arithmetic on the bogus length wraps and we end up calling
+    # malloc(0) -- silent data loss.
+    self._output.append("    if ((uint64_t)len + 1 > AILANG_MAX_ALLOC_SIZE) {")
+    self._output.append(
+        '        fprintf(stderr, "Error: read_file(\\"%s\\"): file size %lld'
+        ' exceeds per-allocation cap %lld\\n",'
+        " path, (long long)len, (long long)AILANG_MAX_ALLOC_SIZE);"
+    )
+    self._output.append("        fclose(f);")
+    self._output.append(
+        '        __ailang_safety_trap("read_file: size exceeds per-alloc cap");'
+    )
+    self._output.append("        return NULL;")
+    self._output.append("    }")
+    self._output.append("    char *buf = (char *)ailang_safe_malloc((size_t)len + 1);")
+    self._output.append("    if (buf) {")
+    self._output.append("        size_t got = fread(buf, 1, (size_t)len, f);")
+    self._output.append("        buf[got] = '\\0';")
+    self._output.append("    }")
+    self._output.append("    fclose(f);")
+    self._output.append("    return buf;")
+    self._output.append("#else")
+    self._output.append("    (void)path;")
+    self._output.append("    return NULL;")
+    self._output.append("#endif")
+    self._output.append("}")
+    self._output.append("")
+    self._output.append(
+        "AILANG_UNUSED static int64_t write_file(const char *path, const char *data) {"
+    )
+    self._output.append("#ifndef AILANG_FREESTANDING")
+    self._output.append('    FILE *f = fopen(path, "wb");')
+    self._output.append("    if (!f) return 0;")
+    self._output.append("    setvbuf(f, NULL, _IOFBF, 65536);  /* 64KB buffer */")
+    self._output.append("    size_t len = strlen(data);")
+    self._output.append("    size_t written = fwrite(data, 1, len, f);")
+    self._output.append("    fclose(f);")
+    self._output.append("    return (int64_t)(written == len);")
+    self._output.append("#else")
+    self._output.append("    (void)path; (void)data;")
+    self._output.append("    return 0;")
+    self._output.append("#endif")
+    self._output.append("}")
+    self._output.append("")
+    # Optimized write for loops - keeps file open, appends
+    self._output.append("/* Optimized streaming write - auto-detected for loops */")
+    self._output.append("static FILE *_ailang_stream_file = NULL;")
+    self._output.append("static char _ailang_stream_path[4096] = {0};")
+    self._output.append(
+        "AILANG_UNUSED static int _ailang_stream_fresh = 1;  /* 1 = truncate, 0 = append */"
+    )
+    self._output.append("")
+    self._output.append(
+        "AILANG_UNUSED static int64_t write_file_stream(const char *path, const char *data) {"
+    )
+    self._output.append("#ifndef AILANG_FREESTANDING")
+    self._output.append("    /* Check if same path as current stream */")
+    self._output.append(
+        "    if (_ailang_stream_file && strcmp(_ailang_stream_path, path) == 0) {"
+    )
+    self._output.append("        /* Append to existing stream */")
+    self._output.append("        size_t len = strlen(data);")
+    self._output.append(
+        "        size_t written = fwrite(data, 1, len, _ailang_stream_file);"
+    )
+    self._output.append("        return (int64_t)(written == len);")
+    self._output.append("    }")
+    self._output.append("    /* Different path - close old stream */")
+    self._output.append("    if (_ailang_stream_file) {")
+    self._output.append("        fclose(_ailang_stream_file);")
+    self._output.append("        _ailang_stream_file = NULL;")
+    self._output.append("    }")
+    self._output.append("    /* Open new stream - always truncate on first open */")
+    self._output.append('    FILE *f = fopen(path, "wb");')
+    self._output.append("    if (!f) return 0;")
+    self._output.append("    setvbuf(f, NULL, _IOFBF, 65536);")
+    self._output.append("    size_t len = strlen(data);")
+    self._output.append("    size_t written = fwrite(data, 1, len, f);")
+    self._output.append("    /* Keep open for potential reuse */")
+    self._output.append("    _ailang_stream_file = f;")
+    self._output.append(
+        "    strncpy(_ailang_stream_path, path, sizeof(_ailang_stream_path) - 1);"
+    )
+    self._output.append("    return (int64_t)(written == len);")
+    self._output.append("#else")
+    self._output.append("    (void)path; (void)data;")
+    self._output.append("    return 0;")
+    self._output.append("#endif")
+    self._output.append("}")
+    self._output.append("")
+    self._output.append("AILANG_UNUSED static void _ailang_close_streams(void) {")
+    self._output.append("#ifndef AILANG_FREESTANDING")
+    self._output.append("    if (_ailang_stream_file) {")
+    self._output.append("        fclose(_ailang_stream_file);")
+    self._output.append("        _ailang_stream_file = NULL;")
+    self._output.append("        _ailang_stream_path[0] = '\\0';")
+    self._output.append("    }")
+    self._output.append("#endif")
+    self._output.append("}")
+    self._output.append("")
+    self._output.append("#ifndef AILANG_FREESTANDING")
+    self._output.append("#include <sys/stat.h>")
+    self._output.append("#if defined(_WIN32) || defined(_WIN64)")
+    self._output.append("#include <io.h>")
+    self._output.append("#endif")
+    self._output.append("#endif")
+    self._output.append("AILANG_UNUSED static int64_t file_exists(const char *path) {")
+    self._output.append("#ifndef AILANG_FREESTANDING")
+    self._output.append("#if defined(_WIN32) || defined(_WIN64)")
+    self._output.append("    struct _stat st;")
+    self._output.append("    return _stat(path, &st) == 0 ? 1 : 0;")
+    self._output.append("#else")
+    self._output.append("    struct stat st;")
+    self._output.append("    return stat(path, &st) == 0 ? 1 : 0;")
+    self._output.append("#endif")
+    self._output.append("#else")
+    self._output.append("    (void)path;")
+    self._output.append("    return 0;")
+    self._output.append("#endif")
+    self._output.append("}")
+    self._output.append("")
+    self._output.append(
+        "AILANG_UNUSED static int64_t file_is_regular(const char *path) {"
+    )
+    self._output.append("#ifndef AILANG_FREESTANDING")
+    self._output.append("#if defined(_WIN32) || defined(_WIN64)")
+    self._output.append("    struct _stat st;")
+    self._output.append("    if (_stat(path, &st) != 0) return 0;")
+    self._output.append("    return (st.st_mode & _S_IFREG) != 0 ? 1 : 0;")
+    self._output.append("#else")
+    self._output.append("    struct stat st;")
+    self._output.append("    if (stat(path, &st) != 0) return 0;")
+    self._output.append("    return S_ISREG(st.st_mode) ? 1 : 0;")
+    self._output.append("#endif")
+    self._output.append("#else")
+    self._output.append("    (void)path;")
+    self._output.append("    return 0;")
+    self._output.append("#endif")
+    self._output.append("}")
+    self._output.append("")
+    self._output.append(
+        "AILANG_UNUSED static int64_t file_is_symlink(const char *path) {"
+    )
+    self._output.append("#ifndef AILANG_FREESTANDING")
+    self._output.append("#if defined(_WIN32) || defined(_WIN64)")
+    self._output.append("    (void)path;")
+    self._output.append("    return 0;")
+    self._output.append("#else")
+    self._output.append("    struct stat st;")
+    self._output.append("    if (lstat(path, &st) != 0) return 0;")
+    self._output.append("    return S_ISLNK(st.st_mode) ? 1 : 0;")
+    self._output.append("#endif")
+    self._output.append("#else")
+    self._output.append("    (void)path;")
+    self._output.append("    return 0;")
+    self._output.append("#endif")
+    self._output.append("}")
+    self._output.append("")
+    self._output.append("AILANG_UNUSED static int64_t fd_is_tty(int64_t fd) {")
+    self._output.append("#ifndef AILANG_FREESTANDING")
+    self._output.append("#if defined(_WIN32) || defined(_WIN64)")
+    self._output.append("    return _isatty((int)fd) ? 1 : 0;")
+    self._output.append("#else")
+    self._output.append("    return isatty((int)fd) ? 1 : 0;")
+    self._output.append("#endif")
+    self._output.append("#else")
+    self._output.append("    (void)fd;")
+    self._output.append("    return 0;")
+    self._output.append("#endif")
+    self._output.append("}")
+    self._output.append("")
+    self._output.append(
+        "AILANG_UNUSED static int64_t __ailang_file_mode(const char *path) {"
+    )
+    self._output.append("#ifndef AILANG_FREESTANDING")
+    self._output.append("#if defined(_WIN32) || defined(_WIN64)")
+    self._output.append("    struct _stat st;")
+    self._output.append("    if (_stat(path, &st) != 0) return -1;")
+    self._output.append("    return (int64_t)st.st_mode;")
+    self._output.append("#else")
+    self._output.append("    struct stat st;")
+    self._output.append("    if (stat(path, &st) != 0) return -1;")
+    self._output.append("    return (int64_t)st.st_mode;")
+    self._output.append("#endif")
+    self._output.append("#else")
+    self._output.append("    (void)path;")
+    self._output.append("    return -1;")
+    self._output.append("#endif")
+    self._output.append("}")
+    self._output.append("")
+    self._output.append(
+        "AILANG_UNUSED static int64_t file_is_block(const char *path) {"
+    )
+    self._output.append("#if !defined(AILANG_FREESTANDING) && defined(S_ISBLK)")
+    self._output.append("    int64_t m = __ailang_file_mode(path);")
+    self._output.append("    return (m >= 0 && S_ISBLK((mode_t)m)) ? 1 : 0;")
+    self._output.append("#else")
+    self._output.append("    (void)path; return 0;")
+    self._output.append("#endif")
+    self._output.append("}")
+    self._output.append("AILANG_UNUSED static int64_t file_is_char(const char *path) {")
+    self._output.append("#if !defined(AILANG_FREESTANDING) && defined(S_ISCHR)")
+    self._output.append("    int64_t m = __ailang_file_mode(path);")
+    self._output.append("    return (m >= 0 && S_ISCHR((mode_t)m)) ? 1 : 0;")
+    self._output.append("#else")
+    self._output.append("    (void)path; return 0;")
+    self._output.append("#endif")
+    self._output.append("}")
+    self._output.append("AILANG_UNUSED static int64_t file_is_fifo(const char *path) {")
+    self._output.append("#if !defined(AILANG_FREESTANDING) && defined(S_ISFIFO)")
+    self._output.append("    int64_t m = __ailang_file_mode(path);")
+    self._output.append("    return (m >= 0 && S_ISFIFO((mode_t)m)) ? 1 : 0;")
+    self._output.append("#else")
+    self._output.append("    (void)path; return 0;")
+    self._output.append("#endif")
+    self._output.append("}")
+    self._output.append(
+        "AILANG_UNUSED static int64_t file_is_socket(const char *path) {"
+    )
+    self._output.append("#if !defined(AILANG_FREESTANDING) && defined(S_ISSOCK)")
+    self._output.append("    int64_t m = __ailang_file_mode(path);")
+    self._output.append("    return (m >= 0 && S_ISSOCK((mode_t)m)) ? 1 : 0;")
+    self._output.append("#else")
+    self._output.append("    (void)path; return 0;")
+    self._output.append("#endif")
+    self._output.append("}")
+    self._output.append(
+        "AILANG_UNUSED static int64_t file_is_setuid(const char *path) {"
+    )
+    self._output.append("#if !defined(AILANG_FREESTANDING) && defined(S_ISUID)")
+    self._output.append("    int64_t m = __ailang_file_mode(path);")
+    self._output.append("    return (m >= 0 && (m & S_ISUID) != 0) ? 1 : 0;")
+    self._output.append("#else")
+    self._output.append("    (void)path; return 0;")
+    self._output.append("#endif")
+    self._output.append("}")
+    self._output.append(
+        "AILANG_UNUSED static int64_t file_is_setgid(const char *path) {"
+    )
+    self._output.append("#if !defined(AILANG_FREESTANDING) && defined(S_ISGID)")
+    self._output.append("    int64_t m = __ailang_file_mode(path);")
+    self._output.append("    return (m >= 0 && (m & S_ISGID) != 0) ? 1 : 0;")
+    self._output.append("#else")
+    self._output.append("    (void)path; return 0;")
+    self._output.append("#endif")
+    self._output.append("}")
+    self._output.append("")
+    self._output.append("AILANG_UNUSED static int64_t file_mtime(const char *path) {")
+    self._output.append("#ifndef AILANG_FREESTANDING")
+    self._output.append("#if defined(_WIN32) || defined(_WIN64)")
+    self._output.append("    struct _stat st;")
+    self._output.append("    if (_stat(path, &st) != 0) return -1;")
+    self._output.append("    return (int64_t)st.st_mtime;")
+    self._output.append("#else")
+    self._output.append("    struct stat st;")
+    self._output.append("    if (stat(path, &st) != 0) return -1;")
+    self._output.append("    return (int64_t)st.st_mtime;")
+    self._output.append("#endif")
+    self._output.append("#else")
+    self._output.append("    (void)path;")
+    self._output.append("    return -1;")
+    self._output.append("#endif")
+    self._output.append("}")
+    self._output.append("")
+    self._output.append(
+        "AILANG_UNUSED static int64_t file_same(const char *a, const char *b) {"
+    )
+    self._output.append("#ifndef AILANG_FREESTANDING")
+    self._output.append("#if defined(_WIN32) || defined(_WIN64)")
+    self._output.append("    struct _stat sa;")
+    self._output.append("    struct _stat sb;")
+    self._output.append("    if (_stat(a, &sa) != 0 || _stat(b, &sb) != 0) return 0;")
+    self._output.append(
+        "    return (sa.st_dev == sb.st_dev && sa.st_ino == sb.st_ino) ? 1 : 0;"
+    )
+    self._output.append("#else")
+    self._output.append("    struct stat sa;")
+    self._output.append("    struct stat sb;")
+    self._output.append("    if (stat(a, &sa) != 0 || stat(b, &sb) != 0) return 0;")
+    self._output.append(
+        "    return (sa.st_dev == sb.st_dev && sa.st_ino == sb.st_ino) ? 1 : 0;"
+    )
+    self._output.append("#endif")
+    self._output.append("#else")
+    self._output.append("    (void)a; (void)b;")
+    self._output.append("    return 0;")
+    self._output.append("#endif")
+    self._output.append("}")
+    self._output.append("")
+    self._output.append("AILANG_UNUSED static int __ailang_ascii_ieq(char a, char b) {")
+    self._output.append("    if (a >= 'A' && a <= 'Z') a = (char)(a + ('a' - 'A'));")
+    self._output.append("    if (b >= 'A' && b <= 'Z') b = (char)(b + ('a' - 'A'));")
+    self._output.append("    return a == b;")
+    self._output.append("}")
+    self._output.append("")
+    self._output.append(
+        "AILANG_UNUSED static int __ailang_ext_eq(const char *dot, const char *ext) {"
+    )
+    self._output.append("    while (*dot && *ext) {")
+    self._output.append("        if (!__ailang_ascii_ieq(*dot, *ext)) return 0;")
+    self._output.append("        dot++; ext++;")
+    self._output.append("    }")
+    self._output.append("    return *dot == '\\0' && *ext == '\\0';")
+    self._output.append("}")
+    self._output.append("")
+    self._output.append(
+        "AILANG_UNUSED static int __ailang_has_exec_suffix(const char *path) {"
+    )
+    self._output.append("#if defined(_WIN32) || defined(_WIN64)")
+    self._output.append("    const char *dot = strrchr(path, '.');")
+    self._output.append("    const char *slash = strrchr(path, '/');")
+    self._output.append("    const char *backslash = strrchr(path, '\\\\');")
+    self._output.append("    const char *sep = slash;")
+    self._output.append(
+        "    if (!sep || (backslash && backslash > sep)) sep = backslash;"
+    )
+    self._output.append("    if (!dot || (sep && dot < sep)) return 0;")
+    self._output.append(
+        '    return __ailang_ext_eq(dot, ".exe") || __ailang_ext_eq(dot, ".cmd") ||'
+    )
+    self._output.append(
+        '           __ailang_ext_eq(dot, ".bat") || __ailang_ext_eq(dot, ".com");'
+    )
+    self._output.append("#else")
+    self._output.append("    (void)path;")
+    self._output.append("    return 1;")
+    self._output.append("#endif")
+    self._output.append("}")
+    self._output.append("")
+    self._output.append(
+        "AILANG_UNUSED static int64_t ailang_access(const char *path, int64_t mode) {"
+    )
+    self._output.append("#ifndef AILANG_FREESTANDING")
+    self._output.append("    if (!path) return 0;")
+    self._output.append("    if ((mode & ~(int64_t)7) != 0) return 0;")
+    self._output.append("#if defined(_WIN32) || defined(_WIN64)")
+    self._output.append("    if ((mode & 1) != 0) {")
+    self._output.append("        struct _stat st;")
+    self._output.append("        if (_stat(path, &st) != 0) return 0;")
+    self._output.append("        if ((st.st_mode & _S_IFDIR) != 0) return 0;")
+    self._output.append("        if (!__ailang_has_exec_suffix(path)) return 0;")
+    self._output.append("    }")
+    self._output.append("    int win_mode = 0;")
+    self._output.append("    if ((mode & 2) != 0) win_mode |= 2;")
+    self._output.append("    if ((mode & 4) != 0) win_mode |= 4;")
+    self._output.append("    return _access(path, win_mode) == 0 ? 1 : 0;")
+    self._output.append("#else")
+    self._output.append("    return access(path, (int)mode) == 0 ? 1 : 0;")
+    self._output.append("#endif")
+    self._output.append("#else")
+    self._output.append("    (void)path; (void)mode;")
+    self._output.append("    return 0;")
+    self._output.append("#endif")
+    self._output.append("}")
+    self._output.append("")
+    self._output.append(
+        "AILANG_UNUSED static int64_t file_can_execute(const char *path) {"
+    )
+    self._output.append("    return ailang_access(path, 1);")
+    self._output.append("}")
+    self._output.append("")
+    # file_size - get file size without reading content
+    self._output.append("AILANG_UNUSED static int64_t file_size(const char *path) {")
+    self._output.append("#ifndef AILANG_FREESTANDING")
+    self._output.append('    FILE *f = fopen(path, "rb");')
+    self._output.append("    if (!f) return -1;")
+    self._output.append("    fseek(f, 0, SEEK_END);")
+    self._output.append("    long len = ftell(f);")
+    self._output.append("    fclose(f);")
+    self._output.append("    return (int64_t)len;")
+    self._output.append("#else")
+    self._output.append("    (void)path;")
+    self._output.append("    return -1;")
+    self._output.append("#endif")
+    self._output.append("}")
+    self._output.append("")
+    # read_bytes - read binary file, return pointer and size
+    self._output.append(
+        "AILANG_UNUSED static int64_t read_bytes(const char *path, int64_t *out_size) {"
+    )
+    self._output.append("#ifndef AILANG_FREESTANDING")
+    self._output.append('    FILE *f = fopen(path, "rb");')
+    self._output.append("    if (!f) { *out_size = 0; return 0; }")
+    self._output.append("    fseek(f, 0, SEEK_END);")
+    self._output.append("    long len = ftell(f);")
+    self._output.append("    fseek(f, 0, SEEK_SET);")
+    self._output.append("    char *buf = (char *)ailang_safe_malloc((size_t)len);")
+    self._output.append("    if (!buf) { fclose(f); *out_size = 0; return 0; }")
+    self._output.append("    size_t read = fread(buf, 1, (size_t)len, f);")
+    self._output.append("    fclose(f);")
+    self._output.append("    *out_size = (int64_t)read;")
+    self._output.append("    return (int64_t)(uintptr_t)buf;")
+    self._output.append("#else")
+    self._output.append("    (void)path; *out_size = 0;")
+    self._output.append("    return 0;")
+    self._output.append("#endif")
+    self._output.append("}")
+    self._output.append("")
+    # write_bytes - write raw bytes to file
+    self._output.append(
+        "AILANG_UNUSED static int64_t write_bytes(const char *path, int64_t ptr, int64_t size) {"
+    )
+    self._output.append("#ifndef AILANG_FREESTANDING")
+    self._output.append('    FILE *f = fopen(path, "wb");')
+    self._output.append("    if (!f) return 0;")
+    self._output.append(
+        "    size_t written = fwrite((void *)(uintptr_t)ptr, 1, (size_t)size, f);"
+    )
+    self._output.append("    fclose(f);")
+    self._output.append("    return (int64_t)(written == (size_t)size);")
+    self._output.append("#else")
+    self._output.append("    (void)path; (void)ptr; (void)size;")
+    self._output.append("    return 0;")
+    self._output.append("#endif")
+    self._output.append("}")
+    self._output.append("")
+
+
+# Keep strict static checks from reporting this module as dead code when
+# it is consumed via delegation wiring from runtime_emitter.
+_exported_runtime_emit_string_aux = (
+    emit_arena_helper,
+    emit_dynamic_array_helpers,
+    emit_file_io_helpers,
+    emit_input_helper,
+)

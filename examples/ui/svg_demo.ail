@@ -1,0 +1,50 @@
+import stdlib.ui.svg
+
+
+def build_dashboard(): string
+    canvas = svg_begin(720, 420, "#f5f7fb")
+
+    canvas = canvas + svg_panel(32, 28, 656, 364, "#ffffff", "#d8dee9")
+    canvas = canvas + svg_text_weight(62, 78, 26, 700, "#111827", "AILang UI")
+    canvas = canvas + svg_text(62, 106, 14, "#4b5563", "A declarative graphics seed written in AILang")
+    canvas = canvas + svg_badge(552, 58, "native .ail", "#dbeafe", "#1d4ed8")
+
+    canvas = canvas + svg_panel(62, 138, 180, 96, "#f8fafc", "#e5e7eb")
+    canvas = canvas + svg_text_weight(84, 176, 18, 700, "#0f172a", "Layout")
+    canvas = canvas + svg_text(84, 204, 13, "#64748b", "Composable views")
+
+    canvas = canvas + svg_panel(270, 138, 180, 96, "#f8fafc", "#e5e7eb")
+    canvas = canvas + svg_text_weight(292, 176, 18, 700, "#0f172a", "Graphics")
+    canvas = canvas + svg_text(292, 204, 13, "#64748b", "SVG renderer first")
+
+    canvas = canvas + svg_panel(478, 138, 180, 96, "#f8fafc", "#e5e7eb")
+    canvas = canvas + svg_text_weight(500, 176, 18, 700, "#0f172a", "Backends")
+    canvas = canvas + svg_text(500, 204, 13, "#64748b", "SDL later")
+
+    canvas = canvas + svg_line(82, 276, 638, 276, "#d1d5db", 2)
+    canvas = canvas + svg_circle(92, 276, 7, "#2563eb")
+    canvas = canvas + svg_circle(360, 276, 7, "#10b981")
+    canvas = canvas + svg_circle(628, 276, 7, "#f59e0b")
+
+    canvas = canvas + svg_button(62, 316, 150, 42, "Preview", "#111827", "#ffffff")
+    canvas = canvas + svg_button(228, 316, 164, 42, "Export SVG", "#e0f2fe", "#075985")
+
+    return canvas + svg_end()
+end
+
+
+def main(): int
+    make_dir("out")
+    make_dir("out/generated")
+    make_dir("out/generated/ui")
+
+    svg = build_dashboard()
+    ok = write_file("out/generated/ui/svg_demo.svg", svg)
+    if ok == 1 then
+        print("out/generated/ui/svg_demo.svg")
+    else
+        print("svg write failed")
+    end
+    print(len(svg))
+    return 0
+end

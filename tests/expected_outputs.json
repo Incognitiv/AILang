@@ -1,0 +1,25 @@
+{
+  "01_hello.ail": [
+    "Hello, World!"
+  ],
+  "02_factorial.ail": [
+    "3628800"
+  ],
+  "03_fibonacci.ail": [
+    "55"
+  ],
+  "04_string_concat.ail": [
+    "Hello World!"
+  ],
+  "05_arena_routed.ail": [
+    "sink=",
+    "20000000"
+  ],
+  "06_sqlite_demo.ail": [
+    "Opening database...",
+    "Database opened successfully",
+    "Table created",
+    "Data inserted",
+    "Database closed"
+  ]
+}

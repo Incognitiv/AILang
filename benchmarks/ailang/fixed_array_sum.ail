@@ -1,0 +1,28 @@
+type Arr8 = [int; 8]
+
+
+def fixed_array_sum_bench(iterations):
+    Arr8 arr = [3, 1, 4, 1, 5, 9, 2, 6]
+    acc = 0
+    i = 0
+    while i < iterations then
+        j := 0..7 = 0
+        while true then
+            acc = acc + arr[j]
+            if j == 7 then
+                break
+            end
+            j = j + 1
+        end
+        i = i + 1
+    end
+    return acc
+end
+
+
+def main(): int
+    iterations = 250000
+    result = fixed_array_sum_bench(iterations)
+    print(result)
+    return 0
+end

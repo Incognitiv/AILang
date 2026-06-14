@@ -1,0 +1,1569 @@
+// Pure AILang Win32 backend proof.
+// Native declarations and ABI layout constants are generated through #cimport.
+
+#cimport windows "win32_pure.cbind.json"
+
+const string WIN32_PURE_CLASS_NAME = "AILangPureWin32"
+
+const int AIL_UI_PLATFORM_WINDOWS = 1
+
+const int AIL_UI_EVENT_NONE = 0
+const int AIL_UI_EVENT_CLOSE = 1
+const int AIL_UI_EVENT_RESIZE = 2
+const int AIL_UI_EVENT_MOUSE_MOVE = 3
+const int AIL_UI_EVENT_MOUSE_DOWN = 4
+const int AIL_UI_EVENT_MOUSE_UP = 5
+const int AIL_UI_EVENT_KEY_DOWN = 6
+const int AIL_UI_EVENT_KEY_UP = 7
+
+const int AIL_DWMWA_USE_HOSTBACKDROPBRUSH = 17
+const int AIL_DWMWA_WINDOW_CORNER_PREFERENCE = 33
+const int AIL_DWMWA_BORDER_COLOR = 34
+const int AIL_DWMWA_SYSTEMBACKDROP_TYPE = 38
+const int AIL_DWMWCP_DONOTROUND = 1
+const int AIL_DWMSBT_NONE = 1
+const int AIL_DWMWA_COLOR_NONE = 4294967294
+const int AIL_DWM_BB_ENABLE = 1
+const int AIL_SW_MINIMIZE = 6
+const int AIL_SW_RESTORE = 9
+const int AIL_SW_MAXIMIZE = 3
+
+static int g_win32_pure_class_registered = 0
+static int g_win32_pure_window_alive = 0
+static int g_win32_pure_borderless = 0
+static int g_win32_pure_width_px = 0
+static int g_win32_pure_height_px = 0
+static int g_win32_pure_scale_milli = 1000
+static int g_win32_pure_memory_dc = 0
+static int g_win32_pure_bitmap = 0
+static int g_win32_pure_old_bitmap = 0
+static int g_win32_pure_pixels = 0
+static int g_win32_pure_layered_pixels_prepared = 0
+static int g_win32_pure_last_frame_color = 0
+static int g_win32_pure_clip_enabled = 0
+static int g_win32_pure_clip_x0 = 0
+static int g_win32_pure_clip_y0 = 0
+static int g_win32_pure_clip_x1 = 0
+static int g_win32_pure_clip_y1 = 0
+static int g_win32_pure_pending_event = 0
+static int g_win32_pure_event_x = 0
+static int g_win32_pure_event_y = 0
+static int g_win32_pure_event_key = 0
+static int g_win32_pure_event_width_px = 0
+static int g_win32_pure_event_height_px = 0
+
+type Win32WndProc = fn(hwnd: ptr, msg: ushort, wparam: uint, lparam: int): int @stdcall
+
+def win32_loword(value: int): int
+    part = value % 65536
+    if part < 0 then
+        return part + 65536
+    end
+    return part
+end
+
+def win32_hiword(value: int): int
+    return win32_loword(value / 65536)
+end
+
+def win32_signed_word(value: int): int
+    part = win32_loword(value)
+    if part >= 32768 then
+        return part - 65536
+    end
+    return part
+end
+
+def win32_i32(value: int): int
+    part = value % 4294967296
+    if part < 0 then
+        part = part + 4294967296
+    end
+    if part >= 2147483648 then
+        return part - 4294967296
+    end
+    return part
+end
+
+def win32_colorref(color: int): int
+    r = (color / 65536) % 256
+    g = (color / 256) % 256
+    b = color % 256
+    return r + (g * 256) + (b * 65536)
+end
+
+def win32_query_scale_milli(hwnd: ptr): int
+    dc = GetDC(hwnd)
+    dpi = 96
+    if reinterpret(int, dc) != 0 then
+        dpi = GetDeviceCaps(dc, LOGPIXELSX)
+        ReleaseDC(hwnd, dc)
+    end
+    if dpi <= 0 then
+        dpi = 96
+    end
+    return (dpi * 1000) / 96
+end
+
+def win32_set_pending_event(
+    kind: int,
+    x: int,
+    y: int,
+    key: int,
+    width_px: int,
+    height_px: int
+): void
+    g_win32_pure_pending_event = kind
+    g_win32_pure_event_x = x
+    g_win32_pure_event_y = y
+    g_win32_pure_event_key = key
+    g_win32_pure_event_width_px = width_px
+    g_win32_pure_event_height_px = height_px
+end
+
+def win32_write_rect(rect: ptr, left: int, top: int, right: int, bottom: int): void
+    raw = reinterpret(int, rect)
+    poke32(raw, OFFSETOF_RECT_left / 4, left)
+    poke32(raw, OFFSETOF_RECT_top / 4, top)
+    poke32(raw, OFFSETOF_RECT_right / 4, right)
+    poke32(raw, OFFSETOF_RECT_bottom / 4, bottom)
+end
+
+def win32_release_framebuffer_handles(memory_dc: int, bitmap: int, old_bitmap: int): void
+    if memory_dc != 0 then
+        if old_bitmap != 0 then
+            SelectObject(reinterpret(ptr, memory_dc), reinterpret(ptr, old_bitmap))
+        end
+    end
+
+    if bitmap != 0 then
+        DeleteObject(reinterpret(ptr, bitmap))
+    end
+
+    if memory_dc != 0 then
+        DeleteDC(reinterpret(ptr, memory_dc))
+    end
+end
+
+def win32_release_framebuffer(): void
+    win32_release_framebuffer_handles(
+        g_win32_pure_memory_dc,
+        g_win32_pure_bitmap,
+        g_win32_pure_old_bitmap
+    )
+
+    g_win32_pure_memory_dc = 0
+    g_win32_pure_bitmap = 0
+    g_win32_pure_old_bitmap = 0
+    g_win32_pure_pixels = 0
+    g_win32_pure_layered_pixels_prepared = 0
+    g_win32_pure_clip_enabled = 0
+end
+
+def win32_clear_raw_pixels(pixels: int, width: int, height: int, color: int): void
+    if pixels == 0 then
+        return
+    end
+    if width <= 0 then
+        return
+    end
+    if height <= 0 then
+        return
+    end
+
+    pixel = color % 16777216
+    if pixel < 0 then
+        pixel = pixel + 16777216
+    end
+
+    count = width * height
+    i = 0
+    while i < count then
+        poke32(pixels, i, pixel)
+        i = i + 1
+    end
+end
+
+def win32_preview_old_frame(new_memory_dc: int, old_memory_dc: int, old_width: int, old_height: int, new_width: int, new_height: int): int
+    if new_memory_dc == 0 then
+        return 0
+    end
+    if old_memory_dc == 0 then
+        return 0
+    end
+    if old_width <= 0 then
+        return 0
+    end
+    if old_height <= 0 then
+        return 0
+    end
+    if new_width <= 0 then
+        return 0
+    end
+    if new_height <= 0 then
+        return 0
+    end
+
+    if StretchBlt(
+        reinterpret(ptr, new_memory_dc),
+        0,
+        0,
+        new_width,
+        new_height,
+        reinterpret(ptr, old_memory_dc),
+        0,
+        0,
+        old_width,
+        old_height,
+        SRCCOPY
+    ) == 0 then
+        return 0
+    end
+    return 1
+end
+
+def win32_write_bitmap_info(info: int, width: int, height: int): void
+    memset(info, 0, SIZEOF_BITMAPINFO)
+    header = ptr_add(info, OFFSETOF_BITMAPINFO_bmiHeader)
+
+    poke32(header, OFFSETOF_BITMAPINFOHEADER_biSize / 4, SIZEOF_BITMAPINFOHEADER)
+    poke32(header, OFFSETOF_BITMAPINFOHEADER_biWidth / 4, width)
+    poke32(header, OFFSETOF_BITMAPINFOHEADER_biHeight / 4, 0 - height)
+
+    poke8(header, OFFSETOF_BITMAPINFOHEADER_biPlanes, 1)
+    poke8(header, OFFSETOF_BITMAPINFOHEADER_biPlanes + 1, 0)
+    poke8(header, OFFSETOF_BITMAPINFOHEADER_biBitCount, 32)
+    poke8(header, OFFSETOF_BITMAPINFOHEADER_biBitCount + 1, 0)
+    poke32(header, OFFSETOF_BITMAPINFOHEADER_biCompression / 4, BI_RGB)
+end
+
+def win32_resize_framebuffer(hwnd: ptr, width: int, height: int): int
+    if width <= 0 then
+        return 0
+    end
+    if height <= 0 then
+        return 0
+    end
+    if width > 32767 then
+        return 0
+    end
+    if height > 32767 then
+        return 0
+    end
+    if width * height > 268435456 then
+        return 0
+    end
+
+    old_memory_dc = g_win32_pure_memory_dc
+    old_bitmap = g_win32_pure_bitmap
+    old_old_bitmap = g_win32_pure_old_bitmap
+    old_width = g_win32_pure_width_px
+    old_height = g_win32_pure_height_px
+
+    info = alloc(SIZEOF_BITMAPINFO)
+    bits_slot = alloc(8)
+    poke64(bits_slot, 0, 0)
+    win32_write_bitmap_info(info, width, height)
+
+    screen_dc = GetDC(hwnd)
+    memory_dc = CreateCompatibleDC(screen_dc)
+    bitmap = CreateDIBSection(
+        screen_dc,
+        reinterpret(ptr, info),
+        DIB_RGB_COLORS,
+        reinterpret(ptrptr, bits_slot),
+        0,
+        0
+    )
+
+    if reinterpret(int, screen_dc) != 0 then
+        ReleaseDC(hwnd, screen_dc)
+    end
+
+    pixels = peek64(bits_slot, 0)
+    dealloc(bits_slot)
+    dealloc(info)
+
+    if reinterpret(int, memory_dc) == 0 then
+        if reinterpret(int, bitmap) != 0 then
+            DeleteObject(bitmap)
+        end
+        return 0
+    end
+
+    if reinterpret(int, bitmap) == 0 then
+        DeleteDC(memory_dc)
+        return 0
+    end
+
+    if pixels == 0 then
+        DeleteObject(bitmap)
+        DeleteDC(memory_dc)
+        return 0
+    end
+
+    new_old_bitmap = SelectObject(memory_dc, bitmap)
+    g_win32_pure_memory_dc = reinterpret(int, memory_dc)
+    g_win32_pure_bitmap = reinterpret(int, bitmap)
+    g_win32_pure_old_bitmap = reinterpret(int, new_old_bitmap)
+    g_win32_pure_pixels = pixels
+    g_win32_pure_width_px = width
+    g_win32_pure_height_px = height
+    g_win32_pure_layered_pixels_prepared = 0
+    g_win32_pure_clip_enabled = 0
+
+    if win32_preview_old_frame(
+        g_win32_pure_memory_dc,
+        old_memory_dc,
+        old_width,
+        old_height,
+        width,
+        height
+    ) == 0 then
+        win32_clear_raw_pixels(g_win32_pure_pixels, width, height, g_win32_pure_last_frame_color)
+    end
+
+    win32_release_framebuffer_handles(old_memory_dc, old_bitmap, old_old_bitmap)
+    return 1
+end
+
+def win32_set_clip_rect(x: int, y: int, width: int, height: int): void
+    x0 = x
+    y0 = y
+    x1 = x + width
+    y1 = y + height
+
+    if x0 < 0 then
+        x0 = 0
+    end
+    if y0 < 0 then
+        y0 = 0
+    end
+    if x1 > g_win32_pure_width_px then
+        x1 = g_win32_pure_width_px
+    end
+    if y1 > g_win32_pure_height_px then
+        y1 = g_win32_pure_height_px
+    end
+    if x1 < x0 then
+        x1 = x0
+    end
+    if y1 < y0 then
+        y1 = y0
+    end
+
+    g_win32_pure_clip_enabled = 1
+    g_win32_pure_clip_x0 = x0
+    g_win32_pure_clip_y0 = y0
+    g_win32_pure_clip_x1 = x1
+    g_win32_pure_clip_y1 = y1
+end
+
+def win32_fill_pixels(x: int, y: int, width: int, height: int, color: int): void
+    if g_win32_pure_pixels == 0 then
+        return
+    end
+    if width <= 0 then
+        return
+    end
+    if height <= 0 then
+        return
+    end
+    g_win32_pure_layered_pixels_prepared = 0
+
+    x0 = x
+    y0 = y
+    x1 = x + width
+    y1 = y + height
+
+    if x0 < 0 then
+        x0 = 0
+    end
+    if y0 < 0 then
+        y0 = 0
+    end
+    if x1 > g_win32_pure_width_px then
+        x1 = g_win32_pure_width_px
+    end
+    if y1 > g_win32_pure_height_px then
+        y1 = g_win32_pure_height_px
+    end
+
+    if g_win32_pure_clip_enabled == 1 then
+        if x0 < g_win32_pure_clip_x0 then
+            x0 = g_win32_pure_clip_x0
+        end
+        if y0 < g_win32_pure_clip_y0 then
+            y0 = g_win32_pure_clip_y0
+        end
+        if x1 > g_win32_pure_clip_x1 then
+            x1 = g_win32_pure_clip_x1
+        end
+        if y1 > g_win32_pure_clip_y1 then
+            y1 = g_win32_pure_clip_y1
+        end
+    end
+
+    if x1 <= x0 then
+        return
+    end
+    if y1 <= y0 then
+        return
+    end
+
+    pixel = color % 16777216
+    if pixel < 0 then
+        pixel = pixel + 16777216
+    end
+
+    yy = y0
+    while yy < y1 then
+        idx = (yy * g_win32_pure_width_px) + x0
+        xx = x0
+        while xx < x1 then
+            poke32(g_win32_pure_pixels, idx, pixel)
+            idx = idx + 1
+            xx = xx + 1
+        end
+        yy = yy + 1
+    end
+end
+
+def win32_write_point(point: int, x: int, y: int): void
+    poke32(point, OFFSETOF_POINT_x / 4, x)
+    poke32(point, OFFSETOF_POINT_y / 4, y)
+end
+
+def win32_write_size(size: int, cx: int, cy: int): void
+    poke32(size, OFFSETOF_SIZE_cx / 4, cx)
+    poke32(size, OFFSETOF_SIZE_cy / 4, cy)
+end
+
+def win32_rect_left(rect: int): int
+    return win32_i32(peek32(rect, OFFSETOF_RECT_left / 4))
+end
+
+def win32_rect_top(rect: int): int
+    return win32_i32(peek32(rect, OFFSETOF_RECT_top / 4))
+end
+
+def win32_rect_right(rect: int): int
+    return win32_i32(peek32(rect, OFFSETOF_RECT_right / 4))
+end
+
+def win32_rect_bottom(rect: int): int
+    return win32_i32(peek32(rect, OFFSETOF_RECT_bottom / 4))
+end
+
+def win32_dwm_set_u32(hwnd: ptr, attribute: int, value: int): void
+    slot = alloc(4)
+    poke32(slot, 0, value)
+    DwmSetWindowAttribute(hwnd, attribute, reinterpret(ptr, slot), 4)
+    dealloc(slot)
+end
+
+def win32_configure_borderless_dwm(hwnd: ptr): void
+    if reinterpret(int, hwnd) == 0 then
+        return
+    end
+
+    margins = alloc(SIZEOF_MARGINS)
+    memset(margins, 0, SIZEOF_MARGINS)
+    DwmExtendFrameIntoClientArea(hwnd, reinterpret(ptr, margins))
+    dealloc(margins)
+
+    blur = alloc(SIZEOF_DWM_BLURBEHIND)
+    memset(blur, 0, SIZEOF_DWM_BLURBEHIND)
+    poke32(blur, OFFSETOF_DWM_BLURBEHIND_dwFlags / 4, AIL_DWM_BB_ENABLE)
+    poke32(blur, OFFSETOF_DWM_BLURBEHIND_fEnable / 4, FALSE)
+    DwmEnableBlurBehindWindow(hwnd, reinterpret(ptr, blur))
+    dealloc(blur)
+
+    win32_dwm_set_u32(hwnd, AIL_DWMWA_WINDOW_CORNER_PREFERENCE, AIL_DWMWCP_DONOTROUND)
+    win32_dwm_set_u32(hwnd, AIL_DWMWA_BORDER_COLOR, AIL_DWMWA_COLOR_NONE)
+    win32_dwm_set_u32(hwnd, AIL_DWMWA_USE_HOSTBACKDROPBRUSH, FALSE)
+    win32_dwm_set_u32(hwnd, AIL_DWMWA_SYSTEMBACKDROP_TYPE, AIL_DWMSBT_NONE)
+end
+
+def win32_apply_borderless_window_region(hwnd: ptr): void
+    if g_win32_pure_borderless != 1 then
+        return
+    end
+    SetWindowRgn(hwnd, 0, TRUE)
+end
+
+def win32_borderless_corner_radius_px(): int
+    radius = (8 * g_win32_pure_scale_milli + 500) / 1000
+    if radius < 1 then
+        return 1
+    end
+    return radius
+end
+
+def win32_rounded_top_left_coverage(px: int, py: int, radius: int): int
+    scale = 8
+    center = radius * scale
+    rr = center * center
+    coverage = 0
+    sy = 0
+    while sy < 4 then
+        sx = 0
+        while sx < 4 then
+            sample_x = (px * scale) + (sx * 2) + 1
+            sample_y = (py * scale) + (sy * 2) + 1
+            dx = center - sample_x
+            dy = center - sample_y
+            if (dx * dx) + (dy * dy) <= rr then
+                coverage = coverage + 1
+            end
+            sx = sx + 1
+        end
+        sy = sy + 1
+    end
+    return coverage
+end
+
+def win32_rounded_top_right_coverage(px: int, py: int, radius: int): int
+    scale = 8
+    center = radius * scale
+    rr = center * center
+    coverage = 0
+    sy = 0
+    while sy < 4 then
+        sx = 0
+        while sx < 4 then
+            sample_x = (px * scale) + (sx * 2) + 1
+            sample_y = (py * scale) + (sy * 2) + 1
+            dx = sample_x
+            dy = center - sample_y
+            if (dx * dx) + (dy * dy) <= rr then
+                coverage = coverage + 1
+            end
+            sx = sx + 1
+        end
+        sy = sy + 1
+    end
+    return coverage
+end
+
+def win32_premultiply_argb(color: int, alpha: int): int
+    base = color % 16777216
+    if base < 0 then
+        base = base + 16777216
+    end
+    r = (base / 65536) % 256
+    g = (base / 256) % 256
+    b = base % 256
+    if alpha <= 0 then
+        return 0
+    end
+    if alpha >= 255 then
+        return 4278190080 + base
+    end
+    r = ((r * alpha) + 127) / 255
+    g = ((g * alpha) + 127) / 255
+    b = ((b * alpha) + 127) / 255
+    return (alpha * 16777216) + (r * 65536) + (g * 256) + b
+end
+
+def win32_prepare_layered_borderless_pixels(hwnd: ptr): void
+    if g_win32_pure_borderless != 1 then
+        return
+    end
+    if g_win32_pure_pixels == 0 then
+        return
+    end
+    if g_win32_pure_layered_pixels_prepared == 1 then
+        return
+    end
+
+    count = g_win32_pure_width_px * g_win32_pure_height_px
+    i = 0
+    while i < count then
+        raw = peek32(g_win32_pure_pixels, i)
+        if raw < 0 then
+            raw = raw + 4294967296
+        end
+        poke32(g_win32_pure_pixels, i, 4278190080 + (raw % 16777216))
+        i = i + 1
+    end
+
+    if IsZoomed(hwnd) != 0 then
+        g_win32_pure_layered_pixels_prepared = 1
+        return
+    end
+
+    radius = win32_borderless_corner_radius_px()
+    if radius <= 0 then
+        g_win32_pure_layered_pixels_prepared = 1
+        return
+    end
+    if radius * 2 > g_win32_pure_width_px then
+        g_win32_pure_layered_pixels_prepared = 1
+        return
+    end
+    if radius > g_win32_pure_height_px then
+        g_win32_pure_layered_pixels_prepared = 1
+        return
+    end
+
+    y = 0
+    while y < radius then
+        x = 0
+        while x < radius then
+            idx_left = (y * g_win32_pure_width_px) + x
+            left_raw = peek32(g_win32_pure_pixels, idx_left)
+            if left_raw < 0 then
+                left_raw = left_raw + 4294967296
+            end
+            left_alpha = (win32_rounded_top_left_coverage(x, y, radius) * 255 + 8) / 16
+            poke32(g_win32_pure_pixels, idx_left, win32_premultiply_argb(left_raw, left_alpha))
+
+            right_x = g_win32_pure_width_px - radius + x
+            idx_right = (y * g_win32_pure_width_px) + right_x
+            right_raw = peek32(g_win32_pure_pixels, idx_right)
+            if right_raw < 0 then
+                right_raw = right_raw + 4294967296
+            end
+            right_alpha = (win32_rounded_top_right_coverage(x, y, radius) * 255 + 8) / 16
+            poke32(g_win32_pure_pixels, idx_right, win32_premultiply_argb(right_raw, right_alpha))
+            x = x + 1
+        end
+        y = y + 1
+    end
+    g_win32_pure_layered_pixels_prepared = 1
+end
+
+def win32_present_layered_borderless(hwnd: ptr): int
+    if g_win32_pure_borderless != 1 then
+        return 0
+    end
+    if g_win32_pure_memory_dc == 0 then
+        return 0
+    end
+
+    win32_prepare_layered_borderless_pixels(hwnd)
+
+    rect = alloc(SIZEOF_RECT)
+    if GetWindowRect(hwnd, reinterpret(ptr, rect)) == 0 then
+        dealloc(rect)
+        return 0
+    end
+
+    dst = alloc(SIZEOF_POINT)
+    src = alloc(SIZEOF_POINT)
+    size = alloc(SIZEOF_SIZE)
+    blend = alloc(SIZEOF_BLENDFUNCTION)
+    win32_write_point(dst, win32_rect_left(rect), win32_rect_top(rect))
+    win32_write_point(src, 0, 0)
+    win32_write_size(size, g_win32_pure_width_px, g_win32_pure_height_px)
+    memset(blend, 0, SIZEOF_BLENDFUNCTION)
+    poke8(blend, OFFSETOF_BLENDFUNCTION_BlendOp, AC_SRC_OVER)
+    poke8(blend, OFFSETOF_BLENDFUNCTION_SourceConstantAlpha, 255)
+    poke8(blend, OFFSETOF_BLENDFUNCTION_AlphaFormat, AC_SRC_ALPHA)
+
+    screen_dc = GetDC(0)
+    ok = 0
+    if reinterpret(int, screen_dc) != 0 then
+        ok = UpdateLayeredWindow(
+            hwnd,
+            screen_dc,
+            reinterpret(ptr, dst),
+            reinterpret(ptr, size),
+            reinterpret(ptr, g_win32_pure_memory_dc),
+            reinterpret(ptr, src),
+            0,
+            reinterpret(ptr, blend),
+            ULW_ALPHA
+        )
+        ReleaseDC(0, screen_dc)
+    end
+
+    dealloc(blend)
+    dealloc(size)
+    dealloc(src)
+    dealloc(dst)
+    dealloc(rect)
+    return ok
+end
+
+def win32_present_framebuffer(hwnd: ptr): void
+    if g_win32_pure_memory_dc == 0 then
+        return
+    end
+    if reinterpret(int, hwnd) == 0 then
+        return
+    end
+
+    if win32_present_layered_borderless(hwnd) != 0 then
+        return
+    end
+
+    dc = GetDC(hwnd)
+    if reinterpret(int, dc) == 0 then
+        return
+    end
+
+    BitBlt(
+        dc,
+        0,
+        0,
+        g_win32_pure_width_px,
+        g_win32_pure_height_px,
+        reinterpret(ptr, g_win32_pure_memory_dc),
+        0,
+        0,
+        SRCCOPY
+    )
+    ReleaseDC(hwnd, dc)
+end
+
+def win32_draw_text_style_on_dc(
+    dc: ptr,
+    x: int,
+    y: int,
+    size_px: int,
+    weight: int,
+    color: int,
+    text: string
+): void
+    g_win32_pure_layered_pixels_prepared = 0
+    if size_px <= 0 then
+        size_px = 14
+    end
+    if size_px < 8 then
+        size_px = 8
+    end
+    if size_px > 96 then
+        size_px = 96
+    end
+    if weight <= 0 then
+        weight = FW_NORMAL
+    end
+
+    font = CreateFontA(
+        0 - size_px,
+        0,
+        0,
+        0,
+        weight,
+        FALSE,
+        FALSE,
+        FALSE,
+        DEFAULT_CHARSET,
+        OUT_DEFAULT_PRECIS,
+        CLIP_DEFAULT_PRECIS,
+        CLEARTYPE_QUALITY,
+        DEFAULT_PITCH + FF_DONTCARE,
+        "Segoe UI"
+    )
+    if reinterpret(int, font) == 0 then
+        return
+    end
+
+    saved = 0
+    if g_win32_pure_clip_enabled == 1 then
+        saved = SaveDC(dc)
+        if saved != 0 then
+            IntersectClipRect(
+                dc,
+                g_win32_pure_clip_x0,
+                g_win32_pure_clip_y0,
+                g_win32_pure_clip_x1,
+                g_win32_pure_clip_y1
+            )
+        end
+    end
+
+    old_font = SelectObject(dc, font)
+    SetBkMode(dc, TRANSPARENT)
+    SetTextColor(dc, win32_colorref(color))
+    TextOutA(dc, x, y, text, lstrlenA(text))
+    if reinterpret(int, old_font) != 0 then
+        SelectObject(dc, old_font)
+    end
+
+    if saved != 0 then
+        RestoreDC(dc, saved)
+    end
+    DeleteObject(font)
+end
+
+def win32_draw_text_on_dc(dc: ptr, x: int, y: int, scale: int, color: int, text: string): void
+    if scale <= 0 then
+        scale = 1
+    end
+    font_height = 12 + ((scale - 1) * 4)
+    if font_height < 10 then
+        font_height = 10
+    end
+    if font_height > 30 then
+        font_height = 30
+    end
+    win32_draw_text_style_on_dc(dc, x, y, font_height, FW_NORMAL, color, text)
+end
+
+def win32_handle_getminmaxinfo(hwnd: ptr, lparam: int): int
+    if g_win32_pure_borderless != 1 then
+        return 0
+    end
+    monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST)
+    if reinterpret(int, monitor) == 0 then
+        return 1
+    end
+
+    info = alloc(SIZEOF_MONITORINFO)
+    memset(info, 0, SIZEOF_MONITORINFO)
+    poke32(info, OFFSETOF_MONITORINFO_cbSize / 4, SIZEOF_MONITORINFO)
+    if GetMonitorInfoA(monitor, reinterpret(ptr, info)) == 0 then
+        dealloc(info)
+        return 1
+    end
+
+    monitor_rect = ptr_add(info, OFFSETOF_MONITORINFO_rcMonitor)
+    work_rect = ptr_add(info, OFFSETOF_MONITORINFO_rcWork)
+    mon_left = win32_rect_left(monitor_rect)
+    mon_top = win32_rect_top(monitor_rect)
+    work_left = win32_rect_left(work_rect)
+    work_top = win32_rect_top(work_rect)
+    work_right = win32_rect_right(work_rect)
+    work_bottom = win32_rect_bottom(work_rect)
+
+    mmi = lparam
+    max_pos = ptr_add(mmi, OFFSETOF_MINMAXINFO_ptMaxPosition)
+    max_size = ptr_add(mmi, OFFSETOF_MINMAXINFO_ptMaxSize)
+    win32_write_point(max_pos, work_left - mon_left, work_top - mon_top)
+    win32_write_point(max_size, work_right - work_left, work_bottom - work_top)
+
+    dealloc(info)
+    return 1
+end
+
+def win32_is_client_control_area(x: int, y: int): int
+    if y < 50 then
+        if x < 560 then
+            return 1
+        end
+        if x >= g_win32_pure_width_px - 150 then
+            return 1
+        end
+    end
+    return 0
+end
+
+def win32_borderless_hit_test(hwnd: ptr, lparam: int): int
+    if g_win32_pure_borderless != 1 then
+        return 0
+    end
+
+    point = alloc(SIZEOF_POINT)
+    win32_write_point(point, win32_signed_word(lparam), win32_signed_word(lparam / 65536))
+    ScreenToClient(hwnd, reinterpret(ptr, point))
+    x = win32_i32(peek32(point, OFFSETOF_POINT_x / 4))
+    y = win32_i32(peek32(point, OFFSETOF_POINT_y / 4))
+    dealloc(point)
+
+    edge = (8 * g_win32_pure_scale_milli + 500) / 1000
+    if edge < 6 then
+        edge = 6
+    end
+    radius = win32_borderless_corner_radius_px()
+
+    if IsZoomed(hwnd) == 0 then
+        if radius > 0 and y >= 0 and y < radius then
+            if x >= 0 and x < radius then
+                if win32_rounded_top_left_coverage(x, y, radius) == 0 then
+                    return HTTRANSPARENT
+                end
+            end
+            if x >= g_win32_pure_width_px - radius and x < g_win32_pure_width_px then
+                rx = x - (g_win32_pure_width_px - radius)
+                if win32_rounded_top_right_coverage(rx, y, radius) == 0 then
+                    return HTTRANSPARENT
+                end
+            end
+        end
+    end
+
+    if y < edge and x < edge then
+        return HTTOPLEFT
+    end
+    if y < edge and x >= g_win32_pure_width_px - edge then
+        return HTTOPRIGHT
+    end
+    if y >= g_win32_pure_height_px - edge and x < edge then
+        return HTBOTTOMLEFT
+    end
+    if y >= g_win32_pure_height_px - edge and x >= g_win32_pure_width_px - edge then
+        return HTBOTTOMRIGHT
+    end
+    if y < edge then
+        return HTTOP
+    end
+    if y >= g_win32_pure_height_px - edge then
+        return HTBOTTOM
+    end
+    if x < edge then
+        return HTLEFT
+    end
+    if x >= g_win32_pure_width_px - edge then
+        return HTRIGHT
+    end
+    if y < 50 and win32_is_client_control_area(x, y) == 0 then
+        return HTCAPTION
+    end
+    return 0
+end
+
+def win32_handle_dpi_changed(hwnd: ptr, wparam: uint, lparam: int): void
+    dpi = win32_loword(wparam)
+    if dpi <= 0 then
+        g_win32_pure_scale_milli = win32_query_scale_milli(hwnd)
+    else
+        g_win32_pure_scale_milli = (dpi * 1000) / 96
+    end
+
+    if lparam != 0 then
+        rect = lparam
+        left = win32_rect_left(rect)
+        top = win32_rect_top(rect)
+        right = win32_rect_right(rect)
+        bottom = win32_rect_bottom(rect)
+        SetWindowPos(
+            hwnd,
+            0,
+            left,
+            top,
+            right - left,
+            bottom - top,
+            SWP_NOZORDER + SWP_NOACTIVATE
+        )
+    end
+end
+
+def win32_handle_paint(hwnd: ptr): void
+    paint = alloc(SIZEOF_PAINTSTRUCT)
+    BeginPaint(hwnd, reinterpret(ptr, paint))
+    EndPaint(hwnd, reinterpret(ptr, paint))
+    dealloc(paint)
+    win32_present_framebuffer(hwnd)
+end
+
+@stdcall
+@export
+def win32_pure_wndproc(hwnd: ptr, msg: ushort, wparam: uint, lparam: int): int
+    if msg == WM_GETMINMAXINFO then
+        if win32_handle_getminmaxinfo(hwnd, lparam) == 1 then
+            return 0
+        end
+    end
+
+    if msg == WM_NCCALCSIZE then
+        if g_win32_pure_borderless == 1 then
+            return 0
+        end
+    end
+
+    if msg == WM_NCPAINT then
+        if g_win32_pure_borderless == 1 then
+            return 0
+        end
+    end
+
+    if msg == WM_NCACTIVATE then
+        if g_win32_pure_borderless == 1 then
+            return TRUE
+        end
+    end
+
+    if msg == WM_ERASEBKGND then
+        if g_win32_pure_borderless == 1 then
+            return 1
+        end
+    end
+
+    if msg == WM_NCHITTEST then
+        hit = win32_borderless_hit_test(hwnd, lparam)
+        if hit != 0 then
+            return hit
+        end
+    end
+
+    if msg == WM_CLOSE then
+        g_win32_pure_window_alive = 0
+        win32_set_pending_event(AIL_UI_EVENT_CLOSE, 0, 0, 0, 0, 0)
+        DestroyWindow(hwnd)
+        return 0
+    end
+
+    if msg == WM_DESTROY then
+        g_win32_pure_window_alive = 0
+        win32_release_framebuffer()
+        win32_set_pending_event(AIL_UI_EVENT_CLOSE, 0, 0, 0, 0, 0)
+        PostQuitMessage(0)
+        return 0
+    end
+
+    if msg == WM_NCDESTROY then
+        g_win32_pure_window_alive = 0
+        return DefWindowProcA(hwnd, msg, wparam, lparam)
+    end
+
+    if msg == WM_SIZE then
+        width_px = win32_loword(lparam)
+        height_px = win32_hiword(lparam)
+        if win32_resize_framebuffer(hwnd, width_px, height_px) == 1 then
+            win32_present_framebuffer(hwnd)
+        else
+            g_win32_pure_width_px = width_px
+            g_win32_pure_height_px = height_px
+        end
+        g_win32_pure_scale_milli = win32_query_scale_milli(hwnd)
+        win32_apply_borderless_window_region(hwnd)
+        win32_set_pending_event(AIL_UI_EVENT_RESIZE, 0, 0, 0, width_px, height_px)
+        return 0
+    end
+
+    if msg == WM_DPICHANGED then
+        win32_handle_dpi_changed(hwnd, wparam, lparam)
+        return 0
+    end
+
+    if msg == WM_DISPLAYCHANGE then
+        g_win32_pure_scale_milli = win32_query_scale_milli(hwnd)
+        return 0
+    end
+
+    if msg == WM_MOUSEMOVE then
+        win32_set_pending_event(
+            AIL_UI_EVENT_MOUSE_MOVE,
+            win32_loword(lparam),
+            win32_hiword(lparam),
+            0,
+            0,
+            0
+        )
+        return 0
+    end
+
+    if msg == WM_LBUTTONDOWN then
+        SetCapture(hwnd)
+        win32_set_pending_event(
+            AIL_UI_EVENT_MOUSE_DOWN,
+            win32_loword(lparam),
+            win32_hiword(lparam),
+            1,
+            0,
+            0
+        )
+        return 0
+    end
+
+    if msg == WM_LBUTTONUP then
+        ReleaseCapture()
+        win32_set_pending_event(
+            AIL_UI_EVENT_MOUSE_UP,
+            win32_loword(lparam),
+            win32_hiword(lparam),
+            1,
+            0,
+            0
+        )
+        return 0
+    end
+
+    if msg == WM_KEYDOWN then
+        win32_set_pending_event(AIL_UI_EVENT_KEY_DOWN, 0, 0, wparam, 0, 0)
+        return 0
+    end
+
+    if msg == WM_KEYUP then
+        win32_set_pending_event(AIL_UI_EVENT_KEY_UP, 0, 0, wparam, 0, 0)
+        return 0
+    end
+
+    if msg == WM_PAINT then
+        win32_handle_paint(hwnd)
+        return 0
+    end
+
+    return DefWindowProcA(hwnd, msg, wparam, lparam)
+end
+
+def win32_pure_register_class(): int
+    if g_win32_pure_class_registered == 1 then
+        return 1
+    end
+
+    wc = alloc(SIZEOF_WNDCLASSA)
+    memset(wc, 0, SIZEOF_WNDCLASSA)
+
+    class_style = CS_HREDRAW + CS_VREDRAW
+    poke32(wc, OFFSETOF_WNDCLASSA_style / 4, class_style)
+    poke64(wc, OFFSETOF_WNDCLASSA_lpfnWndProc / 8, fn_ptr("win32_pure_wndproc"))
+
+    instance = GetModuleHandleA(0)
+    poke64(wc, OFFSETOF_WNDCLASSA_hInstance / 8, reinterpret(int, instance))
+    poke64(
+        wc,
+        OFFSETOF_WNDCLASSA_lpszClassName / 8,
+        reinterpret(int, WIN32_PURE_CLASS_NAME)
+    )
+
+    atom = RegisterClassA(reinterpret(ptr, wc))
+    dealloc(wc)
+
+    if atom == 0 then
+        return 0
+    end
+
+    g_win32_pure_class_registered = 1
+    return 1
+end
+
+def win32_pure_create_window(
+    title: string,
+    width: int,
+    height: int,
+    style: int,
+    ex_style: int,
+    borderless: int
+): ptr
+    if win32_pure_register_class() != 1 then
+        return 0
+    end
+
+    g_win32_pure_borderless = borderless
+    window_width = width
+    window_height = height
+
+    if borderless != 1 then
+        rect = alloc(SIZEOF_RECT)
+        win32_write_rect(reinterpret(ptr, rect), 0, 0, width, height)
+        if AdjustWindowRect(reinterpret(ptr, rect), style, FALSE) != 0 then
+            window_width = win32_rect_right(rect) - win32_rect_left(rect)
+            window_height = win32_rect_bottom(rect) - win32_rect_top(rect)
+        end
+        dealloc(rect)
+    end
+
+    hwnd = CreateWindowExA(
+        ex_style,
+        WIN32_PURE_CLASS_NAME,
+        title,
+        style,
+        CW_USEDEFAULT,
+        CW_USEDEFAULT,
+        window_width,
+        window_height,
+        0,
+        0,
+        GetModuleHandleA(0),
+        0
+    )
+
+    if reinterpret(int, hwnd) == 0 then
+        return 0
+    end
+
+    g_win32_pure_window_alive = 1
+    g_win32_pure_width_px = width
+    g_win32_pure_height_px = height
+    g_win32_pure_scale_milli = win32_query_scale_milli(hwnd)
+    win32_resize_framebuffer(hwnd, width, height)
+    if borderless == 1 then
+        win32_configure_borderless_dwm(hwnd)
+        SetWindowPos(
+            hwnd,
+            0,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE + SWP_NOSIZE + SWP_NOZORDER + SWP_NOACTIVATE + SWP_FRAMECHANGED
+        )
+        win32_apply_borderless_window_region(hwnd)
+    end
+    ShowWindow(hwnd, SW_SHOW)
+    UpdateWindow(hwnd)
+    return hwnd
+end
+
+def win32_pure_open_window(title: string, width: int, height: int): ptr
+    return win32_pure_create_window(title, width, height, WS_OVERLAPPEDWINDOW + WS_VISIBLE, 0, 0)
+end
+
+def win32_pure_open_borderless_window(title: string, width: int, height: int): ptr
+    style = WS_POPUP + WS_THICKFRAME + WS_MINIMIZEBOX + WS_MAXIMIZEBOX + WS_SYSMENU + WS_VISIBLE
+    return win32_pure_create_window(title, width, height, style, WS_EX_LAYERED, 1)
+end
+
+def win32_pure_close_window(hwnd: ptr): void
+    if reinterpret(int, hwnd) == 0 then
+        return
+    end
+    win32_release_framebuffer()
+    if IsWindow(hwnd) != 0 then
+        DestroyWindow(hwnd)
+    end
+    g_win32_pure_window_alive = 0
+    g_win32_pure_borderless = 0
+end
+
+def win32_pure_poll_once(): int
+    msg = alloc(SIZEOF_MSG)
+    memset(msg, 0, SIZEOF_MSG)
+
+    seen_any = 0
+    seen = PeekMessageA(reinterpret(ptr, msg), 0, 0, 0, PM_REMOVE)
+    while seen != 0 then
+        seen_any = 1
+        TranslateMessage(reinterpret(ptr, msg))
+        DispatchMessageA(reinterpret(ptr, msg))
+        if g_win32_pure_pending_event != AIL_UI_EVENT_NONE then
+            dealloc(msg)
+            return seen_any
+        end
+        memset(msg, 0, SIZEOF_MSG)
+        seen = PeekMessageA(reinterpret(ptr, msg), 0, 0, 0, PM_REMOVE)
+    end
+
+    dealloc(msg)
+    return seen_any
+end
+
+def win32_fill_rect(hwnd: ptr, x: int, y: int, width: int, height: int, color: int): void
+    if reinterpret(int, hwnd) == 0 then
+        return
+    end
+    if width <= 0 then
+        return
+    end
+    if height <= 0 then
+        return
+    end
+
+    dc = GetDC(hwnd)
+    if reinterpret(int, dc) == 0 then
+        return
+    end
+
+    brush = CreateSolidBrush(win32_colorref(color))
+    if reinterpret(int, brush) == 0 then
+        ReleaseDC(hwnd, dc)
+        return
+    end
+
+    rect = alloc(SIZEOF_RECT)
+    win32_write_rect(reinterpret(ptr, rect), x, y, x + width, y + height)
+    FillRect(dc, reinterpret(ptr, rect), brush)
+    dealloc(rect)
+
+    DeleteObject(brush)
+    ReleaseDC(hwnd, dc)
+end
+
+def ail_ui_init(): int
+    SetProcessDPIAware()
+    return win32_pure_register_class()
+end
+
+def ail_ui_shutdown(): void
+    win32_release_framebuffer()
+end
+
+def ail_ui_open_window(title: string, width: int, height: int): int
+    hwnd = win32_pure_open_window(title, width, height)
+    return reinterpret(int, hwnd)
+end
+
+def ail_ui_open_borderless_window(title: string, width: int, height: int): int
+    hwnd = win32_pure_open_borderless_window(title, width, height)
+    return reinterpret(int, hwnd)
+end
+
+def ail_ui_close_window(window: int): void
+    win32_pure_close_window(reinterpret(ptr, window))
+end
+
+def ail_ui_minimize_window(window: int): void
+    if window == 0 then
+        return
+    end
+    ShowWindow(reinterpret(ptr, window), AIL_SW_MINIMIZE)
+end
+
+def ail_ui_toggle_maximize_window(window: int): void
+    if window == 0 then
+        return
+    end
+    hwnd = reinterpret(ptr, window)
+    if IsZoomed(hwnd) != 0 then
+        ShowWindow(hwnd, AIL_SW_RESTORE)
+        return
+    end
+    ShowWindow(hwnd, AIL_SW_MAXIMIZE)
+end
+
+def ail_ui_window_alive(window: int): int
+    hwnd = reinterpret(ptr, window)
+    if reinterpret(int, hwnd) == 0 then
+        return 0
+    end
+    if g_win32_pure_window_alive != 1 then
+        return 0
+    end
+    if IsWindow(hwnd) == 0 then
+        g_win32_pure_window_alive = 0
+        return 0
+    end
+    return 1
+end
+
+def ail_ui_platform(): int
+    return AIL_UI_PLATFORM_WINDOWS
+end
+
+def ail_ui_window_width_px(window: int): int
+    return g_win32_pure_width_px
+end
+
+def ail_ui_window_height_px(window: int): int
+    return g_win32_pure_height_px
+end
+
+def ail_ui_window_scale_milli(window: int): int
+    return g_win32_pure_scale_milli
+end
+
+def ail_ui_window_text_scale_milli(window: int): int
+    return g_win32_pure_scale_milli
+end
+
+def ail_ui_window_maximized(window: int): int
+    return IsZoomed(reinterpret(ptr, window))
+end
+
+def ail_ui_poll_event(window: int): int
+    g_win32_pure_pending_event = AIL_UI_EVENT_NONE
+    win32_pure_poll_once()
+
+    if reinterpret(int, reinterpret(ptr, window)) != 0 then
+        if IsWindow(reinterpret(ptr, window)) == 0 then
+            g_win32_pure_window_alive = 0
+        end
+    end
+
+    kind = g_win32_pure_pending_event
+    g_win32_pure_pending_event = AIL_UI_EVENT_NONE
+    return kind
+end
+
+def ail_ui_event_x(): int
+    return g_win32_pure_event_x
+end
+
+def ail_ui_event_y(): int
+    return g_win32_pure_event_y
+end
+
+def ail_ui_event_key(): int
+    return g_win32_pure_event_key
+end
+
+def ail_ui_event_width_px(): int
+    return g_win32_pure_event_width_px
+end
+
+def ail_ui_event_height_px(): int
+    return g_win32_pure_event_height_px
+end
+
+def ail_ui_begin_frame(window: int, color: int): void
+    g_win32_pure_clip_enabled = 0
+    g_win32_pure_layered_pixels_prepared = 0
+    g_win32_pure_last_frame_color = color
+    if g_win32_pure_pixels == 0 then
+        win32_resize_framebuffer(
+            reinterpret(ptr, window),
+            ail_ui_window_width_px(window),
+            ail_ui_window_height_px(window)
+        )
+    end
+
+    if g_win32_pure_pixels != 0 then
+        win32_fill_pixels(
+            0,
+            0,
+            ail_ui_window_width_px(window),
+            ail_ui_window_height_px(window),
+            color
+        )
+        return
+    end
+
+    win32_fill_rect(
+        reinterpret(ptr, window),
+        0,
+        0,
+        ail_ui_window_width_px(window),
+        ail_ui_window_height_px(window),
+        color
+    )
+end
+
+def ail_ui_draw_rect(window: int, x: int, y: int, width: int, height: int, color: int): void
+    if g_win32_pure_pixels != 0 then
+        win32_fill_pixels(x, y, width, height, color)
+        return
+    end
+    win32_fill_rect(reinterpret(ptr, window), x, y, width, height, color)
+end
+
+def ail_ui_draw_text(
+    window: int,
+    x: int,
+    y: int,
+    scale: int,
+    color: int,
+    text: string
+): void
+    hwnd = reinterpret(ptr, window)
+    if reinterpret(int, hwnd) == 0 then
+        return
+    end
+
+    if g_win32_pure_memory_dc != 0 then
+        win32_draw_text_on_dc(reinterpret(ptr, g_win32_pure_memory_dc), x, y, scale, color, text)
+        return
+    end
+
+    dc = GetDC(hwnd)
+    if reinterpret(int, dc) == 0 then
+        return
+    end
+
+    win32_draw_text_on_dc(dc, x, y, scale, color, text)
+    ReleaseDC(hwnd, dc)
+end
+
+def ail_ui_draw_text_style(
+    window: int,
+    x: int,
+    y: int,
+    size_px: int,
+    weight: int,
+    color: int,
+    text: string
+): void
+    hwnd = reinterpret(ptr, window)
+    if reinterpret(int, hwnd) == 0 then
+        return
+    end
+
+    if g_win32_pure_memory_dc != 0 then
+        win32_draw_text_style_on_dc(reinterpret(ptr, g_win32_pure_memory_dc), x, y, size_px, weight, color, text)
+        return
+    end
+
+    dc = GetDC(hwnd)
+    if reinterpret(int, dc) == 0 then
+        return
+    end
+
+    win32_draw_text_style_on_dc(dc, x, y, size_px, weight, color, text)
+    ReleaseDC(hwnd, dc)
+end
+
+
+def ail_ui_set_font(font_name: string): void
+    // Per-call font selection is the stable ABI today.
+end
+
+
+def ail_ui_draw_text_font(
+    window: int,
+    x: int,
+    y: int,
+    size_px: int,
+    weight: int,
+    color: int,
+    font_name: string,
+    text: string
+): void
+    // Current Win32 backend uses the system font through DrawText; keep the
+    // font-name ABI stable while richer font selection lands in the backend.
+    ail_ui_draw_text_style(window, x, y, size_px, weight, color, text)
+end
+
+def ail_ui_set_clip(window: int, x: int, y: int, width: int, height: int): void
+    win32_set_clip_rect(x, y, width, height)
+end
+
+def ail_ui_clear_clip(window: int): void
+    g_win32_pure_clip_enabled = 0
+end
+
+def ail_ui_end_frame(window: int): void
+    win32_present_framebuffer(reinterpret(ptr, window))
+end
+
+def ail_ui_sleep_ms(ms: int): void
+    if ms > 0 then
+        Sleep(ms)
+    end
+end
+
+def ail_ui_wait_event_ms(ms: int): void
+    timeout = ms
+    if timeout < 0 then
+        timeout = INFINITE
+    end
+    MsgWaitForMultipleObjects(0, 0, FALSE, timeout, QS_ALLINPUT)
+end
+
+def win32_pure_run_frames(window: int, frames: int): int
+    if window == 0 then
+        return 0
+    end
+
+    i = 0
+    while i < frames then
+        if ail_ui_window_alive(window) != 1 then
+            return i
+        end
+        ail_ui_poll_event(window)
+        ail_ui_sleep_ms(16)
+        i = i + 1
+    end
+    return i
+end
+
+def win32_pure_smoke(frames: int): int
+    if ail_ui_init() != 1 then
+        return 1
+    end
+
+    window = ail_ui_open_borderless_window("AILang pure Win32", 640, 360)
+    if window == 0 then
+        return 2
+    end
+
+    ail_ui_begin_frame(window, 15791611)
+    ail_ui_draw_rect(window, 48, 48, 220, 72, 3385907)
+    ail_ui_draw_text(window, 64, 72, 1, 16777215, "AILang pure Win32")
+    ail_ui_end_frame(window)
+
+    win32_pure_run_frames(window, frames)
+    ail_ui_close_window(window)
+    ail_ui_shutdown()
+    return 0
+end
+
+def win32_pure_module_ready(): int
+    return 1
+end
+
+def main(): int
+    return win32_pure_smoke(2)
+end

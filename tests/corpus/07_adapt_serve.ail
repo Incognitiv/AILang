@@ -1,0 +1,868 @@
+// ADAPT — HTTP server (ticket #57).
+//
+// Serves the adapt-chat-static UI (extracted to ./static/) over HTTP/1.1
+// on port 8765, plus the JSON API the UI expects:
+//
+//   GET  /                                → static/index.html
+//   GET  /favicon.svg                     → static/favicon.svg
+//   GET  /assets/<file>                   → static/assets/<file>
+//   GET  /api/adapt/status                → {connected, vocabSize, eventCount,
+//                                            prime: {available, turnCount}}
+//   GET  /api/adapt/vocab                 → {connected, words: [{node_id, text}]}
+//   GET  /api/adapt/journal               → {connected, events: [{ts, kind,
+//                                            node_id, other_id, score}]}
+//   GET  /api/adapt/graph                 → {connected, nodes: [{node_id,
+//                                            label, strength, event_count}]}
+//   POST /api/adapt/chat   {message:"…"}  → {response, badge}
+//   POST /api/adapt/reset                 → {ok}
+//
+// Pipeline for chat (#58a + #58b):
+//   parse_intent_cloud → dispatch_cloud → superpose_run.
+// The hypothesis cloud handles input-side ambiguity (typos route
+// to closest vocab; tied candidates collapse to FRAME_AMBIGUOUS).
+// The superposition pipeline runs ADAPT and PRIME both as
+// producers and collapses to one output by an explicit comparison
+// rule, journaling the collapse kind for the editor loop's audit
+// trail. Same path as tools/adapt_chat.ail — the REPL and the
+// server route through the same substrate.
+//
+// Connection model: HTTP/1.1 with keep-alive. The server reads one
+// complete request, responds, then loops back to read the next on
+// the same socket — closes only when the client explicitly sends
+// Connection: close or disconnects. This eliminates the per-request
+// TCP handshake, which was the dominant overhead in the v1 design.
+//
+// What v1 does NOT do: import/export endpoints, binary file serving
+// (.jpg — read_file truncates at NUL), concurrency. Single accept
+// thread; suitable for local single-user development.
+//
+// Run: python ailang.py tools/adapt_serve.ail, then open
+// http://127.0.0.1:8765/
+
+import core.qrax
+import core.encoding
+import core.vocab
+import core.journal
+import core.verify
+import core.tutor
+import core.frame
+import core.fuzzy
+import core.dialogue
+import core.prime
+import core.superpose
+import memory.graph
+import memory.predict
+import memory.replay
+import memory.index
+import memory.journaled
+import memory.spread
+import memory.daydream
+
+// ---------------------------------------------------------------------
+// HTTP request parsing helpers
+// ---------------------------------------------------------------------
+
+// Find the byte index of `needle` in `hay` starting at `start_at`.
+// Returns -1 if not present. Hand-rolled because AILang's stdlib
+// index_of has no offset variant; the offset is needed to skip past
+// the headers when finding the body separator. ('from' would be the
+// natural parameter name but it's a reserved word in AILang.)
+//
+// @unchecked: this function explicitly bounds every char_at via the
+// `i + nn <= nh` outer-loop invariant and `j < nn` inner-loop
+// invariant. The default safety checks add ~30% to every char_at
+// on the parsing hot path — disabling them is safe because the
+// function validates its own access.
+@unchecked
+def srv_find(hay: string, needle: string, start_at: int): int
+    // Hot path delegated to libc strstr via index_of_from. Was a
+    // hand-rolled O(n*m) char_at loop that ate ~5% CPU per `perf`
+    // — strstr is typically Boyer-Moore-Horspool-flavored, much
+    // faster on long buffers like accumulated HTTP requests.
+    return index_of_from(hay, needle, start_at)
+end
+
+@unchecked
+def srv_find_legacy(hay: string, needle: string, start_at: int): int
+    nh = strlen(hay)
+    nn = strlen(needle)
+    if nn == 0 then
+        return start_at
+    end
+    i = start_at
+    while i + nn <= nh then
+        is_match = 1
+        j = 0
+        while j < nn then
+            if char_at(hay, i + j) != char_at(needle, j) then
+                is_match = 0
+                j = nn
+            end
+            j = j + 1
+        end
+        if is_match == 1 then
+            return i
+        end
+        i = i + 1
+    end
+    return -1
+end
+
+// Extract the HTTP method (token before the first space). Returns "" if
+// the request line is malformed.
+@unchecked
+def srv_method(req: string): string
+    sp = srv_find(req, " ", 0)
+    if sp < 0 then
+        return ""
+    end
+    return substr(req, 0, sp)
+end
+
+// Extract the path (token between first and second space).
+@unchecked
+def srv_path(req: string): string
+    sp1 = srv_find(req, " ", 0)
+    if sp1 < 0 then
+        return ""
+    end
+    sp2 = srv_find(req, " ", sp1 + 1)
+    if sp2 < 0 then
+        return ""
+    end
+    return substr(req, sp1 + 1, sp2 - sp1 - 1)
+end
+
+// Find the body offset — first byte after the \r\n\r\n separator.
+// Returns -1 if no separator (request still being received).
+@unchecked
+def srv_body_offset(req: string): int
+    pos = srv_find(req, "\r\n\r\n", 0)
+    if pos < 0 then
+        return -1
+    end
+    return pos + 4
+end
+
+// Parse the body out of the full request buffer. Empty string if no
+// body separator found.
+@unchecked
+def srv_body(req: string): string
+    off = srv_body_offset(req)
+    if off < 0 then
+        return ""
+    end
+    return substr(req, off, strlen(req) - off)
+end
+
+// Parse a Content-Length header value to int. Returns 0 if absent
+// or unparseable (which is the right default — no body).
+@unchecked
+def srv_content_length(req: string): int
+    cl_header = "Content-Length:"
+    pos = srv_find(req, cl_header, 0)
+    if pos < 0 then
+        return 0
+    end
+    start = pos + strlen(cl_header)
+    while char_at(req, start) == 32 then
+        start = start + 1
+    end
+    end_pos = srv_find(req, "\r", start)
+    if end_pos < 0 then
+        return 0
+    end
+    return parse_int(substr(req, start, end_pos - start))
+end
+
+// True (1) if the request asks the connection to close after
+// response (Connection: close header). HTTP/1.1 default is
+// keep-alive, so if the header is absent we keep the connection
+// open. We do a substring match rather than a strict header parse
+// because every value of Connection: close looks the same.
+@unchecked
+def srv_wants_close(req: string): int
+    if srv_find(req, "Connection: close", 0) >= 0 then
+        return 1
+    end
+    if srv_find(req, "connection: close", 0) >= 0 then
+        return 1
+    end
+    return 0
+end
+
+// Read one complete HTTP request from the connection. HTTP/1.1
+// keep-alive needs strict request boundaries: read until we see
+// \r\n\r\n (end of headers), parse Content-Length, then read
+// exactly that many body bytes. Returns "" if the client closed
+// before sending a complete request.
+@unchecked
+def srv_read_request(conn: int): string
+    accumulated = ""
+    // Read until we have the full headers (terminated by \r\n\r\n).
+    // The 4096-byte chunk size matches typical kernel TCP buffer
+    // grain so most requests come in one recv call.
+    have_headers = 0
+    body_start = -1
+    while have_headers == 0 then
+        chunk = tcp_recv(conn, 4096)
+        chunk_len = strlen(chunk)
+        if chunk_len == 0 then
+            return ""
+        end
+        accumulated = accumulated + chunk
+        body_start = srv_find(accumulated, "\r\n\r\n", 0)
+        if body_start >= 0 then
+            have_headers = 1
+            body_start = body_start + 4
+        end
+    end
+
+    // Determine if there's a body and read it to completion.
+    cl = srv_content_length(accumulated)
+    body_have = strlen(accumulated) - body_start
+    while body_have < cl then
+        chunk = tcp_recv(conn, cl - body_have)
+        chunk_len = strlen(chunk)
+        if chunk_len == 0 then
+            // Client closed mid-body — return what we have, which
+            // is incomplete. Caller will likely produce a 400-style
+            // response and close.
+            return accumulated
+        end
+        accumulated = accumulated + chunk
+        body_have = body_have + chunk_len
+    end
+    return accumulated
+end
+
+// Find the value of `header_name` (case-insensitive prefix match would
+// be ideal but we only need exact-case for known headers like
+// "Content-Length:"). Returns "" if absent.
+@unchecked
+def srv_header(req: string, name: string): string
+    pos = srv_find(req, name, 0)
+    if pos < 0 then
+        return ""
+    end
+    start = pos + strlen(name)
+    // Skip leading spaces after the colon
+    while char_at(req, start) == 32 then
+        start = start + 1
+    end
+    // Find end of line (CR)
+    end_pos = srv_find(req, "\r", start)
+    if end_pos < 0 then
+        return ""
+    end
+    return substr(req, start, end_pos - start)
+end
+
+// ---------------------------------------------------------------------
+// JSON helpers (delegate to frame_json_escape from core.frame)
+// ---------------------------------------------------------------------
+
+// Build {"key":"<escaped>", ...}-style fragments. Caller composes them.
+def srv_jstr(key: string, value: string): string
+    return "\"" + key + "\":\"" + frame_json_escape(value) + "\""
+end
+
+def srv_jnum(key: string, value: int): string
+    return "\"" + key + "\":" + str(value)
+end
+
+def srv_jbool(key: string, truthy: int): string
+    if truthy == 1 then
+        return "\"" + key + "\":true"
+    end
+    return "\"" + key + "\":false"
+end
+
+// Look at the suffix of a path and return the right Content-Type.
+// Limited to text formats — binary files are out of scope (see file header).
+def srv_mime(path: string): string
+    if endswith(path, ".html") == 1 then
+        return "text/html; charset=utf-8"
+    end
+    if endswith(path, ".css") == 1 then
+        return "text/css; charset=utf-8"
+    end
+    if endswith(path, ".js") == 1 then
+        return "application/javascript; charset=utf-8"
+    end
+    if endswith(path, ".svg") == 1 then
+        return "image/svg+xml"
+    end
+    if endswith(path, ".json") == 1 then
+        return "application/json; charset=utf-8"
+    end
+    return "text/plain; charset=utf-8"
+end
+
+// ---------------------------------------------------------------------
+// HTTP response builders
+// ---------------------------------------------------------------------
+
+// Build an HTTP/1.1 response. Always emits Connection: keep-alive;
+// per-request close decision lives in the main loop (which checks
+// the client's request-side Connection header). Threading a
+// keep_alive bit through every handler would be invasive and
+// provide no real benefit — clients tolerate a slight header
+// mismatch (response says keep-alive, server closes anyway).
+def srv_response(
+    status_line: string, content_type: string, body: string
+): string
+    body_len = strlen(body)
+    return "HTTP/1.1 " + status_line + "\r\n"
+        + "Content-Type: " + content_type + "\r\n"
+        + "Content-Length: " + str(body_len) + "\r\n"
+        + "Connection: keep-alive" + "\r\n"
+        + "Cache-Control: no-store" + "\r\n"
+        + "\r\n"
+        + body
+end
+
+def srv_ok_json(body: string): string
+    return srv_response("200 OK", "application/json; charset=utf-8", body)
+end
+
+def srv_ok_static(content_type: string, body: string): string
+    return srv_response("200 OK", content_type, body)
+end
+
+def srv_404(): string
+    return srv_response(
+        "404 Not Found", "text/plain; charset=utf-8", "Not Found\n"
+    )
+end
+
+def srv_405(): string
+    return srv_response(
+        "405 Method Not Allowed",
+        "text/plain; charset=utf-8",
+        "Method Not Allowed\n"
+    )
+end
+
+// ---------------------------------------------------------------------
+// API endpoint handlers
+// ---------------------------------------------------------------------
+
+// GET /api/adapt/status — UI uses this to show "connected" badge and
+// PRIME availability.
+def srv_handle_status(cfg: PrimeConfig, nodes: array, db: int): string
+    n_vocab = vocab_count(db)
+    n_events = journal_count(db)
+    prime_ok = prime_available(cfg)
+    body = "{"
+        + srv_jbool("connected", 1) + ","
+        + srv_jnum("vocabSize", n_vocab) + ","
+        + srv_jnum("eventCount", n_events) + ","
+        + "\"prime\":{"
+        + srv_jbool("available", prime_ok) + ","
+        + srv_jnum("turnCount", 0)
+        + "}}"
+    return srv_ok_json(body)
+end
+
+// GET /api/adapt/vocab — list every registered word with its node_id.
+// SELECT node_id, text FROM vocab ORDER BY node_id.
+def srv_handle_vocab(db: int): string
+    sql = "SELECT node_id, text FROM vocab ORDER BY node_id"
+    stmt = sql_prepare(db, sql)
+    if stmt == 0 then
+        return srv_ok_json("{\"connected\":false,\"words\":[]}")
+    end
+    arr = "["
+    first = 1
+    while sql_step(stmt) == 100 then
+        nid = sql_column_int(stmt, 0)
+        // Force a fresh copy before sql_finalize invalidates the pointer
+        // (same trick as vocab_gloss).
+        text_raw = sql_column_text(stmt, 1)
+        text_owned = text_raw + ""
+        sep = ","
+        if first == 1 then
+            sep = ""
+            first = 0
+        end
+        arr = arr + sep + "{"
+            + srv_jnum("node_id", nid) + ","
+            + srv_jstr("text", text_owned)
+            + "}"
+    end
+    sql_finalize(stmt)
+    arr = arr + "]"
+    body = "{\"connected\":true,\"words\":" + arr + "}"
+    return srv_ok_json(body)
+end
+
+// GET /api/adapt/journal — recent events. Most-recent first, capped at
+// 100 to keep the response small.
+def srv_handle_journal(db: int): string
+    sql = "SELECT ts, kind, node_id, other_id, score FROM adapt_events"
+        + " ORDER BY ts DESC LIMIT 100"
+    stmt = sql_prepare(db, sql)
+    if stmt == 0 then
+        return srv_ok_json("{\"connected\":false,\"events\":[]}")
+    end
+    arr = "["
+    first = 1
+    while sql_step(stmt) == 100 then
+        ts = sql_column_int(stmt, 0)
+        kind_raw = sql_column_text(stmt, 1)
+        kind_owned = kind_raw + ""
+        nid = sql_column_int(stmt, 2)
+        oid = sql_column_int(stmt, 3)
+        score = sql_column_int(stmt, 4)
+        sep = ","
+        if first == 1 then
+            sep = ""
+            first = 0
+        end
+        arr = arr + sep + "{"
+            + srv_jnum("ts", ts) + ","
+            + srv_jstr("kind", kind_owned) + ","
+            + srv_jnum("node_id", nid) + ","
+            + srv_jnum("other_id", oid) + ","
+            + srv_jnum("score", score)
+            + "}"
+    end
+    sql_finalize(stmt)
+    arr = arr + "]"
+    body = "{\"connected\":true,\"events\":" + arr + "}"
+    return srv_ok_json(body)
+end
+
+// GET /api/adapt/graph — list every in-memory MemoryNode as a graph
+// vertex. Strength is recency at `now`; event_count approximates "how
+// many connections does this node have" (its outbound edge count).
+def srv_handle_graph(nodes: array, now: int, db: int): string
+    n = array_len(nodes)
+    arr = "["
+    first = 1
+    i = 0
+    while i < n then
+        node = as_class(array_get(nodes, i), MemoryNode)
+        label = vocab_gloss(node.id, db)
+        s = node.current_strength(now)
+        ec = array_len(node.edge_ptrs)
+        sep = ","
+        if first == 1 then
+            sep = ""
+            first = 0
+        end
+        arr = arr + sep + "{"
+            + srv_jnum("node_id", node.id) + ","
+            + srv_jstr("label", label) + ","
+            + srv_jnum("strength", s) + ","
+            + srv_jnum("event_count", ec)
+            + "}"
+        i = i + 1
+    end
+    arr = arr + "]"
+    body = "{\"connected\":true,\"nodes\":" + arr + "}"
+    return srv_ok_json(body)
+end
+
+// POST /api/adapt/chat — parse {"message":"..."} body, run through the
+// dialogue pipeline, return {"response":"...", "badge":"..."}. The
+// badge is derived from the frame kind so the UI can color the bubble.
+//
+// Hand-parses the JSON: looks for "message":" then takes everything up
+// to the next unescaped quote. Brittle for arbitrary JSON but the UI
+// only ever sends this exact shape, so it's enough for v1.
+def srv_extract_message(body: string): string
+    key = "\"message\":"
+    pos = srv_find(body, key, 0)
+    if pos < 0 then
+        return ""
+    end
+    // Skip past "message": and any whitespace
+    cur = pos + strlen(key)
+    while char_at(body, cur) == 32 then
+        cur = cur + 1
+    end
+    // Expect opening quote
+    if char_at(body, cur) != 34 then
+        return ""
+    end
+    cur = cur + 1
+    // Find the matching close quote, honoring backslash escapes. Pieces
+    // are pushed into a str_array and joined at the end so the function
+    // stays O(n) regardless of escape density (vs. the old O(n^2) of
+    // `out = out + ...` per chunk).
+    n = strlen(body)
+    start = cur
+    out_parts = str_array_new(16)
+    while cur < n then
+        c = char_at(body, cur)
+        if c == 34 then
+            out_parts = str_array_push(out_parts, substr(body, start, cur - start))
+            return str_array_join(out_parts, "")
+        end
+        if c == 92 then  // backslash escape
+            // Append the run so far, then translate the escape
+            out_parts = str_array_push(out_parts, substr(body, start, cur - start))
+            if cur + 1 < n then
+                esc = char_at(body, cur + 1)
+                if esc == 110 then
+                    out_parts = str_array_push(out_parts, "\n")
+                end
+                if esc == 116 then
+                    out_parts = str_array_push(out_parts, "\t")
+                end
+                if esc == 34 then
+                    out_parts = str_array_push(out_parts, "\"")
+                end
+                if esc == 92 then
+                    out_parts = str_array_push(out_parts, "\\")
+                end
+                if esc == 47 then
+                    out_parts = str_array_push(out_parts, "/")
+                end
+                cur = cur + 2
+                start = cur
+            end
+            if cur + 1 >= n then
+                cur = cur + 1
+            end
+        end
+        if c != 34 then
+            if c != 92 then
+                cur = cur + 1
+            end
+        end
+    end
+    return str_array_join(out_parts, "")
+end
+
+// Map a SemanticFrame.kind into a short label the UI uses as a badge.
+def srv_badge_for(kind: int): string
+    if kind == 1 then
+        return "GREETING"
+    end
+    if kind == 2 then
+        return "ANSWER"
+    end
+    if kind == 3 then
+        return "UNKNOWN"
+    end
+    if kind == 4 then
+        return "NOTED"
+    end
+    if kind == 5 then
+        return "FORGOT"
+    end
+    if kind == 6 then
+        return "CONFIDENCE"
+    end
+    if kind == 7 then
+        return "PLAN"
+    end
+    if kind == 8 then
+        return "VIOLATED"
+    end
+    if kind == 9 then
+        return "AMBIGUOUS"
+    end
+    return "UNKNOWN_INTENT"
+end
+
+// Run the full dialogue pipeline (#58a + #58b): hypothesis cloud
+// for input, superposition for output. Returns the JSON response.
+// Caller must rebind seed and idx after this if they intend to stay
+// consistent with teach-driven graph growth (same pattern as adapt_chat.ail).
+//
+// Performance: wraps the entire dispatch in a single SQL transaction.
+// A TEACH normally fires 6-10 separate sql_exec INSERTs (vocab_register,
+// journaled_create, link, link_bidirectional inverse, plus events for
+// touch / cue), and with synchronous=NORMAL each one round-trips to the
+// WAL file. Wrapping them in one BEGIN..COMMIT amortizes that to a
+// single fsync per request — the difference between ~4K teach req/s
+// (10 fsyncs) and ~12K (1 fsync). Read-only requests (queries, idle
+// dispatches) end up with an empty transaction; the commit is a no-op
+// in WAL mode for read-only work, so this wrapper is essentially free
+// when nothing wrote.
+def srv_handle_chat(
+    body: string, seed: MemoryNode, nodes: array, idx: NodeIndex,
+    cfg: PrimeConfig, now: int, db: int
+): string
+    msg = srv_extract_message(body)
+    if streq(msg, "") == 1 then
+        body_json = "{\"response\":\"(empty message)\","
+            + "\"badge\":\"UNKNOWN_INTENT\","
+            + "\"collapse\":\"NONE\","
+            + "\"confidence\":0}"
+        return srv_ok_json(body_json)
+    end
+
+    sql_exec(db, "BEGIN")
+    cands = parse_intent_cloud(msg, db)
+    f = dispatch_cloud(cands, seed, nodes, idx, now, db)
+    sr = superpose_run(f, cfg, now, db)
+    sql_exec(db, "COMMIT")
+    badge = srv_badge_for(f.kind)
+    collapse = superpose_kind_name(sr.collapse_kind)
+
+    // Response shape extends the original {response, badge} with
+    // `collapse` (string label) and `confidence` (0..1000) so the
+    // UI can show grounding metadata without breaking on the older
+    // payload — both pre-existing fields are still present.
+    body_json = "{"
+        + srv_jstr("response", sr.output) + ","
+        + srv_jstr("badge", badge) + ","
+        + srv_jstr("collapse", collapse) + ","
+        + srv_jnum("confidence", sr.confidence)
+        + "}"
+    return srv_ok_json(body_json)
+end
+
+// POST /api/adapt/reset — wipe the journal + vocab and re-init. The UI
+// guards this behind a typed-confirmation phrase (see RESET_PHRASE in
+// the JS), so reaching this handler implies user intent.
+//
+// v1 implementation: report not-implemented. Real reset requires
+// closing the DB, deleting files, reopening — and the in-memory nodes
+// array would also need to be reset. That's coordination with main()'s
+// state which the handler doesn't own. Tracked as a follow-up.
+def srv_handle_reset(db: int): string
+    body_json = "{\"ok\":false,\"error\":\"reset is not implemented in v1 — restart the server with a deleted adapt_serve.db to start fresh\"}"
+    return srv_response("501 Not Implemented",
+        "application/json; charset=utf-8", body_json)
+end
+
+// ---------------------------------------------------------------------
+// Static file serving
+// ---------------------------------------------------------------------
+
+// Map a request path to a filesystem path under ./static/. Returns "" if
+// the path looks unsafe (contains "..", absolute path, etc). Conservative
+// — if anything's off, refuse rather than risk path traversal.
+def srv_static_path(req_path: string): string
+    if streq(req_path, "/") == 1 then
+        return "static/index.html"
+    end
+    // Reject path traversal attempts outright.
+    if srv_find(req_path, "..", 0) >= 0 then
+        return ""
+    end
+    if char_at(req_path, 0) != 47 then  // must start with /
+        return ""
+    end
+    // Strip the leading slash and prepend "static/"
+    return "static" + req_path
+end
+
+def srv_handle_static(req_path: string): string
+    fs_path = srv_static_path(req_path)
+    if streq(fs_path, "") == 1 then
+        return srv_404()
+    end
+    if file_exists(fs_path) == 0 then
+        return srv_404()
+    end
+    body = read_file(fs_path)
+    if streq(body, "") == 1 then
+        // Empty file or read error — treat as 404 rather than serve
+        // a header-only response that confuses the browser.
+        return srv_404()
+    end
+    return srv_ok_static(srv_mime(fs_path), body)
+end
+
+// ---------------------------------------------------------------------
+// Routing
+// ---------------------------------------------------------------------
+
+// Dispatch by (method, path). The chat handler may grow `nodes` via
+// teach events; the caller treats this as a side effect by re-binding
+// idx afterwards.
+def srv_route(
+    method: string, path: string, body: string,
+    seed: MemoryNode, nodes: array, idx: NodeIndex,
+    cfg: PrimeConfig, now: int, db: int
+): string
+    // API routes
+    if streq(path, "/api/adapt/status") == 1 then
+        if streq(method, "GET") == 0 then
+            return srv_405()
+        end
+        return srv_handle_status(cfg, nodes, db)
+    end
+    if streq(path, "/api/adapt/vocab") == 1 then
+        if streq(method, "GET") == 0 then
+            return srv_405()
+        end
+        return srv_handle_vocab(db)
+    end
+    if streq(path, "/api/adapt/journal") == 1 then
+        if streq(method, "GET") == 0 then
+            return srv_405()
+        end
+        return srv_handle_journal(db)
+    end
+    if streq(path, "/api/adapt/graph") == 1 then
+        if streq(method, "GET") == 0 then
+            return srv_405()
+        end
+        return srv_handle_graph(nodes, now, db)
+    end
+    if streq(path, "/api/adapt/chat") == 1 then
+        if streq(method, "POST") == 0 then
+            return srv_405()
+        end
+        return srv_handle_chat(body, seed, nodes, idx, cfg, now, db)
+    end
+    if streq(path, "/api/adapt/reset") == 1 then
+        if streq(method, "POST") == 0 then
+            return srv_405()
+        end
+        return srv_handle_reset(db)
+    end
+    // Anything else: treat as a static file request.
+    if streq(method, "GET") == 0 then
+        return srv_405()
+    end
+    return srv_handle_static(path)
+end
+
+// ---------------------------------------------------------------------
+// Main accept loop
+// ---------------------------------------------------------------------
+
+def main():
+    print "=== ADAPT HTTP server (ticket #57) ==="
+    print "Initializing..."
+
+    db = journal_open("adapt_serve.db")
+    if db == 0 then
+        print "[fatal] could not open journal at adapt_serve.db"
+        return 1
+    end
+    vocab_open(db)
+
+    nodes = reconstruct(db)
+    idx = index_build_from_nodes(nodes)
+    if idx.lookup(0) < 0 then
+        s_node = journaled_create(0, 0, 0, 1, 0, db)
+        nodes = array_push(nodes, s_node)
+        idx.add(0, array_len(nodes) - 1)
+        print "[init] created seed node id=0"
+    end
+    seed = as_class(array_get(nodes, idx.lookup(0)), MemoryNode)
+    seed.bump_importance(400)
+
+    cfg = prime_init_default()
+    if prime_available(cfg) == 1 then
+        print "[init] PRIME available — chat responses will be LLM-rendered"
+    end
+    if prime_available(cfg) == 0 then
+        print "[init] PRIME not available — chat responses will use templates"
+    end
+    print "[init] nodes loaded ="
+    print array_len(nodes)
+    print "[init] vocab loaded ="
+    print vocab_count(db)
+
+    port = 8765
+    listener = tcp_listen(port)
+    if listener == 0 then
+        print "[fatal] tcp_listen failed — port 8765 likely already in use"
+        prime_close(cfg)
+        journal_close(db)
+        return 2
+    end
+    print "[ok] listening on http://127.0.0.1:8765/"
+    print "     open it in a browser, or hit /api/adapt/status with curl"
+
+    // Per-request arena. Without it every ailang_strcat / ailang_substr /
+    // tcp_recv buffer leaks until the 4 GB safe_malloc cap trips. With
+    // it, an arena_reset between requests reclaims everything in O(1).
+    // Sized at 1 MB which comfortably fits any /status response; larger
+    // payloads silently fall back to malloc (still safe, just not
+    // arena-cleaned).
+    //
+    // HAZARD — /chat path: when vocab grows, reconstruct(db) pulls
+    // strings out of SQLite via sql_column_text + ailang_strcat. With
+    // the arena active, those strings land IN the arena, then the next
+    // request's arena_reset frees them out from under the MemoryNode
+    // fields that captured them — dangling pointer, will corrupt later
+    // reads. To make /chat safe, wrap the mutating section in
+    // arena_use(0) ... arena_use(request_arena), or refactor reconstruct
+    // to allocate persistently. Until then, /chat is only safe if vocab
+    // never grows (no TEACH intents).
+    request_arena = arena_create(1024 * 1024)
+
+    // HTTP/1.1 keep-alive: the outer loop accepts a connection,
+    // then an inner loop reads-processes-responds until either the
+    // client closes (recv returns 0) or sends Connection: close.
+    // This eliminates the TCP handshake + TIME_WAIT cost from every
+    // request, which was the single biggest per-request overhead.
+    while 1 == 1 then
+        conn = tcp_accept(listener)
+        if conn == 0 then
+            // Spurious accept failure — skip rather than crash.
+        end
+        if conn != 0 then
+            keep_serving = 1
+            while keep_serving == 1 then
+                arena_reset(request_arena)
+                arena_use(request_arena)
+                req = srv_read_request(conn)
+                if streq(req, "") then
+                    // Client closed before we got a complete request
+                    // (or sent zero bytes) — disconnect cleanly.
+                    keep_serving = 0
+                end
+                if streq(req, "") == 0 then
+                    method = srv_method(req)
+                    path = srv_path(req)
+                    body = srv_body(req)
+
+                    // Only the chat endpoint can grow vocab (TEACH
+                    // intents land there). Every other path —
+                    // status, vocab, journal, graph, static files,
+                    // 404s — is read-only with respect to the in-
+                    // memory node array. Skipping the two vocab_count
+                    // SQL queries on those paths saves ~20 µs per
+                    // request, which at 30K+ req/s is meaningful.
+                    can_mutate = 0
+                    if streq(path, "/api/adapt/chat") then
+                        can_mutate = 1
+                    end
+
+                    vocab_before = 0
+                    if can_mutate == 1 then
+                        vocab_before = vocab_count(db)
+                    end
+
+                    now = clock_ns()
+                    response = srv_route(
+                        method, path, body, seed, nodes, idx, cfg, now, db
+                    )
+                    tcp_send(conn, response)
+
+                    if srv_wants_close(req) == 1 then
+                        keep_serving = 0
+                    end
+
+                    if can_mutate == 1 then
+                        vocab_after = vocab_count(db)
+                        if vocab_after != vocab_before then
+                            nodes = reconstruct(db)
+                            idx = index_build_from_nodes(nodes)
+                            seed = as_class(array_get(nodes, idx.lookup(0)), MemoryNode)
+                        end
+                    end
+                end
+            end
+            tcp_close(conn)
+        end
+    end
+
+    tcp_close(listener)
+    prime_close(cfg)
+    journal_close(db)
+    return 0
+end

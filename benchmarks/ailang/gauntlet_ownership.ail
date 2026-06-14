@@ -1,0 +1,32 @@
+class Packet then
+    string label
+    array values
+    public def init(label_arg: string, seed: int):
+        this.label = label_arg
+        this.values = array_new(4)
+        this.values = array_push(this.values, seed)
+        this.values = array_push(this.values, seed + 1)
+        this.values = array_push(this.values, seed + 2)
+    end
+    public def score(): int
+        return strlen(this.label) + array_get(this.values, 0) + array_get(this.values, 1) + array_get(this.values, 2)
+    end
+end
+
+
+def ownership_churn(iterations: int): int
+    acc = 0
+    i = 0
+    while i < iterations then
+        Packet p = new Packet("pkt_" + str(i), i % 97)
+        acc = (acc + p.score()) % 1000000007
+        i = i + 1
+    end
+    return acc
+end
+
+
+def main(): int
+    print(ownership_churn(8000000))
+    return 0
+end

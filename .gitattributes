@@ -1,0 +1,23 @@
+# Byte-equivalent diffs depend on consistent line endings.
+# Force LF for all text files; the equivalence harness compares stdout
+# from subprocesses, but golden files live on disk and must not get
+# CRLF-mangled by Windows checkouts.
+
+* text=auto eol=lf
+
+*.ail   text eol=lf
+*.c     text eol=lf
+*.h     text eol=lf
+*.py    text eol=lf
+*.md    text eol=lf
+*.sh    text eol=lf
+*.json  text eol=lf
+*.toml  text eol=lf
+
+# Binary outputs - never let git touch these.
+*.o     binary
+*.exe   binary
+*.dll   binary
+*.so    binary
+*.dylib binary
+bin/*   binary

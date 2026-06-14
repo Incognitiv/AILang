@@ -1,0 +1,401 @@
+@library("default_desktop_content")
+
+import stdlib.ui.layout
+import stdlib.ui.paint
+import stdlib.ui.platform
+
+// Default dark workbench content. The window chrome uses
+// the default UI paint preset, and the rendering path is AILang-only.
+
+class DesktopState then
+    public int close_requested = 0
+    public int active_file = 0
+    public int active_output_tab = 1
+
+    public def init():
+        this.close_requested = 0
+        this.active_file = 0
+        this.active_output_tab = 1
+    end
+
+    public def ~DesktopState():
+    end
+end
+
+
+def desktop_state_free(state: DesktopState): void
+    dealloc(state)
+end
+
+
+def desktop_border(window: int, x: int, y: int, width: int, height: int, fill: int, border: int): void
+    ail_ui_draw_rect(window, x, y, width, height, fill)
+    ail_ui_draw_rect(window, x, y, width, 1, border)
+    ail_ui_draw_rect(window, x, y + height - 1, width, 1, border)
+    ail_ui_draw_rect(window, x, y, 1, height, border)
+    ail_ui_draw_rect(window, x + width - 1, y, 1, height, border)
+end
+
+
+def desktop_text(window: int, x: int, y: int, scale: int, color: int, text: string): void
+    ail_ui_draw_text(window, x, y, scale, color, text)
+end
+
+
+def desktop_caption_control(
+    window: int,
+    frame: UiFrame,
+    caption: UiCaptionPaint,
+    id: int,
+    x: int,
+    y: int,
+    width: int,
+    height: int,
+    kind: int
+): int
+    rect = ui_rect(x, y, width, height)
+    clicked = ui_button_logic(frame, id, rect)
+    visual = ui_button_visual(frame, id, rect)
+    ui_draw_caption_button(window, caption, x, y, width, height, kind, visual)
+    ui_rect_free(rect)
+    return clicked
+end
+
+
+def desktop_draw_app_icon(window: int, x: int, y: int): void
+    desktop_border(window, x, y, 14, 12, 0x0f253c, 0x1169b1)
+    ail_ui_draw_rect(window, x + 3, y + 3, 8, 6, 0x0e1116)
+end
+
+
+def desktop_draw_caption(
+    window: int,
+    width: int,
+    frame: UiFrame,
+    state: DesktopState,
+    caption: UiCaptionPaint,
+    metrics: UiChromeMetrics
+): int
+    changed = 0
+    title_y = (metrics.title_bar_height - 18) / 2
+    icon_y = title_y + 3
+    control_y = metrics.control_list_top_margin
+    control_h = metrics.caption_face_height
+    min_w = metrics.caption_button_width + 2
+    mid_w = metrics.caption_middle_button_width + 2
+    close_w = metrics.caption_close_button_width + 2
+    middle_kind = 2
+
+    if metrics.maximized == 1 then
+        close_w = metrics.caption_close_button_width + 2
+        middle_kind = 3
+    else
+        control_h = metrics.caption_face_height + 2
+    end
+
+    desktop_draw_app_icon(window, 10, icon_y)
+    desktop_text(window, 30, title_y, 2, 0xe8eef5, "AILang UI - workspace")
+    ail_ui_draw_rect(window, 0, metrics.title_bar_height - 1, width, 1, 0x05070a)
+
+    controls_x = width - metrics.control_list_right_margin - metrics.caption_buttons_width
+    if desktop_caption_control(window, frame, caption, 1001, controls_x, control_y, min_w, control_h, 1) == 1 then
+        changed = 1
+    end
+    if desktop_caption_control(window, frame, caption, 1002, controls_x + metrics.caption_button_width + 1, control_y, mid_w, control_h, middle_kind) == 1 then
+        changed = 1
+    end
+    if desktop_caption_control(window, frame, caption, 1003, controls_x + metrics.caption_button_width + metrics.caption_middle_button_width + 2, control_y, close_w, control_h, 4) == 1 then
+        state.close_requested = 1
+        changed = 1
+    end
+    return changed
+end
+
+
+def desktop_draw_menu_item(window: int, x: int, y: int, label: string): int
+    desktop_text(window, x, y + 9, 2, 0xc7ccd3, label)
+    return x + 52
+end
+
+
+def desktop_draw_menubar(window: int, width: int, y: int): void
+    ail_ui_draw_rect(window, 0, y, width, 30, 0x2d2d30)
+    ail_ui_draw_rect(window, 0, y + 29, width, 1, 0x3f3f46)
+    x = 15
+    x = desktop_draw_menu_item(window, x, y, "File")
+    x = desktop_draw_menu_item(window, x - 8, y, "Edit")
+    x = desktop_draw_menu_item(window, x - 8, y, "View")
+    x = desktop_draw_menu_item(window, x - 4, y, "Build")
+    x = desktop_draw_menu_item(window, x + 4, y, "Debug")
+    x = desktop_draw_menu_item(window, x + 12, y, "Tools")
+    x = desktop_draw_menu_item(window, x + 8, y, "Extensions")
+    x = desktop_draw_menu_item(window, x + 38, y, "Window")
+    desktop_draw_menu_item(window, x + 24, y, "Help")
+end
+
+
+def desktop_draw_combo(window: int, x: int, y: int, width: int, label: string): void
+    desktop_border(window, x, y, width, 26, 0x2a2d33, 0x3b414a)
+    desktop_text(window, x + 14, y + 6, 2, 0xdfe7ef, label)
+    desktop_text(window, x + width - 24, y + 6, 2, 0x93a2b5, "v")
+end
+
+
+def desktop_draw_toolbar(window: int, width: int, y: int): void
+    ail_ui_draw_rect(window, 0, y, width, 36, 0x25282e)
+    ail_ui_draw_rect(window, 0, y + 35, width, 1, 0x3f3f46)
+    desktop_text(window, 16, y + 13, 2, 0x9aa7b5, "<")
+    desktop_draw_combo(window, 40, y + 6, 110, "Debug")
+    desktop_draw_combo(window, 155, y + 6, 88, "x64")
+    desktop_text(window, 258, y + 13, 2, 0x6bc275, "Run testing34")
+    desktop_text(window, 370, y + 13, 2, 0x93a2b5, "Stop")
+end
+
+
+def desktop_draw_folder_icon(window: int, x: int, y: int, open: int): void
+    if open == 1 then
+        ail_ui_draw_rect(window, x, y + 6, 16, 11, 0x2a2d30)
+        desktop_border(window, x + 2, y + 4, 14, 12, 0x252526, 0xd89015)
+    else
+        ail_ui_draw_rect(window, x, y + 7, 16, 10, 0xd89015)
+        ail_ui_draw_rect(window, x + 1, y + 5, 7, 4, 0xf0b326)
+    end
+end
+
+
+def desktop_draw_file_icon(window: int, x: int, y: int): void
+    desktop_border(window, x + 2, y + 1, 12, 15, 0x252526, 0x7f8b99)
+    ail_ui_draw_rect(window, x + 5, y + 5, 6, 1, 0x7f8b99)
+    ail_ui_draw_rect(window, x + 5, y + 9, 6, 1, 0x7f8b99)
+end
+
+
+def desktop_draw_tree_row(
+    window: int,
+    frame: UiFrame,
+    state: DesktopState,
+    id: int,
+    x: int,
+    y: int,
+    width: int,
+    label: string,
+    kind: int,
+    indent: int
+): int
+    rect = ui_rect(x, y, width, 27)
+    clicked = ui_button_logic(frame, id, rect)
+    visual = ui_button_visual(frame, id, rect)
+    bg = 0x252526
+    if visual != 0 then
+        bg = 0x303036
+    end
+    if state.active_file == id then
+        bg = 0x3b3b40
+    end
+    if clicked == 1 then
+        state.active_file = id
+        bg = 0x3b3b40
+    end
+    ail_ui_draw_rect(window, x, y, width, 27, bg)
+    if kind == 1 then
+        desktop_text(window, x + indent, y + 6, 2, 0xc7ccd3, "v")
+        desktop_draw_folder_icon(window, x + indent + 18, y + 5, 1)
+        desktop_text(window, x + indent + 42, y + 5, 2, 0xdfe7ef, label)
+    else
+        desktop_draw_file_icon(window, x + indent + 18, y + 5)
+        desktop_text(window, x + indent + 42, y + 5, 2, 0xc7ccd3, label)
+    end
+    ui_rect_free(rect)
+    return clicked
+end
+
+
+def desktop_draw_solution(window: int, frame: UiFrame, state: DesktopState, x: int, y: int, width: int, height: int): int
+    changed = 0
+    desktop_border(window, x, y, width, height, 0x252526, 0x3f3f46)
+    ail_ui_draw_rect(window, x, y, width, 48, 0x252526)
+    desktop_text(window, x + 10, y + 20, 2, 0xdfe7ef, "SOLUTION EXPLORER")
+    desktop_text(window, x + width - 30, y + 17, 2, 0xa9b4c0, "Q")
+    ail_ui_draw_rect(window, x, y + 48, width, 1, 0x3f3f46)
+
+    if desktop_draw_tree_row(window, frame, state, 2001, x + 1, y + 50, width - 2, "testing34", 2, 8) == 1 then
+        changed = 1
+    end
+    desktop_draw_app_icon(window, x + 12, y + 58)
+    if desktop_draw_tree_row(window, frame, state, 2002, x + 1, y + 77, width - 2, "Source Files", 1, 30) == 1 then
+        changed = 1
+    end
+    if desktop_draw_tree_row(window, frame, state, 2003, x + 1, y + 104, width - 2, "application.cxx", 2, 56) == 1 then
+        changed = 1
+    end
+    if desktop_draw_tree_row(window, frame, state, 2004, x + 1, y + 131, width - 2, "main.cxx", 2, 56) == 1 then
+        changed = 1
+    end
+    if desktop_draw_tree_row(window, frame, state, 2005, x + 1, y + 158, width - 2, "new_file1.cxx", 2, 56) == 1 then
+        changed = 1
+    end
+    if desktop_draw_tree_row(window, frame, state, 2006, x + 1, y + 185, width - 2, "new_file2.cxx", 2, 56) == 1 then
+        changed = 1
+    end
+    if desktop_draw_tree_row(window, frame, state, 2007, x + 1, y + 212, width - 2, "new_file3.cxx", 2, 56) == 1 then
+        changed = 1
+    end
+    if desktop_draw_tree_row(window, frame, state, 2008, x + 1, y + 239, width - 2, "renderer.cxx", 2, 56) == 1 then
+        changed = 1
+    end
+    if desktop_draw_tree_row(window, frame, state, 2009, x + 1, y + 284, width - 2, "Header Files", 1, 30) == 1 then
+        changed = 1
+    end
+    if desktop_draw_tree_row(window, frame, state, 2010, x + 1, y + 311, width - 2, "application.hxx", 2, 56) == 1 then
+        changed = 1
+    end
+    if desktop_draw_tree_row(window, frame, state, 2011, x + 1, y + 338, width - 2, "renderer.hxx", 2, 56) == 1 then
+        changed = 1
+    end
+    if desktop_draw_tree_row(window, frame, state, 2012, x + 1, y + 383, width - 2, "Resource Files", 1, 30) == 1 then
+        changed = 1
+    end
+    if desktop_draw_tree_row(window, frame, state, 2013, x + 1, y + 410, width - 2, "app.rc", 2, 56) == 1 then
+        changed = 1
+    end
+    if desktop_draw_tree_row(window, frame, state, 2014, x + 1, y + 437, width - 2, "testing34.mxs", 2, 56) == 1 then
+        changed = 1
+    end
+    return changed
+end
+
+
+def desktop_draw_center(window: int, x: int, y: int, width: int, height: int, bottom_h: int): void
+    editor_h = height - bottom_h
+    desktop_border(window, x, y, width, editor_h, 0x1e1e1e, 0x50555d)
+    cx = x + (width / 2) - 140
+    cy = y + (editor_h / 2) - 25
+    desktop_text(window, cx + 70, cy, 2, 0x93a2b5, "No file is open.")
+    desktop_text(window, cx, cy + 26, 2, 0x93a2b5, "Use File > New File... to start editing.")
+    desktop_text(window, cx + 74, cy + 72, 2, 0xdfe7ef, "Create New File")
+end
+
+
+def desktop_output_tab(window: int, frame: UiFrame, state: DesktopState, id: int, x: int, y: int, label: string): int
+    rect = ui_rect(x, y, 82, 30)
+    clicked = ui_button_logic(frame, id, rect)
+    visual = ui_button_visual(frame, id, rect)
+    color = 0xc7ccd3
+    if clicked == 1 then
+        state.active_output_tab = id
+    end
+    if state.active_output_tab == id then
+        color = 0x78bbff
+        ail_ui_draw_rect(window, x, y + 28, 70, 2, 0x007acc)
+    else
+        if visual != 0 then
+            color = 0xdfe7ef
+        end
+    end
+    desktop_text(window, x + 10, y + 8, 2, color, label)
+    ui_rect_free(rect)
+    return clicked
+end
+
+
+def desktop_draw_output(window: int, frame: UiFrame, state: DesktopState, x: int, y: int, width: int, height: int): int
+    changed = 0
+    desktop_border(window, x, y, width, height, 0x1e1e1e, 0x50555d)
+    ail_ui_draw_rect(window, x, y, width, 30, 0x252526)
+    if desktop_output_tab(window, frame, state, 3001, x + 12, y, "Output") == 1 then
+        changed = 1
+    end
+    if desktop_output_tab(window, frame, state, 3002, x + 94, y, "Problems") == 1 then
+        changed = 1
+    end
+    if desktop_output_tab(window, frame, state, 3003, x + 184, y, "Terminal") == 1 then
+        changed = 1
+    end
+    if desktop_output_tab(window, frame, state, 3004, x + 280, y, "Build") == 1 then
+        changed = 1
+    end
+    ail_ui_draw_rect(window, x, y + 30, width, 1, 0x3f3f46)
+    desktop_text(window, x + 12, y + 48, 2, 0xdfe7ef, "Run a Python file or build CMake executable with Debug > Start Without Debugging or Ctrl+F5 to see process output here.")
+    return changed
+end
+
+
+def desktop_prop_row(window: int, x: int, y: int, label: string, value: string): void
+    desktop_border(window, x, y, 132, 32, 0x2d2d30, 0x3f3f46)
+    desktop_border(window, x + 132, y, 184, 32, 0x1e1e1e, 0x3f3f46)
+    desktop_text(window, x + 8, y + 9, 2, 0x9399a1, label)
+    desktop_text(window, x + 140, y + 9, 2, 0xc7ccd3, value)
+end
+
+
+def desktop_draw_properties(window: int, x: int, y: int, width: int, height: int): void
+    desktop_border(window, x, y, width, height, 0x252526, 0x3f3f46)
+    desktop_text(window, x + 12, y + 20, 2, 0xdfe7ef, "PROPERTIES")
+    desktop_text(window, x + width - 24, y + 17, 2, 0xa9b4c0, "#")
+    ail_ui_draw_rect(window, x, y + 48, width, 1, 0x3f3f46)
+    desktop_draw_app_icon(window, x + 12, y + 66)
+    desktop_text(window, x + 38, y + 64, 2, 0xdfe7ef, "(none)")
+    grid_x = x + 12
+    grid_y = y + 88
+    desktop_prop_row(window, grid_x, grid_y, "File Name", "(none)")
+    desktop_prop_row(window, grid_x, grid_y + 32, "Full Path", "...")
+    desktop_prop_row(window, grid_x, grid_y + 64, "Size", "0 KB")
+    desktop_prop_row(window, grid_x, grid_y + 96, "Encoding", "UTF-8")
+    desktop_prop_row(window, grid_x, grid_y + 128, "Item Type", "None")
+    desktop_text(window, x + 12, grid_y + 184, 2, 0xdfe7ef, "ADVANCED")
+    desktop_prop_row(window, grid_x, grid_y + 216, "Build Action", "Compile")
+    desktop_prop_row(window, grid_x, grid_y + 248, "Copy to Output", "Do not copy")
+end
+
+
+def desktop_draw_content(window: int, width: int, height: int, frame: UiFrame, state: DesktopState): int
+    changed = 0
+    style = new UiFramePaint()
+    caption = new UiCaptionPaint()
+    metrics = new UiChromeMetrics()
+    ui_chrome_metrics_default(metrics, ail_ui_window_maximized(window))
+    ui_frame_paint_default_dark(style, 0x70b0e8, 0xe8b876)
+    ui_caption_paint_default_dark(caption, 0x70b0e8, 0xe8b876, 0xe85f51, 0x5b2822)
+    ui_caption_paint_apply_metrics(caption, metrics)
+    ui_frame_paint_surface(window, style, 0, 0, width, height, metrics.title_bar_height)
+
+    if desktop_draw_caption(window, width, frame, state, caption, metrics) == 1 then
+        changed = 1
+    end
+    desktop_draw_menubar(window, width, metrics.title_bar_height)
+    desktop_draw_toolbar(window, width, metrics.title_bar_height + 30)
+
+    body_y = metrics.title_bar_height + 66
+    left_w = 342
+    right_w = 342
+    bottom_h = 184
+    if width < 1200 then
+        left_w = 280
+        right_w = 280
+    end
+    if height < 700 then
+        bottom_h = 140
+    end
+    center_w = width - left_w - right_w
+    if center_w < 260 then
+        right_w = 0
+        center_w = width - left_w
+    end
+    body_h = height - body_y
+
+    if desktop_draw_solution(window, frame, state, 0, body_y, left_w, body_h) == 1 then
+        changed = 1
+    end
+    desktop_draw_center(window, left_w, body_y, center_w, body_h, bottom_h)
+    if desktop_draw_output(window, frame, state, left_w, height - bottom_h, center_w, bottom_h) == 1 then
+        changed = 1
+    end
+    if right_w > 0 then
+        desktop_draw_properties(window, left_w + center_w, body_y, right_w, body_h)
+    end
+
+    ui_caption_paint_free(caption)
+    ui_frame_paint_free(style)
+    ui_chrome_metrics_free(metrics)
+    return changed
+end

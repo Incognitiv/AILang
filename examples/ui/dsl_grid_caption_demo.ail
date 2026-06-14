@@ -1,0 +1,75 @@
+window default_chrome:
+    width -> 420 px
+    height -> 260 px
+    title -> "Default chrome"
+    background -> #f8fafc
+
+    caption:
+        type -> "default"
+        controls:
+            position -> "right"
+        end
+    end
+
+    body:
+        grid:
+            columns -> 2
+            rows -> 2
+            gap -> 10 px
+
+            label:
+                text -> "Native frame"
+            end
+
+            label:
+                text -> "AILang renderer"
+            end
+
+            button:
+                name -> "Export SVG"
+            end
+
+            button:
+                name -> "Export HTML"
+            end
+        end
+    end
+end
+
+window traffic_chrome:
+    width -> 420 px
+    height -> 260 px
+    title -> "Traffic chrome"
+    background -> #ffffff
+
+    caption:
+        type -> "traffic"
+        controls:
+            position -> "left"
+        end
+    end
+
+    body:
+        grid:
+            columns -> 2
+            rows -> 2
+            gap -> 10 px
+
+            label:
+                text -> "macOS controls"
+            end
+
+            label:
+                text -> "Same layout tree"
+            end
+
+            button:
+                name -> "Preview"
+            end
+
+            button:
+                name -> "Run"
+            end
+        end
+    end
+end

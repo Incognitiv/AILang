@@ -1,0 +1,684 @@
+// Auto-generated durability mega program.
+// Duration target: 5000 ms.
+// Inventory dump so one source contains full token/builtin names.
+// token:ALLOC
+// token:AMPERSAND
+// token:AND
+// token:ARRAY
+// token:AS
+// token:ASM
+// token:ASSERT
+// token:ASSIGN
+// token:ASYNC
+// token:AT
+// token:ATOMIC
+// token:AWAIT
+// token:BITCAST
+// token:BOOL
+// token:BOUND
+// token:BOUNDED
+// token:BREAK
+// token:BYTE
+// token:CARET
+// token:CASE
+// token:CATCH
+// token:CHANNEL
+// token:CHAN_CLOSE
+// token:CHAN_RECV
+// token:CHAN_SEND
+// token:CHAN_TRY_RECV
+// token:CHAN_TRY_SEND
+// token:CHARLIT
+// token:CHAR_AT
+// token:CHR
+// token:CIMPORT
+// token:CINCLUDE
+// token:CLASS
+// token:COLON
+// token:COLON_ASSIGN
+// token:COLOS
+// token:COMMA
+// token:COMMENT
+// token:COMMENT_BLOCK
+// token:COMPTIME
+// token:CONST
+// token:CONTINUE
+// token:DEALLOC
+// token:DEF
+// token:DICT
+// token:DO
+// token:DOT
+// token:DOUBLE
+// token:ELSE
+// token:ELSIF
+// token:END
+// token:ENUM
+// token:EQ
+// token:EXCEPT
+// token:EXTERN
+// token:FALSE
+// token:FASTMATH
+// token:FINALLY
+// token:FLOAT
+// token:FLOAT_T
+// token:FOR
+// token:FOREACH
+// token:FROM
+// token:GATE_AND
+// token:GATE_NAND
+// token:GATE_NOR
+// token:GATE_NOT
+// token:GATE_OR
+// token:GATE_XNOR
+// token:GATE_XOR
+// token:GIANT
+// token:GRAND
+// token:GT
+// token:GTEQ
+// token:HASH_COMMENT
+// token:HEREDOC
+// token:IDENT
+// token:IF
+// token:IMPORT
+// token:IN
+// token:INFINITY
+// token:INLINE
+// token:INPUT
+// token:INT
+// token:INTERP_STRLIT
+// token:IS
+// token:IS_NOT
+// token:JOIN
+// token:LBRACE
+// token:LBRACKET
+// token:LEN
+// token:LIBRARY
+// token:LINK_DIR
+// token:LONG
+// token:LOOP
+// token:LPAREN
+// token:LSHIFT
+// token:LT
+// token:LTEQ
+// token:MAP
+// token:MATCH
+// token:MINUS
+// token:MINUSEQ
+// token:MINUSMINUS
+// token:MOD
+// token:MODEQ
+// token:NEQ
+// token:NEW
+// token:NEWLINE
+// token:NOALIAS
+// token:NOT
+// token:NULL
+// token:NULLPTR
+// token:NUMBER
+// token:OPAQUE
+// token:OR
+// token:ORD
+// token:OTHERWISE
+// token:PEEK32
+// token:PEEK64
+// token:PEEK8
+// token:PIPE
+// token:PLUS
+// token:PLUSEQ
+// token:PLUSPLUS
+// token:POKE32
+// token:POKE64
+// token:POKE8
+// token:POWER
+// token:PRINT
+// token:PRIVATE
+// token:PTR
+// token:PUBLIC
+// token:PURE
+// token:PUTC
+// token:PUTS
+// token:QUAD
+// token:QUESTION
+// token:RANGE
+// token:RANGE_EXCL
+// token:RBRACE
+// token:RBRACKET
+// token:READ_FILE
+// token:RECORD
+// token:REINTERPRET
+// token:REPEAT
+// token:RETURN
+// token:RPAREN
+// token:RSHIFT
+// token:SAFE_DOT
+// token:SECTION
+// token:SEMICOLON
+// token:SHL
+// token:SHORT
+// token:SHR
+// token:SKIP
+// token:SLASH
+// token:SLASHEQ
+// token:SMALL
+// token:SPAWN
+// token:SQL_CLOSE
+// token:SQL_EXEC
+// token:SQL_OPEN
+// token:SQL_QUERY
+// token:STAR
+// token:STAREQ
+// token:STATIC
+// token:STATIC_ASSERT
+// token:STRING
+// token:STRLEN
+// token:STRLIT
+// token:SUBSTR
+// token:SYNCHRONIZED
+// token:TEMPLATE_END
+// token:TEMPLATE_START
+// token:TEST
+// token:THEN
+// token:THIS
+// token:THROW
+// token:TILDE
+// token:TIMES
+// token:TINY
+// token:TITAN
+// token:TRUE
+// token:TRY
+// token:TYPE
+// token:TYPEDEF
+// token:UCOLOS
+// token:UGIANT
+// token:UGRAND
+// token:UINT
+// token:ULONG
+// token:UNBOUNDED
+// token:UNCHECKED
+// token:UNION
+// token:UNLESS
+// token:UNSAFE
+// token:UNSIGNED
+// token:UNTIL
+// token:USE
+// token:USHORT
+// token:USHR
+// token:USMALL
+// token:UTITAN
+// token:UVAST
+// token:UWIDE
+// token:VAST
+// token:VEC16B
+// token:VEC16I
+// token:VEC2D
+// token:VEC2L
+// token:VEC32B
+// token:VEC4D
+// token:VEC4F
+// token:VEC4I
+// token:VEC4L
+// token:VEC64B
+// token:VEC8F
+// token:VEC8I
+// token:VEC8L
+// token:VOID
+// token:WHERE
+// token:WHILE
+// token:WIDE
+// token:WRITE_FILE
+// builtin:abs
+// builtin:access
+// builtin:addressof
+// builtin:alignof
+// builtin:alloc
+// builtin:and
+// builtin:arena_alloc
+// builtin:arena_create
+// builtin:arena_destroy
+// builtin:arena_remaining
+// builtin:arena_reset
+// builtin:arena_use
+// builtin:arena_used
+// builtin:argc
+// builtin:argv
+// builtin:array
+// builtin:array_cap
+// builtin:array_get
+// builtin:array_len
+// builtin:array_new
+// builtin:array_pop
+// builtin:array_push
+// builtin:array_set
+// builtin:as
+// builtin:as_class
+// builtin:asm
+// builtin:assert
+// builtin:async
+// builtin:atomic
+// builtin:atomic_add
+// builtin:atomic_compare_exchange
+// builtin:atomic_exchange
+// builtin:atomic_load
+// builtin:atomic_store
+// builtin:atomic_sub
+// builtin:await
+// builtin:band
+// builtin:bin
+// builtin:bnot
+// builtin:bool
+// builtin:bor
+// builtin:break
+// builtin:bxor
+// builtin:byte
+// builtin:calloc
+// builtin:case
+// builtin:catch
+// builtin:ceil
+// builtin:chan_close
+// builtin:chan_recv
+// builtin:chan_send
+// builtin:chan_try_recv
+// builtin:chan_try_send
+// builtin:channel
+// builtin:char_at
+// builtin:chr
+// builtin:class
+// builtin:clock_ns
+// builtin:clz
+// builtin:colos
+// builtin:comptime
+// builtin:concat
+// builtin:cond_broadcast
+// builtin:cond_create
+// builtin:cond_destroy
+// builtin:cond_signal
+// builtin:cond_wait
+// builtin:const
+// builtin:continue
+// builtin:cos
+// builtin:ctz
+// builtin:dealloc
+// builtin:dealloc_array
+// builtin:dealloc_int_array
+// builtin:dealloc_str_array
+// builtin:def
+// builtin:delete_file
+// builtin:dict
+// builtin:dict_get
+// builtin:dict_get_string
+// builtin:dict_get_type
+// builtin:dict_has
+// builtin:dict_has_key
+// builtin:dict_key_at
+// builtin:dict_remove
+// builtin:dict_size
+// builtin:dict_value_at
+// builtin:do
+// builtin:double
+// builtin:effect
+// builtin:else
+// builtin:elsif
+// builtin:end
+// builtin:endswith
+// builtin:enum
+// builtin:except
+// builtin:exp
+// builtin:export
+// builtin:extern
+// builtin:fabs
+// builtin:false
+// builtin:fastcall
+// builtin:file_exists
+// builtin:file_size
+// builtin:finally
+// builtin:float
+// builtin:floor
+// builtin:fn
+// builtin:fn_call
+// builtin:fn_call_str
+// builtin:fn_ptr
+// builtin:for
+// builtin:foreach
+// builtin:free
+// builtin:from
+// builtin:gcd
+// builtin:getenv
+// builtin:giant
+// builtin:grand
+// builtin:hex
+// builtin:if
+// builtin:import
+// builtin:in
+// builtin:inb
+// builtin:index_of
+// builtin:index_of_from
+// builtin:infinity
+// builtin:input
+// builtin:int
+// builtin:is
+// builtin:join
+// builtin:lcm
+// builtin:len
+// builtin:log
+// builtin:long
+// builtin:loop
+// builtin:make_dir
+// builtin:map
+// builtin:match
+// builtin:max
+// builtin:mem_used
+// builtin:memcpy
+// builtin:memmove
+// builtin:memset
+// builtin:min
+// builtin:mkdir
+// builtin:move_file
+// builtin:mutex_create
+// builtin:mutex_destroy
+// builtin:mutex_lock
+// builtin:mutex_unlock
+// builtin:nand
+// builtin:new
+// builtin:nil
+// builtin:noinline
+// builtin:nor
+// builtin:not
+// builtin:null
+// builtin:num_cpus
+// builtin:oct
+// builtin:offsetof
+// builtin:or
+// builtin:ord
+// builtin:otherwise
+// builtin:outb
+// builtin:packed
+// builtin:parallel_map
+// builtin:parse_int
+// builtin:peek
+// builtin:peek32
+// builtin:peek64
+// builtin:peek8
+// builtin:poke
+// builtin:poke32
+// builtin:poke64
+// builtin:poke8
+// builtin:popcount
+// builtin:pow
+// builtin:print
+// builtin:private
+// builtin:ptr_add
+// builtin:ptr_sub
+// builtin:public
+// builtin:putc
+// builtin:puts
+// builtin:quad
+// builtin:rdtsc
+// builtin:read_bytes
+// builtin:read_file
+// builtin:realloc
+// builtin:record
+// builtin:rename
+// builtin:repeat
+// builtin:return
+// builtin:round
+// builtin:rwlock_create
+// builtin:rwlock_destroy
+// builtin:rwlock_read_lock
+// builtin:rwlock_read_unlock
+// builtin:rwlock_write_lock
+// builtin:rwlock_write_unlock
+// builtin:section
+// builtin:shl
+// builtin:short
+// builtin:shr
+// builtin:sign
+// builtin:sin
+// builtin:sizeof
+// builtin:sleep_ms
+// builtin:small
+// builtin:spawn
+// builtin:split
+// builtin:split_get
+// builtin:split_ints
+// builtin:split_len
+// builtin:split_set
+// builtin:split_str_get
+// builtin:sql_bind_int
+// builtin:sql_bind_null
+// builtin:sql_bind_text
+// builtin:sql_bind_text_i64
+// builtin:sql_bind_text_i64_parts
+// builtin:sql_clear_bindings
+// builtin:sql_close
+// builtin:sql_column_int
+// builtin:sql_column_text
+// builtin:sql_exec
+// builtin:sql_finalize
+// builtin:sql_open
+// builtin:sql_prepare
+// builtin:sql_reset
+// builtin:sql_step
+// builtin:sqrt
+// builtin:startswith
+// builtin:static
+// builtin:static_assert
+// builtin:stdcall
+// builtin:str
+// builtin:str_array_get
+// builtin:str_array_join
+// builtin:str_array_len
+// builtin:str_array_new
+// builtin:str_array_pop
+// builtin:str_array_push
+// builtin:str_array_set
+// builtin:str_replace
+// builtin:streq
+// builtin:string
+// builtin:strlen
+// builtin:substr
+// builtin:system
+// builtin:tan
+// builtin:tanh
+// builtin:target_backend
+// builtin:target_os
+// builtin:tcp_accept
+// builtin:tcp_close
+// builtin:tcp_listen
+// builtin:tcp_recv
+// builtin:tcp_send
+// builtin:test
+// builtin:then
+// builtin:this
+// builtin:thread_id
+// builtin:throw
+// builtin:time_ms
+// builtin:time_ns
+// builtin:times
+// builtin:tiny
+// builtin:titan
+// builtin:true
+// builtin:trunc
+// builtin:try
+// builtin:type
+// builtin:typedef
+// builtin:typeof
+// builtin:ucolos
+// builtin:ugiant
+// builtin:ugrand
+// builtin:uint
+// builtin:ulong
+// builtin:unbounded
+// builtin:union
+// builtin:unless
+// builtin:unlink
+// builtin:unsafe
+// builtin:unsafe_char_at
+// builtin:unsigned
+// builtin:until
+// builtin:use
+// builtin:ushort
+// builtin:ushr
+// builtin:usmall
+// builtin:utitan
+// builtin:uvast
+// builtin:uwide
+// builtin:vast
+// builtin:vec16b
+// builtin:vec16i
+// builtin:vec2d
+// builtin:vec2l
+// builtin:vec32b
+// builtin:vec4d
+// builtin:vec4f
+// builtin:vec4i
+// builtin:vec4l
+// builtin:vec64b
+// builtin:vec8f
+// builtin:vec8i
+// builtin:vec8l
+// builtin:vec_abs
+// builtin:vec_add
+// builtin:vec_and
+// builtin:vec_avg
+// builtin:vec_blend
+// builtin:vec_broadcast
+// builtin:vec_cmpeq
+// builtin:vec_cmpgt
+// builtin:vec_cmplt
+// builtin:vec_cmpstr
+// builtin:vec_compress
+// builtin:vec_dot
+// builtin:vec_expand
+// builtin:vec_extract
+// builtin:vec_fma
+// builtin:vec_fms
+// builtin:vec_gather
+// builtin:vec_hadd
+// builtin:vec_insert
+// builtin:vec_load
+// builtin:vec_loadu
+// builtin:vec_max
+// builtin:vec_min
+// builtin:vec_movemask
+// builtin:vec_mul
+// builtin:vec_nand
+// builtin:vec_nor
+// builtin:vec_not
+// builtin:vec_or
+// builtin:vec_permute
+// builtin:vec_sad
+// builtin:vec_shl
+// builtin:vec_shr
+// builtin:vec_shuffle
+// builtin:vec_shuffle_bytes
+// builtin:vec_store
+// builtin:vec_storeu
+// builtin:vec_sub
+// builtin:vec_xnor
+// builtin:vec_xor
+// builtin:void
+// builtin:where
+// builtin:while
+// builtin:wide
+// builtin:write_bytes
+// builtin:write_file
+// builtin:xnor
+// builtin:yield_thread
+
+record Pair then
+    int a
+    int b
+end
+
+def stress_math(limit): int
+    i = 0
+    acc = 0
+    while i < limit then
+        acc = acc + ((i * 3) % 97)
+        if (i % 9) == 0 then
+            acc = acc + 1
+        else
+            acc = acc - 1
+        end
+        i = i + 1
+    end
+    return acc
+end
+
+def stress_string(limit): int
+    i = 0
+    acc = 0
+    s = "alpha"
+    while i < limit then
+        s = s + "x"
+        l = strlen(s)
+        acc = acc + l
+        if l > 32 then
+            s = substr(s, 0, 5)
+        end
+        i = i + 1
+    end
+    return acc
+end
+
+def stress_dict(limit): int
+    d = {"a": 1, "b": 2, "c": 3, "d": 4}
+    i = 0
+    acc = 0
+    while i < limit then
+        d["a"] = (d["a"] + d["b"]) % 1000003
+        d["b"] = (d["b"] + d["c"]) % 1000003
+        d["c"] = (d["c"] + d["d"]) % 1000003
+        d["d"] = (d["d"] + 1) % 1000003
+        acc = acc + d["a"] + d["b"] + d["c"] + d["d"]
+        i = i + 1
+    end
+    return acc
+end
+
+def stress_record(limit): int
+    p = new Pair(1, 2)
+    i = 0
+    acc = 0
+    while i < limit then
+        p.a = (p.a + p.b) % 1000003
+        p.b = (p.b + 2) % 1000003
+        acc = acc + p.a + p.b
+        i = i + 1
+    end
+    return acc
+end
+
+def stress_file(limit): int
+    path = "benchmarks/out/durability_io.txt"
+    payload = "abcdefghijklmnopqrstuvwxyz0123456789"
+    i = 0
+    acc = 0
+    while i < limit then
+        if write_file(path, payload) == 1 then
+            content = read_file(path)
+            acc = acc + len(content)
+        end
+        i = i + 1
+    end
+    return acc
+end
+
+def main(): int
+    duration_ms = 5000
+    start = time_ms()
+    loops = 0
+    checksum = 0
+    while time_ms() - start < duration_ms then
+        checksum = checksum + stress_math(3000)
+        checksum = checksum + stress_string(400)
+        checksum = checksum + stress_dict(600)
+        checksum = checksum + stress_record(900)
+        checksum = checksum + stress_file(3)
+        loops = loops + 1
+    end
+    print("DURABILITY_OK")
+    print(loops)
+    print(checksum)
+    return 0
+end

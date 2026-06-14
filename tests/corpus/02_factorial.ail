@@ -1,0 +1,17 @@
+// factorial.ail - Recursive factorial in AILang
+// Demonstrates: def functions, if...then...else...end, recursion
+
+def factorial(n):
+    if n <= 1 then
+        return 1
+    else
+        return n * factorial(n - 1)
+    end
+end
+
+def main():
+    // Calculate factorial of 10
+    result = factorial(10)
+    print(result)
+    return 0
+end

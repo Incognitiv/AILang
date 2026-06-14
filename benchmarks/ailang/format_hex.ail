@@ -1,0 +1,18 @@
+def format_hex_bench(iterations):
+    i = 0
+    sink = 0
+    while i < iterations then
+        h = hex(i)
+        sink = sink + len(h)
+        i = i + 1
+    end
+    return sink
+end
+
+
+def main(): int
+    iterations = 400000
+    result = format_hex_bench(iterations)
+    print(result)
+    return 0
+end

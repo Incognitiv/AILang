@@ -1,0 +1,6 @@
+def main(): int
+    int a = -9223372036854775808
+    int b = 1
+    int c = a - b
+    return c
+end

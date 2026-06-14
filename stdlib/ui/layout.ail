@@ -1,0 +1,378 @@
+@library("ui_layout")
+
+import stdlib.ui.platform
+import stdlib.ui.paint
+
+// Small immediate UI layer above the platform backend. It keeps input state,
+// computes row/column rectangles, and draws interactive widgets.
+
+enum UiLayoutAxis then
+    Column = 1
+    Row = 2
+end
+
+
+enum UiButtonStyle then
+    Dark = 0
+    Light = 1
+end
+
+
+class UiRect then
+    public int x = 0
+    public int y = 0
+    public int width = 0
+    public int height = 0
+
+    public def init(px: int, py: int, pwidth: int, pheight: int):
+        this.x = px
+        this.y = py
+        this.width = pwidth
+        this.height = pheight
+    end
+
+    public def ~UiRect():
+    end
+end
+
+
+class UiLayout then
+    public int x = 0
+    public int y = 0
+    public int width = 0
+    public int height = 0
+    public int cursor_x = 0
+    public int cursor_y = 0
+    public int gap = 0
+    public int axis = 1
+
+    public def init(px: int, py: int, pwidth: int, pheight: int, pgap: int, paxis: int):
+        this.x = px
+        this.y = py
+        this.width = pwidth
+        this.height = pheight
+        this.cursor_x = px
+        this.cursor_y = py
+        this.gap = pgap
+        this.axis = paxis
+    end
+
+    public def ~UiLayout():
+    end
+end
+
+
+class UiFrame then
+    public int scale_milli = 1000
+    public int text_scale_milli = 1000
+    public int mouse_x = -100000
+    public int mouse_y = -100000
+    public int mouse_down = 0
+    public int mouse_pressed = 0
+    public int mouse_released = 0
+    public int active_id = 0
+    public int hot_id = 0
+    public int next_hot_id = 0
+    public int clicked_id = 0
+
+    public def init():
+        this.scale_milli = 1000
+        this.text_scale_milli = 1000
+        this.mouse_x = -100000
+        this.mouse_y = -100000
+        this.mouse_down = 0
+        this.mouse_pressed = 0
+        this.mouse_released = 0
+        this.active_id = 0
+        this.hot_id = 0
+        this.next_hot_id = 0
+        this.clicked_id = 0
+    end
+
+    public def ~UiFrame():
+    end
+end
+
+
+def ui_min(a: int, b: int): int
+    if a < b then
+        return a
+    end
+    return b
+end
+
+
+def ui_max(a: int, b: int): int
+    if a > b then
+        return a
+    end
+    return b
+end
+
+
+def ui_scaled(value: int, scale_milli: int): int
+    if scale_milli <= 0 then
+        scale_milli = 1000
+    end
+    return (value * scale_milli + 500) / 1000
+end
+
+
+def ui_text_scale(base: int, text_scale_milli: int): int
+    scaled = ui_scaled(base, text_scale_milli)
+    if scaled < 1 then
+        return 1
+    end
+    return scaled
+end
+
+
+def ui_rect(x: int, y: int, width: int, height: int): UiRect
+    return new UiRect(x, y, width, height)
+end
+
+
+def ui_rect_free(rect: UiRect): void
+    dealloc(rect)
+end
+
+
+def ui_rect_inset(rect: UiRect, inset: int): UiRect
+    return new UiRect(
+        rect.x + inset,
+        rect.y + inset,
+        rect.width - inset - inset,
+        rect.height - inset - inset
+    )
+end
+
+
+def ui_rect_contains(rect: UiRect, x: int, y: int): int
+    if x < rect.x then
+        return 0
+    end
+    if y < rect.y then
+        return 0
+    end
+    if x >= rect.x + rect.width then
+        return 0
+    end
+    if y >= rect.y + rect.height then
+        return 0
+    end
+    return 1
+end
+
+
+def ui_column(x: int, y: int, width: int, height: int, gap: int, scale_milli: int): UiLayout
+    return new UiLayout(x, y, width, height, ui_scaled(gap, scale_milli), 1)
+end
+
+
+def ui_row(x: int, y: int, width: int, height: int, gap: int, scale_milli: int): UiLayout
+    return new UiLayout(x, y, width, height, ui_scaled(gap, scale_milli), 2)
+end
+
+
+def ui_layout_free(layout: UiLayout): void
+    dealloc(layout)
+end
+
+
+def ui_layout_take(layout: UiLayout, width: int, height: int): UiRect
+    out_width = width
+    out_height = height
+    if out_width <= 0 then
+        out_width = layout.width - (layout.cursor_x - layout.x)
+    end
+    if out_height <= 0 then
+        out_height = layout.height - (layout.cursor_y - layout.y)
+    end
+
+    rect = new UiRect(layout.cursor_x, layout.cursor_y, out_width, out_height)
+    if layout.axis == 1 then
+        layout.cursor_y = layout.cursor_y + out_height + layout.gap
+    else
+        layout.cursor_x = layout.cursor_x + out_width + layout.gap
+    end
+    return rect
+end
+
+
+def ui_layout_spacer(layout: UiLayout, amount: int): void
+    if layout.axis == 1 then
+        layout.cursor_y = layout.cursor_y + amount + layout.gap
+    else
+        layout.cursor_x = layout.cursor_x + amount + layout.gap
+    end
+end
+
+
+def ui_frame_begin(frame: UiFrame, scale_milli: int, text_scale_milli: int): void
+    frame.scale_milli = scale_milli
+    frame.text_scale_milli = text_scale_milli
+    frame.next_hot_id = 0
+    frame.clicked_id = 0
+end
+
+
+def ui_frame_free(frame: UiFrame): void
+    dealloc(frame)
+end
+
+
+def ui_frame_handle_event(frame: UiFrame, event_kind: int): int
+    if event_kind == 0 then
+        return 0
+    end
+
+    if event_kind == 3 then
+        frame.mouse_x = ail_ui_event_x()
+        frame.mouse_y = ail_ui_event_y()
+        return 1
+    end
+
+    if event_kind == 4 then
+        frame.mouse_x = ail_ui_event_x()
+        frame.mouse_y = ail_ui_event_y()
+        frame.mouse_down = 1
+        frame.mouse_pressed = 1
+        return 1
+    end
+
+    if event_kind == 5 then
+        frame.mouse_x = ail_ui_event_x()
+        frame.mouse_y = ail_ui_event_y()
+        frame.mouse_down = 0
+        frame.mouse_released = 1
+        return 1
+    end
+
+    return 1
+end
+
+
+def ui_frame_finish(frame: UiFrame): int
+    changed = 0
+    if frame.hot_id != frame.next_hot_id then
+        changed = 1
+    end
+    frame.hot_id = frame.next_hot_id
+    if frame.mouse_down == 0 then
+        frame.active_id = 0
+    end
+    frame.mouse_pressed = 0
+    frame.mouse_released = 0
+    return changed
+end
+
+
+def ui_panel(window: int, frame: UiFrame, rect: UiRect): void
+    shadow_x = ui_scaled(4, frame.scale_milli)
+    shadow_y = ui_scaled(5, frame.scale_milli)
+    ail_ui_draw_rect(window, rect.x + shadow_x, rect.y + shadow_y, rect.width, rect.height, 0xd1d5db)
+    ail_ui_draw_rect(window, rect.x, rect.y, rect.width, rect.height, 0xffffff)
+    ail_ui_draw_rect(window, rect.x, rect.y, rect.width, 1, 0xe5e7eb)
+    ail_ui_draw_rect(window, rect.x, rect.y + rect.height - 1, rect.width, 1, 0xd8dee9)
+    ail_ui_draw_rect(window, rect.x, rect.y, 1, rect.height, 0xe5e7eb)
+    ail_ui_draw_rect(window, rect.x + rect.width - 1, rect.y, 1, rect.height, 0xd8dee9)
+end
+
+
+def ui_label(window: int, frame: UiFrame, rect: UiRect, scale: int, color: int, text: string): void
+    text_scale = ui_text_scale(scale, frame.text_scale_milli)
+    ail_ui_draw_text(window, rect.x, rect.y, text_scale, color, text)
+end
+
+
+def ui_clip(window: int, rect: UiRect): void
+    ail_ui_set_clip(window, rect.x, rect.y, rect.width, rect.height)
+end
+
+
+def ui_clear_clip(window: int): void
+    ail_ui_clear_clip(window)
+end
+
+
+def ui_button_logic(frame: UiFrame, id: int, rect: UiRect): int
+    inside = ui_rect_contains(rect, frame.mouse_x, frame.mouse_y)
+    clicked = 0
+
+    if inside == 1 then
+        frame.next_hot_id = id
+    end
+
+    if inside == 1 and frame.mouse_pressed == 1 then
+        frame.active_id = id
+    end
+
+    if frame.mouse_released == 1 and frame.active_id == id then
+        if inside == 1 then
+            clicked = 1
+            frame.clicked_id = id
+        end
+        frame.active_id = 0
+    end
+
+    return clicked
+end
+
+
+def ui_button_visual(frame: UiFrame, id: int, rect: UiRect): int
+    inside = ui_rect_contains(rect, frame.mouse_x, frame.mouse_y)
+    if frame.active_id == id then
+        return 2
+    end
+    if inside == 1 then
+        return 1
+    end
+    if frame.hot_id == id then
+        return 1
+    end
+    return 0
+end
+
+
+def ui_button(window: int, frame: UiFrame, id: int, rect: UiRect, label: string, style: int): int
+    clicked = ui_button_logic(frame, id, rect)
+    visual = ui_button_visual(frame, id, rect)
+    bg = 0x111827
+    fg = 0xffffff
+    border = 0x0f172a
+
+    if style == 1 then
+        bg = 0xe0f2fe
+        fg = 0x075985
+        border = 0xbae6fd
+    end
+
+    if visual == 1 then
+        if style == 1 then
+            bg = 0xbae6fd
+        else
+            bg = 0x1f2937
+        end
+    end
+
+    if visual == 2 then
+        if style == 1 then
+            bg = 0x7dd3fc
+        else
+            bg = 0x020617
+        end
+    end
+
+    ail_ui_draw_rect(window, rect.x + 2, rect.y + 3, rect.width, rect.height, 0xcbd5e1)
+    ail_ui_draw_rect(window, rect.x, rect.y, rect.width, rect.height, bg)
+    ail_ui_draw_rect(window, rect.x, rect.y, rect.width, 1, border)
+    ail_ui_draw_text(
+        window,
+        rect.x + ui_scaled(14, frame.scale_milli),
+        rect.y + ui_scaled(12, frame.scale_milli),
+        ui_text_scale(2, frame.text_scale_milli),
+        fg,
+        label
+    )
+    return clicked
+end

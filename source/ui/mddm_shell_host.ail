@@ -1,0 +1,15 @@
+@library("mddm_shell_core")
+
+// Embedded MDDM shell host.
+//
+// This calls the C ABI provided by the MDDM C++/Qt shell runtime. AILang owns
+// the entrypoint; MDDM owns QML context objects, QML loading, rendering, D-Bus
+// integration, and desktop shell behavior.
+
+extern fn mddm_shell_run_default(): int
+extern fn mddm_shell_last_error(): string
+
+
+def mddm_shell_host_run_default(): int
+    return mddm_shell_run_default()
+end

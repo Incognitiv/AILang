@@ -1,0 +1,27 @@
+// fibonacci.ail - AILang syntax following TYPES.md
+// Demonstrates: types, loops, while...then...end
+
+def fibonacci(int n):
+    if n <= 1 then
+        return n
+    end
+
+    int a = 0
+    int b = 1
+    int i = 2
+
+    while i <= n then
+        int temp = a + b
+        a = b
+        b = temp
+        i = i + 1
+    end
+
+    return b
+end
+
+def main():
+    int result = fibonacci(10)
+    print(result)
+    return 0
+end

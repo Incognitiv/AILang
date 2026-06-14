@@ -1,0 +1,27 @@
+record Point then
+    int x
+    int y
+end
+
+
+def records_bench(iterations):
+    p = new Point(1, 2)
+    modulus = 1000000007
+    checksum = 0
+    i = 0
+    while i < iterations then
+        p.x = (p.x + p.y) % modulus
+        p.y = (p.y + 2) % modulus
+        checksum = checksum + p.x + p.y
+        i = i + 1
+    end
+    return checksum
+end
+
+
+def main(): int
+    iterations = 4000000
+    result = records_bench(iterations)
+    print(result)
+    return 0
+end

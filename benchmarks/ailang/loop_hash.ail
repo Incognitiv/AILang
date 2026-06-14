@@ -1,0 +1,20 @@
+def loop_hash_bench(iterations):
+    acc = 0
+    i = 0
+    while i < iterations then
+        acc = acc + i
+        if acc > 1000000000 then
+            acc = acc - 1000000000
+        end
+        i = i + 1
+    end
+    return acc
+end
+
+
+def main(): int
+    iterations = 12000000
+    result = loop_hash_bench(iterations)
+    print(result)
+    return 0
+end

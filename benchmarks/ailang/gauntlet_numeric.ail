@@ -1,0 +1,29 @@
+def numeric_mix(seed: int, iterations: int): int
+    x = seed % 1000003
+    y = 911382323 % 1000003
+    z = 972663749 % 1000003
+    acc = 0
+    i = 0
+    while i < iterations then
+        x = (x * 110351 + 12345 + i) % 1000003
+        y = (y + x * 31 + i * 17) % 1000033
+        if x > y then
+            z = (z + x - y + 97) % 1000037
+        else
+            z = (z + y - x + 193) % 1000037
+        end
+        if z % 7 == 0 then
+            acc = (acc + z * 3 + x) % 1000000007
+        else
+            acc = (acc + y * 5 + z) % 1000000007
+        end
+        i = i + 1
+    end
+    return acc
+end
+
+
+def main(): int
+    print(numeric_mix(1234567, 8000000))
+    return 0
+end

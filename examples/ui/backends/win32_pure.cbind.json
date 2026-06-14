@@ -1,0 +1,1389 @@
+{
+  "name": "win32_pure",
+  "cflags": [
+    "-include",
+    "windows.h",
+    "-include",
+    "dwmapi.h"
+  ],
+  "link_flags": [
+    "-luser32",
+    "-lgdi32",
+    "-lkernel32",
+    "-ldwmapi"
+  ],
+  "macros": [
+    "AC_SRC_ALPHA",
+    "AC_SRC_OVER",
+    "BI_RGB",
+    "CLEARTYPE_QUALITY",
+    "CLIP_DEFAULT_PRECIS",
+    "CS_HREDRAW",
+    "CS_VREDRAW",
+    "CW_USEDEFAULT",
+    "DEFAULT_CHARSET",
+    "DEFAULT_PITCH",
+    "DIB_RGB_COLORS",
+    "FALSE",
+    "FF_DONTCARE",
+    "FW_NORMAL",
+    "HTBOTTOM",
+    "HTBOTTOMLEFT",
+    "HTBOTTOMRIGHT",
+    "HTCAPTION",
+    "HTLEFT",
+    "HTRIGHT",
+    "HTTOP",
+    "HTTOPLEFT",
+    "HTTOPRIGHT",
+    "HTTRANSPARENT",
+    "INFINITE",
+    "LOGPIXELSX",
+    "MONITOR_DEFAULTTONEAREST",
+    "OUT_DEFAULT_PRECIS",
+    "PM_REMOVE",
+    "QS_ALLINPUT",
+    "SW_SHOW",
+    "SWP_FRAMECHANGED",
+    "SWP_NOACTIVATE",
+    "SWP_NOMOVE",
+    "SWP_NOSIZE",
+    "SWP_NOZORDER",
+    "SRCCOPY",
+    "TRANSPARENT",
+    "TRUE",
+    "ULW_ALPHA",
+    "WM_CLOSE",
+    "WM_DESTROY",
+    "WM_DISPLAYCHANGE",
+    "WM_DPICHANGED",
+    "WM_ERASEBKGND",
+    "WM_GETMINMAXINFO",
+    "WM_KEYDOWN",
+    "WM_KEYUP",
+    "WM_LBUTTONDOWN",
+    "WM_LBUTTONUP",
+    "WM_MOUSEMOVE",
+    "WM_NCACTIVATE",
+    "WM_NCCALCSIZE",
+    "WM_NCDESTROY",
+    "WM_NCHITTEST",
+    "WM_NCPAINT",
+    "WM_PAINT",
+    "WM_SIZE",
+    "WS_EX_LAYERED",
+    "WS_MAXIMIZEBOX",
+    "WS_MINIMIZEBOX",
+    "WS_OVERLAPPEDWINDOW",
+    "WS_POPUP",
+    "WS_SYSMENU",
+    "WS_THICKFRAME",
+    "WS_VISIBLE"
+  ],
+  "records": [
+    {
+      "name": "BITMAPINFOHEADER",
+      "c_name": "BITMAPINFOHEADER",
+      "kind": "extern",
+      "fields": [
+        {
+          "name": "biSize",
+          "type": "ushort"
+        },
+        {
+          "name": "biWidth",
+          "type": "short"
+        },
+        {
+          "name": "biHeight",
+          "type": "short"
+        },
+        {
+          "name": "biPlanes",
+          "type": "usmall"
+        },
+        {
+          "name": "biBitCount",
+          "type": "usmall"
+        },
+        {
+          "name": "biCompression",
+          "type": "ushort"
+        }
+      ]
+    },
+    {
+      "name": "BITMAPINFO",
+      "c_name": "BITMAPINFO",
+      "kind": "extern",
+      "fields": [
+        {
+          "name": "bmiHeader",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "BLENDFUNCTION",
+      "c_name": "BLENDFUNCTION",
+      "kind": "extern",
+      "fields": [
+        {
+          "name": "BlendOp",
+          "type": "byte"
+        },
+        {
+          "name": "BlendFlags",
+          "type": "byte"
+        },
+        {
+          "name": "SourceConstantAlpha",
+          "type": "byte"
+        },
+        {
+          "name": "AlphaFormat",
+          "type": "byte"
+        }
+      ]
+    },
+    {
+      "name": "DWM_BLURBEHIND",
+      "c_name": "DWM_BLURBEHIND",
+      "kind": "extern",
+      "fields": [
+        {
+          "name": "dwFlags",
+          "type": "ushort"
+        },
+        {
+          "name": "fEnable",
+          "type": "short"
+        },
+        {
+          "name": "hRgnBlur",
+          "type": "ptr"
+        },
+        {
+          "name": "fTransitionOnMaximized",
+          "type": "short"
+        }
+      ]
+    },
+    {
+      "name": "MARGINS",
+      "c_name": "MARGINS",
+      "kind": "extern",
+      "fields": [
+        {
+          "name": "cxLeftWidth",
+          "type": "short"
+        },
+        {
+          "name": "cxRightWidth",
+          "type": "short"
+        },
+        {
+          "name": "cyTopHeight",
+          "type": "short"
+        },
+        {
+          "name": "cyBottomHeight",
+          "type": "short"
+        }
+      ]
+    },
+    {
+      "name": "POINT",
+      "c_name": "POINT",
+      "kind": "extern",
+      "fields": [
+        {
+          "name": "x",
+          "type": "short"
+        },
+        {
+          "name": "y",
+          "type": "short"
+        }
+      ]
+    },
+    {
+      "name": "SIZE",
+      "c_name": "SIZE",
+      "kind": "extern",
+      "fields": [
+        {
+          "name": "cx",
+          "type": "short"
+        },
+        {
+          "name": "cy",
+          "type": "short"
+        }
+      ]
+    },
+    {
+      "name": "RECT",
+      "c_name": "RECT",
+      "kind": "extern",
+      "fields": [
+        {
+          "name": "left",
+          "type": "short"
+        },
+        {
+          "name": "top",
+          "type": "short"
+        },
+        {
+          "name": "right",
+          "type": "short"
+        },
+        {
+          "name": "bottom",
+          "type": "short"
+        }
+      ]
+    },
+    {
+      "name": "MINMAXINFO",
+      "c_name": "MINMAXINFO",
+      "kind": "extern",
+      "fields": [
+        {
+          "name": "ptMaxSize",
+          "type": "ptr"
+        },
+        {
+          "name": "ptMaxPosition",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "MONITORINFO",
+      "c_name": "MONITORINFO",
+      "kind": "extern",
+      "fields": [
+        {
+          "name": "cbSize",
+          "type": "ushort"
+        },
+        {
+          "name": "rcMonitor",
+          "type": "ptr"
+        },
+        {
+          "name": "rcWork",
+          "type": "ptr"
+        },
+        {
+          "name": "dwFlags",
+          "type": "ushort"
+        }
+      ]
+    },
+    {
+      "name": "PAINTSTRUCT",
+      "c_name": "PAINTSTRUCT",
+      "kind": "extern",
+      "fields": []
+    },
+    {
+      "name": "WNDCLASSA",
+      "c_name": "WNDCLASSA",
+      "kind": "extern",
+      "fields": [
+        {
+          "name": "style",
+          "type": "ushort"
+        },
+        {
+          "name": "cbClsExtra",
+          "type": "short"
+        },
+        {
+          "name": "cbWndExtra",
+          "type": "short"
+        },
+        {
+          "name": "lpfnWndProc",
+          "type": "ptr"
+        },
+        {
+          "name": "hInstance",
+          "type": "ptr"
+        },
+        {
+          "name": "hIcon",
+          "type": "ptr"
+        },
+        {
+          "name": "hCursor",
+          "type": "ptr"
+        },
+        {
+          "name": "hbrBackground",
+          "type": "ptr"
+        },
+        {
+          "name": "lpszMenuName",
+          "type": "ptr"
+        },
+        {
+          "name": "lpszClassName",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "MSG",
+      "c_name": "MSG",
+      "kind": "extern",
+      "fields": []
+    }
+  ],
+  "functions": [
+    {
+      "name": "DefWindowProcA",
+      "return_type": "int",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "hwnd",
+          "type": "ptr"
+        },
+        {
+          "name": "msg",
+          "type": "ushort"
+        },
+        {
+          "name": "wparam",
+          "type": "uint"
+        },
+        {
+          "name": "lparam",
+          "type": "int"
+        }
+      ]
+    },
+    {
+      "name": "DestroyWindow",
+      "return_type": "short",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "hwnd",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "DispatchMessageA",
+      "return_type": "int",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "msg",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "GetModuleHandleA",
+      "return_type": "ptr",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "module_name",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "IsWindow",
+      "return_type": "short",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "hwnd",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "PeekMessageA",
+      "return_type": "short",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "msg",
+          "type": "ptr"
+        },
+        {
+          "name": "hwnd",
+          "type": "ptr"
+        },
+        {
+          "name": "filter_min",
+          "type": "ushort"
+        },
+        {
+          "name": "filter_max",
+          "type": "ushort"
+        },
+        {
+          "name": "remove_msg",
+          "type": "ushort"
+        }
+      ]
+    },
+    {
+      "name": "PostQuitMessage",
+      "return_type": "void",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "exit_code",
+          "type": "short"
+        }
+      ]
+    },
+    {
+      "name": "RegisterClassA",
+      "return_type": "usmall",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "wnd_class",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "SetProcessDPIAware",
+      "return_type": "short",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": []
+    },
+    {
+      "name": "ShowWindow",
+      "return_type": "short",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "hwnd",
+          "type": "ptr"
+        },
+        {
+          "name": "cmd_show",
+          "type": "short"
+        }
+      ]
+    },
+    {
+      "name": "Sleep",
+      "return_type": "void",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "ms",
+          "type": "ushort"
+        }
+      ]
+    },
+    {
+      "name": "TranslateMessage",
+      "return_type": "short",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "msg",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "UpdateWindow",
+      "return_type": "short",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "hwnd",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "GetLastError",
+      "return_type": "ushort",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": []
+    },
+    {
+      "name": "CreateWindowExA",
+      "return_type": "ptr",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "ex_style",
+          "type": "ushort"
+        },
+        {
+          "name": "class_name",
+          "type": "string"
+        },
+        {
+          "name": "window_name",
+          "type": "string"
+        },
+        {
+          "name": "style",
+          "type": "ushort"
+        },
+        {
+          "name": "x",
+          "type": "short"
+        },
+        {
+          "name": "y",
+          "type": "short"
+        },
+        {
+          "name": "width",
+          "type": "short"
+        },
+        {
+          "name": "height",
+          "type": "short"
+        },
+        {
+          "name": "parent",
+          "type": "ptr"
+        },
+        {
+          "name": "menu",
+          "type": "ptr"
+        },
+        {
+          "name": "instance",
+          "type": "ptr"
+        },
+        {
+          "name": "param",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "AdjustWindowRect",
+      "return_type": "short",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "rect",
+          "type": "ptr"
+        },
+        {
+          "name": "style",
+          "type": "ushort"
+        },
+        {
+          "name": "menu",
+          "type": "short"
+        }
+      ]
+    },
+    {
+      "name": "BeginPaint",
+      "return_type": "ptr",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "hwnd",
+          "type": "ptr"
+        },
+        {
+          "name": "paint",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "BitBlt",
+      "return_type": "short",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "dest",
+          "type": "ptr"
+        },
+        {
+          "name": "x",
+          "type": "short"
+        },
+        {
+          "name": "y",
+          "type": "short"
+        },
+        {
+          "name": "width",
+          "type": "short"
+        },
+        {
+          "name": "height",
+          "type": "short"
+        },
+        {
+          "name": "src",
+          "type": "ptr"
+        },
+        {
+          "name": "src_x",
+          "type": "short"
+        },
+        {
+          "name": "src_y",
+          "type": "short"
+        },
+        {
+          "name": "rop",
+          "type": "ushort"
+        }
+      ]
+    },
+    {
+      "name": "CreateCompatibleDC",
+      "return_type": "ptr",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "dc",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "CreateDIBSection",
+      "return_type": "ptr",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "dc",
+          "type": "ptr"
+        },
+        {
+          "name": "bmi",
+          "type": "ptr"
+        },
+        {
+          "name": "usage",
+          "type": "ushort"
+        },
+        {
+          "name": "bits",
+          "type": "ptrptr"
+        },
+        {
+          "name": "section",
+          "type": "ptr"
+        },
+        {
+          "name": "offset",
+          "type": "ushort"
+        }
+      ]
+    },
+    {
+      "name": "CreateFontA",
+      "return_type": "ptr",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "height",
+          "type": "short"
+        },
+        {
+          "name": "width",
+          "type": "short"
+        },
+        {
+          "name": "escapement",
+          "type": "short"
+        },
+        {
+          "name": "orientation",
+          "type": "short"
+        },
+        {
+          "name": "weight",
+          "type": "short"
+        },
+        {
+          "name": "italic",
+          "type": "ushort"
+        },
+        {
+          "name": "underline",
+          "type": "ushort"
+        },
+        {
+          "name": "strike_out",
+          "type": "ushort"
+        },
+        {
+          "name": "charset",
+          "type": "ushort"
+        },
+        {
+          "name": "out_precision",
+          "type": "ushort"
+        },
+        {
+          "name": "clip_precision",
+          "type": "ushort"
+        },
+        {
+          "name": "quality",
+          "type": "ushort"
+        },
+        {
+          "name": "pitch_and_family",
+          "type": "ushort"
+        },
+        {
+          "name": "face_name",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "CreateSolidBrush",
+      "return_type": "ptr",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "color",
+          "type": "ushort"
+        }
+      ]
+    },
+    {
+      "name": "DeleteObject",
+      "return_type": "short",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "obj",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "DeleteDC",
+      "return_type": "short",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "dc",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "DwmEnableBlurBehindWindow",
+      "return_type": "short",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "hwnd",
+          "type": "ptr"
+        },
+        {
+          "name": "blur",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "DwmExtendFrameIntoClientArea",
+      "return_type": "short",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "hwnd",
+          "type": "ptr"
+        },
+        {
+          "name": "margins",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "DwmSetWindowAttribute",
+      "return_type": "short",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "hwnd",
+          "type": "ptr"
+        },
+        {
+          "name": "attribute",
+          "type": "ushort"
+        },
+        {
+          "name": "value",
+          "type": "ptr"
+        },
+        {
+          "name": "size",
+          "type": "ushort"
+        }
+      ]
+    },
+    {
+      "name": "EndPaint",
+      "return_type": "short",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "hwnd",
+          "type": "ptr"
+        },
+        {
+          "name": "paint",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "FillRect",
+      "return_type": "short",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "dc",
+          "type": "ptr"
+        },
+        {
+          "name": "rect",
+          "type": "ptr"
+        },
+        {
+          "name": "brush",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "GetClientRect",
+      "return_type": "short",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "hwnd",
+          "type": "ptr"
+        },
+        {
+          "name": "rect",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "GetDeviceCaps",
+      "return_type": "short",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "dc",
+          "type": "ptr"
+        },
+        {
+          "name": "index",
+          "type": "short"
+        }
+      ]
+    },
+    {
+      "name": "GetDC",
+      "return_type": "ptr",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "hwnd",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "GetMonitorInfoA",
+      "return_type": "short",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "monitor",
+          "type": "ptr"
+        },
+        {
+          "name": "info",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "GetWindowRect",
+      "return_type": "short",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "hwnd",
+          "type": "ptr"
+        },
+        {
+          "name": "rect",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "IsZoomed",
+      "return_type": "short",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "hwnd",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "IntersectClipRect",
+      "return_type": "short",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "dc",
+          "type": "ptr"
+        },
+        {
+          "name": "left",
+          "type": "short"
+        },
+        {
+          "name": "top",
+          "type": "short"
+        },
+        {
+          "name": "right",
+          "type": "short"
+        },
+        {
+          "name": "bottom",
+          "type": "short"
+        }
+      ]
+    },
+    {
+      "name": "lstrlenA",
+      "return_type": "short",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "text",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "MonitorFromWindow",
+      "return_type": "ptr",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "hwnd",
+          "type": "ptr"
+        },
+        {
+          "name": "flags",
+          "type": "ushort"
+        }
+      ]
+    },
+    {
+      "name": "MsgWaitForMultipleObjects",
+      "return_type": "ushort",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "count",
+          "type": "ushort"
+        },
+        {
+          "name": "handles",
+          "type": "ptr"
+        },
+        {
+          "name": "wait_all",
+          "type": "short"
+        },
+        {
+          "name": "ms",
+          "type": "ushort"
+        },
+        {
+          "name": "wake_mask",
+          "type": "ushort"
+        }
+      ]
+    },
+    {
+      "name": "RestoreDC",
+      "return_type": "short",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "dc",
+          "type": "ptr"
+        },
+        {
+          "name": "saved",
+          "type": "short"
+        }
+      ]
+    },
+    {
+      "name": "SaveDC",
+      "return_type": "short",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "dc",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "SelectObject",
+      "return_type": "ptr",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "dc",
+          "type": "ptr"
+        },
+        {
+          "name": "obj",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "ReleaseDC",
+      "return_type": "short",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "hwnd",
+          "type": "ptr"
+        },
+        {
+          "name": "dc",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "ReleaseCapture",
+      "return_type": "short",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": []
+    },
+    {
+      "name": "ScreenToClient",
+      "return_type": "short",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "hwnd",
+          "type": "ptr"
+        },
+        {
+          "name": "point",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "SetCapture",
+      "return_type": "ptr",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "hwnd",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "SetBkMode",
+      "return_type": "short",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "dc",
+          "type": "ptr"
+        },
+        {
+          "name": "mode",
+          "type": "short"
+        }
+      ]
+    },
+    {
+      "name": "SetTextColor",
+      "return_type": "ushort",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "dc",
+          "type": "ptr"
+        },
+        {
+          "name": "color",
+          "type": "ushort"
+        }
+      ]
+    },
+    {
+      "name": "SetWindowPos",
+      "return_type": "short",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "hwnd",
+          "type": "ptr"
+        },
+        {
+          "name": "insert_after",
+          "type": "ptr"
+        },
+        {
+          "name": "x",
+          "type": "short"
+        },
+        {
+          "name": "y",
+          "type": "short"
+        },
+        {
+          "name": "cx",
+          "type": "short"
+        },
+        {
+          "name": "cy",
+          "type": "short"
+        },
+        {
+          "name": "flags",
+          "type": "ushort"
+        }
+      ]
+    },
+    {
+      "name": "SetWindowRgn",
+      "return_type": "short",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "hwnd",
+          "type": "ptr"
+        },
+        {
+          "name": "region",
+          "type": "ptr"
+        },
+        {
+          "name": "redraw",
+          "type": "short"
+        }
+      ]
+    },
+    {
+      "name": "TextOutA",
+      "return_type": "short",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "dc",
+          "type": "ptr"
+        },
+        {
+          "name": "x",
+          "type": "short"
+        },
+        {
+          "name": "y",
+          "type": "short"
+        },
+        {
+          "name": "text",
+          "type": "string"
+        },
+        {
+          "name": "count",
+          "type": "short"
+        }
+      ]
+    },
+    {
+      "name": "UpdateLayeredWindow",
+      "return_type": "short",
+      "decorators": [
+        "stdcall"
+      ],
+      "params": [
+        {
+          "name": "hwnd",
+          "type": "ptr"
+        },
+        {
+          "name": "dest_dc",
+          "type": "ptr"
+        },
+        {
+          "name": "dest",
+          "type": "ptr"
+        },
+        {
+          "name": "size",
+          "type": "ptr"
+        },
+        {
+          "name": "src_dc",
+          "type": "ptr"
+        },
+        {
+          "name": "src",
+          "type": "ptr"
+        },
+        {
+          "name": "color_key",
+          "type": "ushort"
+        },
+        {
+          "name": "blend",
+          "type": "ptr"
+        },
+        {
+          "name": "flags",
+          "type": "ushort"
+        }
+      ]
+    }
+  ]
+}

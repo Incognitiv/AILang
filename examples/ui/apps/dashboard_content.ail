@@ -1,0 +1,313 @@
+@library("dashboard_content")
+
+import stdlib.ui.layout
+import stdlib.ui.platform
+
+// Content layer: this file decides what the demo window shows. Layout, hit
+// testing, and widget states are delegated to stdlib.ui.layout.
+
+class DashboardState then
+    public int mode = 0
+
+    public def init():
+        this.mode = 0
+    end
+
+    public def ~DashboardState():
+    end
+end
+
+
+def dashboard_mode_text(state: DashboardState): string
+    if state.mode == 1 then
+        return "Preview ready"
+    end
+    if state.mode == 2 then
+        return "Export queued"
+    end
+    return "Idle"
+end
+
+
+def dashboard_mode_fill(state: DashboardState, width: int): int
+    if state.mode == 1 then
+        return (width * 2) / 3
+    end
+    if state.mode == 2 then
+        return width
+    end
+    return width / 3
+end
+
+
+def dashboard_draw_chrome(window: int, frame: UiFrame, rect: UiRect, title: string): void
+    shadow_x = ui_scaled(6, frame.scale_milli)
+    shadow_y = ui_scaled(8, frame.scale_milli)
+    title_h = ui_scaled(32, frame.scale_milli)
+    dot = ui_scaled(8, frame.scale_milli)
+    gap = ui_scaled(24, frame.scale_milli)
+    top = rect.y + ui_scaled(12, frame.scale_milli)
+    right = rect.x + rect.width
+
+    ail_ui_draw_rect(window, rect.x + shadow_x, rect.y + shadow_y, rect.width, rect.height, 0xcbd5e1)
+    ail_ui_draw_rect(window, rect.x, rect.y, rect.width, rect.height, 0xffffff)
+    ail_ui_draw_rect(window, rect.x, rect.y, rect.width, title_h, 0xf8fafc)
+    ail_ui_draw_rect(window, rect.x, rect.y + title_h, rect.width, 1, 0xe5e7eb)
+    ail_ui_draw_text(
+        window,
+        rect.x + ui_scaled(12, frame.scale_milli),
+        rect.y + ui_scaled(12, frame.scale_milli),
+        ui_text_scale(1, frame.text_scale_milli),
+        0x475569,
+        title
+    )
+    ail_ui_draw_rect(window, right - gap - gap - gap, top, dot, dot, 0x94a3b8)
+    ail_ui_draw_rect(window, right - gap - gap, top, dot, dot, 0x94a3b8)
+    ail_ui_draw_rect(window, right - gap, top, dot, dot, 0xef4444)
+end
+
+
+def dashboard_draw_desktop_bar(window: int, frame: UiFrame, width: int, height: int, state: DashboardState): void
+    bar_h = ui_scaled(48, frame.scale_milli)
+    icon = ui_scaled(20, frame.scale_milli)
+    y = height - bar_h
+    iy = height - ui_scaled(34, frame.scale_milli)
+
+    ail_ui_draw_rect(window, 0, y, width, bar_h, 0x111827)
+    ail_ui_draw_rect(window, ui_scaled(18, frame.scale_milli), iy, icon, icon, 0x2563eb)
+    ail_ui_draw_rect(window, ui_scaled(52, frame.scale_milli), iy, icon, icon, 0x10b981)
+    ail_ui_draw_rect(window, ui_scaled(86, frame.scale_milli), iy, icon, icon, 0xf59e0b)
+    ail_ui_draw_text(
+        window,
+        ui_scaled(22, frame.scale_milli),
+        height - ui_scaled(28, frame.scale_milli),
+        ui_text_scale(1, frame.text_scale_milli),
+        0xffffff,
+        "AIL"
+    )
+    ail_ui_draw_text(
+        window,
+        width - ui_scaled(190, frame.scale_milli),
+        height - ui_scaled(28, frame.scale_milli),
+        ui_text_scale(1, frame.text_scale_milli),
+        0xd1d5db,
+        dashboard_mode_text(state)
+    )
+end
+
+
+def dashboard_draw_header(window: int, frame: UiFrame, rect: UiRect): void
+    badge_w = ui_scaled(112, frame.scale_milli)
+    badge_h = ui_scaled(24, frame.scale_milli)
+    badge = ui_rect(rect.x + rect.width - badge_w, rect.y - ui_scaled(6, frame.scale_milli), badge_w, badge_h)
+    title = ui_rect(rect.x, rect.y, rect.width, ui_scaled(28, frame.scale_milli))
+    sub = ui_rect(rect.x, rect.y + ui_scaled(32, frame.scale_milli), rect.width, ui_scaled(18, frame.scale_milli))
+    badge_label = ui_rect(
+        badge.x + ui_scaled(12, frame.scale_milli),
+        badge.y + ui_scaled(8, frame.scale_milli),
+        badge.width,
+        badge.height
+    )
+
+    ui_label(window, frame, title, 3, 0x111827, "AILang UI")
+    ui_label(window, frame, sub, 1, 0x64748b, "Native micro platform")
+    ail_ui_draw_rect(window, badge.x, badge.y, badge.width, badge.height, 0xdbeafe)
+    ui_label(window, frame, badge_label, 1, 0x1d4ed8, "native .ail")
+
+    ui_rect_free(badge_label)
+    ui_rect_free(sub)
+    ui_rect_free(title)
+    ui_rect_free(badge)
+end
+
+
+def dashboard_draw_card(
+    window: int,
+    frame: UiFrame,
+    rect: UiRect,
+    accent: int,
+    title: string,
+    subtitle: string,
+    selected: int
+): void
+    if selected == 1 then
+        ail_ui_draw_rect(
+            window,
+            rect.x - ui_scaled(3, frame.scale_milli),
+            rect.y - ui_scaled(3, frame.scale_milli),
+            rect.width + ui_scaled(6, frame.scale_milli),
+            rect.height + ui_scaled(6, frame.scale_milli),
+            accent
+        )
+    end
+
+    ui_panel(window, frame, rect)
+    ail_ui_draw_rect(
+        window,
+        rect.x + ui_scaled(16, frame.scale_milli),
+        rect.y + ui_scaled(18, frame.scale_milli),
+        ui_scaled(44, frame.scale_milli),
+        ui_scaled(10, frame.scale_milli),
+        accent
+    )
+    title_rect = ui_rect(
+        rect.x + ui_scaled(16, frame.scale_milli),
+        rect.y + ui_scaled(40, frame.scale_milli),
+        rect.width,
+        rect.height
+    )
+    sub_rect = ui_rect(
+        rect.x + ui_scaled(16, frame.scale_milli),
+        rect.y + ui_scaled(66, frame.scale_milli),
+        rect.width,
+        rect.height
+    )
+    ui_label(window, frame, title_rect, 2, 0x334155, title)
+    ui_label(window, frame, sub_rect, 1, 0x64748b, subtitle)
+    ui_rect_free(sub_rect)
+    ui_rect_free(title_rect)
+end
+
+
+def dashboard_draw_cards(window: int, frame: UiFrame, rect: UiRect, state: DashboardState): void
+    row = ui_row(rect.x, rect.y, rect.width, rect.height, 20, frame.scale_milli)
+    gap_total = ui_scaled(40, frame.scale_milli)
+    card_w = (rect.width - gap_total) / 3
+    card_h = ui_scaled(96, frame.scale_milli)
+
+    selected_layout = 0
+    selected_text = 0
+    selected_backend = 0
+    if state.mode == 0 then
+        selected_layout = 1
+    end
+    if state.mode == 1 then
+        selected_text = 1
+    end
+    if state.mode == 2 then
+        selected_backend = 1
+    end
+
+    first = ui_layout_take(row, card_w, card_h)
+    second = ui_layout_take(row, card_w, card_h)
+    third = ui_layout_take(row, card_w, card_h)
+    dashboard_draw_card(window, frame, first, 0x2563eb, "Layout", "views", selected_layout)
+    dashboard_draw_card(window, frame, second, 0x10b981, "Text", "input", selected_text)
+    dashboard_draw_card(window, frame, third, 0xf59e0b, "Backend", "win32", selected_backend)
+    ui_rect_free(third)
+    ui_rect_free(second)
+    ui_rect_free(first)
+    ui_layout_free(row)
+end
+
+
+def dashboard_draw_timeline(window: int, frame: UiFrame, rect: UiRect): void
+    line_y = rect.y + ui_scaled(16, frame.scale_milli)
+    dot = ui_scaled(10, frame.scale_milli)
+    dot_y = rect.y + ui_scaled(12, frame.scale_milli)
+    mid = rect.x + (rect.width / 2)
+    right = rect.x + rect.width - dot
+
+    ail_ui_draw_rect(window, rect.x, line_y, rect.width, 2, 0xd1d5db)
+    ail_ui_draw_rect(window, rect.x, dot_y, dot, dot, 0x2563eb)
+    ail_ui_draw_rect(window, mid, dot_y, dot, dot, 0x10b981)
+    ail_ui_draw_rect(window, right, dot_y, dot, dot, 0xf59e0b)
+end
+
+
+def dashboard_draw_progress(window: int, frame: UiFrame, rect: UiRect, state: DashboardState): void
+    bar_w = rect.width - ui_scaled(24, frame.scale_milli)
+    bar_h = ui_scaled(8, frame.scale_milli)
+    bar_y = rect.y + ui_scaled(15, frame.scale_milli)
+    fill = dashboard_mode_fill(state, bar_w)
+
+    ail_ui_draw_rect(window, rect.x, bar_y, bar_w, bar_h, 0xe5e7eb)
+    ail_ui_draw_rect(window, rect.x, bar_y, fill, bar_h, 0x10b981)
+    label_rect = ui_rect(rect.x, rect.y + ui_scaled(28, frame.scale_milli), rect.width, rect.height)
+    ui_label(window, frame, label_rect, 1, 0x475569, dashboard_mode_text(state))
+    ui_rect_free(label_rect)
+end
+
+
+def dashboard_draw_actions(window: int, frame: UiFrame, rect: UiRect, state: DashboardState): int
+    changed = 0
+    row = ui_row(rect.x, rect.y, rect.width, rect.height, 12, frame.scale_milli)
+    preview = ui_layout_take(row, ui_scaled(140, frame.scale_milli), ui_scaled(42, frame.scale_milli))
+    export = ui_layout_take(row, ui_scaled(160, frame.scale_milli), ui_scaled(42, frame.scale_milli))
+    progress = ui_layout_take(row, ui_scaled(190, frame.scale_milli), ui_scaled(42, frame.scale_milli))
+
+    if ui_button(window, frame, 101, preview, "Preview", 0) == 1 then
+        if state.mode != 1 then
+            state.mode = 1
+            changed = 1
+        end
+    end
+
+    if ui_button(window, frame, 102, export, "Export", 1) == 1 then
+        if state.mode != 2 then
+            state.mode = 2
+            changed = 1
+        end
+    end
+
+    dashboard_draw_progress(window, frame, progress, state)
+    ui_rect_free(progress)
+    ui_rect_free(export)
+    ui_rect_free(preview)
+    ui_layout_free(row)
+    return changed
+end
+
+
+def dashboard_draw_content(window: int, width: int, height: int, frame: UiFrame, state: DashboardState): int
+    changed = 0
+    margin = ui_scaled(44, frame.scale_milli)
+    top = ui_scaled(46, frame.scale_milli)
+    panel_w = ui_scaled(650, frame.scale_milli)
+    panel_h = ui_scaled(392, frame.scale_milli)
+    max_w = width - margin - margin
+    max_h = height - ui_scaled(96, frame.scale_milli)
+
+    if panel_w > max_w then
+        panel_w = max_w
+    end
+    if panel_h > max_h then
+        panel_h = max_h
+    end
+
+    panel = ui_rect(margin, top, panel_w, panel_h)
+    dashboard_draw_chrome(window, frame, panel, "AILang desktop")
+    clip = ui_rect_inset(panel, 1)
+    ui_clip(window, clip)
+
+    content = ui_rect(
+        panel.x + ui_scaled(32, frame.scale_milli),
+        panel.y + ui_scaled(54, frame.scale_milli),
+        panel.width - ui_scaled(64, frame.scale_milli),
+        panel.height - ui_scaled(86, frame.scale_milli)
+    )
+    root = ui_column(content.x, content.y, content.width, content.height, 18, frame.scale_milli)
+    header = ui_layout_take(root, 0, ui_scaled(42, frame.scale_milli))
+    cards = ui_layout_take(root, 0, ui_scaled(104, frame.scale_milli))
+    timeline = ui_layout_take(root, 0, ui_scaled(34, frame.scale_milli))
+    actions = ui_layout_take(root, 0, ui_scaled(48, frame.scale_milli))
+
+    dashboard_draw_header(window, frame, header)
+    dashboard_draw_cards(window, frame, cards, state)
+    dashboard_draw_timeline(window, frame, timeline)
+    if dashboard_draw_actions(window, frame, actions, state) == 1 then
+        changed = 1
+    end
+
+    ui_clear_clip(window)
+    dashboard_draw_desktop_bar(window, frame, width, height, state)
+    ui_rect_free(actions)
+    ui_rect_free(timeline)
+    ui_rect_free(cards)
+    ui_rect_free(header)
+    ui_layout_free(root)
+    ui_rect_free(content)
+    ui_rect_free(clip)
+    ui_rect_free(panel)
+    return changed
+end

@@ -1,0 +1,110 @@
+// AILang-native SVG graphics helpers.
+//
+// This module intentionally uses only existing AILang functions and builtins.
+// It is a small bridge toward declarative UI without adding compiler syntax.
+
+def svg_escape_text(value: string): string
+    amp = str_replace(value, "&", "&amp;")
+    lt = str_replace(amp, "<", "&lt;")
+    gt = str_replace(lt, ">", "&gt;")
+    return gt
+end
+
+
+def svg_escape_attr(value: string): string
+    base = svg_escape_text(value)
+    apos = str_replace(base, "'", "&#39;")
+    quot = str_replace(apos, "\"", "&quot;")
+    return quot
+end
+
+
+def svg_begin(width: int, height: int, background: string): string
+    w = str(width)
+    h = str(height)
+    return "<svg xmlns='http://www.w3.org/2000/svg' width='" + w
+        + "' height='" + h + "' viewBox='0 0 " + w + " " + h
+        + "'>\n<rect x='0' y='0' width='100%' height='100%' fill='"
+        + background + "'/>\n"
+end
+
+
+def svg_end(): string
+    return "</svg>\n"
+end
+
+
+def svg_group_begin(id: string): string
+    return "<g id='" + svg_escape_attr(id) + "'>\n"
+end
+
+
+def svg_group_end(): string
+    return "</g>\n"
+end
+
+
+def svg_rect(x: int, y: int, width: int, height: int, fill: string, radius: int): string
+    return "<rect x='" + str(x) + "' y='" + str(y) + "' width='" + str(width)
+        + "' height='" + str(height) + "' rx='" + str(radius)
+        + "' fill='" + fill + "'/>\n"
+end
+
+
+def svg_stroked_rect(x: int, y: int, width: int, height: int, fill: string, stroke: string, radius: int): string
+    return "<rect x='" + str(x) + "' y='" + str(y) + "' width='" + str(width)
+        + "' height='" + str(height) + "' rx='" + str(radius)
+        + "' fill='" + fill + "' stroke='" + stroke + "'/>\n"
+end
+
+
+def svg_circle(cx: int, cy: int, radius: int, fill: string): string
+    return "<circle cx='" + str(cx) + "' cy='" + str(cy) + "' r='" + str(radius)
+        + "' fill='" + fill + "'/>\n"
+end
+
+
+def svg_line(x1: int, y1: int, x2: int, y2: int, stroke: string, width: int): string
+    return "<line x1='" + str(x1) + "' y1='" + str(y1) + "' x2='" + str(x2)
+        + "' y2='" + str(y2) + "' stroke='" + stroke + "' stroke-width='"
+        + str(width) + "'/>\n"
+end
+
+
+def svg_text(x: int, y: int, size: int, fill: string, value: string): string
+    return "<text x='" + str(x) + "' y='" + str(y)
+        + "' font-family='Segoe UI, Arial, sans-serif' font-size='" + str(size)
+        + "' fill='" + fill + "'>" + svg_escape_text(value) + "</text>\n"
+end
+
+
+def svg_text_weight(x: int, y: int, size: int, weight: int, fill: string, value: string): string
+    return "<text x='" + str(x) + "' y='" + str(y)
+        + "' font-family='Segoe UI, Arial, sans-serif' font-size='" + str(size)
+        + "' font-weight='" + str(weight) + "' fill='" + fill + "'>"
+        + svg_escape_text(value) + "</text>\n"
+end
+
+
+def svg_panel(x: int, y: int, width: int, height: int, fill: string, stroke: string): string
+    shadow = svg_rect(x + 3, y + 4, width, height, "#00000022", 8)
+    body = svg_stroked_rect(x, y, width, height, fill, stroke, 8)
+    return shadow + body
+end
+
+
+def svg_button(x: int, y: int, width: int, height: int, label: string, fill: string, text_fill: string): string
+    text_x = x + 16
+    text_y = y + (height / 2) + 5
+    shadow = svg_rect(x + 2, y + 3, width, height, "#00000030", 6)
+    body = svg_stroked_rect(x, y, width, height, fill, "#00000026", 6)
+    caption = svg_text_weight(text_x, text_y, 14, 600, text_fill, label)
+    return shadow + body + caption
+end
+
+
+def svg_badge(x: int, y: int, label: string, fill: string, text_fill: string): string
+    body = svg_rect(x, y, 96, 26, fill, 13)
+    caption = svg_text_weight(x + 14, y + 18, 12, 600, text_fill, label)
+    return body + caption
+end

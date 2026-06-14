@@ -1,0 +1,19 @@
+def recursive_fib(n):
+    if n <= 1 then
+        return 1
+    end
+    return recursive_fib(n - 1) + recursive_fib(n - 2)
+end
+
+
+def recursive_bench(iterations):
+    return recursive_fib(iterations)
+end
+
+
+def main(): int
+    depth = 32
+    result = recursive_bench(depth)
+    print(result)
+    return 0
+end

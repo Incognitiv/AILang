@@ -1,0 +1,6 @@
+import source.ui.qml_bridge
+
+
+def main(): int
+    return qml_bridge_run_default()
+end

@@ -1,0 +1,490 @@
+window ui_desktop:
+    width -> 2048 px
+    height -> 1125 px
+    title -> "AILang UI - workspace"
+    background -> #1e1e1e
+    layout -> "absolute"
+
+    caption:
+        type -> "default"
+        height -> 42 px
+        background -> #172730
+        background_end -> #131a21
+        border -> #05070a
+        title_color -> #e8eef5
+        title_x -> 30 px
+        title_y -> 12 px
+        icon_x -> 10 px
+        icon_y -> 15 px
+        icon_fill -> #0f253c
+        icon_border -> #1169b1
+
+        controls:
+            position -> "right"
+            top -> 1 px
+            right -> 10 px
+            width -> 132 px
+            height -> 30 px
+            minimize_width -> 42 px
+            middle_width -> 42 px
+            close_width -> 50 px
+            middle_offset -> 41 px
+            close_offset -> 82 px
+            normal_fill -> transparent
+            close_fill -> transparent
+            glyph -> #e7f8f4
+        end
+    end
+
+    body:
+        layout -> "absolute"
+        x -> 0 px
+        y -> 0 px
+        width -> 2048 px
+        height -> 1125 px
+
+        menubar:
+            x -> 0 px
+            y -> 42 px
+            width -> 2048 px
+            right -> 0 px
+            height -> 30 px
+            background -> #2d2d30
+            border_bottom -> #3f3f46
+
+            text:
+                x -> 15 px
+                y -> 9 px
+                text -> "File"
+                color -> #c7ccd3
+            end
+            text:
+                x -> 59 px
+                y -> 9 px
+                text -> "Edit"
+                color -> #c7ccd3
+            end
+            text:
+                x -> 103 px
+                y -> 9 px
+                text -> "View"
+                color -> #c7ccd3
+            end
+            text:
+                x -> 151 px
+                y -> 9 px
+                text -> "Build"
+                color -> #c7ccd3
+            end
+            text:
+                x -> 207 px
+                y -> 9 px
+                text -> "Debug"
+                color -> #c7ccd3
+            end
+            text:
+                x -> 271 px
+                y -> 9 px
+                text -> "Tools"
+                color -> #c7ccd3
+            end
+            text:
+                x -> 331 px
+                y -> 9 px
+                text -> "Extensions"
+                color -> #c7ccd3
+            end
+            text:
+                x -> 453 px
+                y -> 9 px
+                text -> "Window"
+                color -> #c7ccd3
+            end
+            text:
+                x -> 529 px
+                y -> 9 px
+                text -> "Help"
+                color -> #c7ccd3
+            end
+        end
+
+        toolbar:
+            x -> 0 px
+            y -> 72 px
+            width -> 2048 px
+            right -> 0 px
+            height -> 36 px
+            background -> #25282e
+            border_bottom -> #3f3f46
+
+            text:
+                x -> 16 px
+                y -> 13 px
+                text -> "<"
+                color -> #9aa7b5
+            end
+            panel debug_combo:
+                x -> 40 px
+                y -> 6 px
+                width -> 110 px
+                height -> 26 px
+                background -> #2a2d33
+                border -> #3b414a
+                text:
+                    x -> 14 px
+                    y -> 6 px
+                    text -> "Debug"
+                    color -> #dfe7ef
+                end
+                text:
+                    x -> 86 px
+                    y -> 6 px
+                    text -> "v"
+                    color -> #93a2b5
+                end
+            end
+            panel arch_combo:
+                x -> 155 px
+                y -> 6 px
+                width -> 88 px
+                height -> 26 px
+                background -> #2a2d33
+                border -> #3b414a
+                text:
+                    x -> 14 px
+                    y -> 6 px
+                    text -> "x64"
+                    color -> #dfe7ef
+                end
+                text:
+                    x -> 64 px
+                    y -> 6 px
+                    text -> "v"
+                    color -> #93a2b5
+                end
+            end
+            text:
+                x -> 258 px
+                y -> 13 px
+                text -> "Run testing34"
+                color -> #6bc275
+            end
+            text:
+                x -> 370 px
+                y -> 13 px
+                text -> "Stop"
+                color -> #93a2b5
+            end
+        end
+
+        panel solution_explorer:
+            x -> 0 px
+            y -> 108 px
+            width -> 342 px
+            height -> 1017 px
+            bottom -> 0 px
+            background -> #252526
+            border -> #3f3f46
+
+            text:
+                x -> 10 px
+                y -> 20 px
+                text -> "SOLUTION EXPLORER"
+                color -> #dfe7ef
+            end
+            text:
+                x -> 312 px
+                y -> 17 px
+                text -> "Q"
+                color -> #a9b4c0
+            end
+            rect:
+                x -> 1 px
+                y -> 50 px
+                width -> 340 px
+                height -> 27 px
+                fill -> #3b3b40
+            end
+            text:
+                x -> 50 px
+                y -> 55 px
+                text -> "testing34"
+                color -> #c7ccd3
+            end
+            text:
+                x -> 31 px
+                y -> 82 px
+                text -> "v"
+                color -> #c7ccd3
+            end
+            text:
+                x -> 72 px
+                y -> 82 px
+                text -> "Source Files"
+                color -> #dfe7ef
+            end
+            text:
+                x -> 98 px
+                y -> 109 px
+                text -> "application.cxx"
+                color -> #c7ccd3
+            end
+            text:
+                x -> 98 px
+                y -> 136 px
+                text -> "main.cxx"
+                color -> #c7ccd3
+            end
+            text:
+                x -> 98 px
+                y -> 163 px
+                text -> "new_file1.cxx"
+                color -> #c7ccd3
+            end
+            text:
+                x -> 98 px
+                y -> 190 px
+                text -> "new_file2.cxx"
+                color -> #c7ccd3
+            end
+            text:
+                x -> 98 px
+                y -> 217 px
+                text -> "new_file3.cxx"
+                color -> #c7ccd3
+            end
+            text:
+                x -> 98 px
+                y -> 244 px
+                text -> "renderer.cxx"
+                color -> #c7ccd3
+            end
+            text:
+                x -> 31 px
+                y -> 289 px
+                text -> "v"
+                color -> #c7ccd3
+            end
+            text:
+                x -> 72 px
+                y -> 289 px
+                text -> "Header Files"
+                color -> #dfe7ef
+            end
+            text:
+                x -> 98 px
+                y -> 316 px
+                text -> "application.hxx"
+                color -> #c7ccd3
+            end
+            text:
+                x -> 98 px
+                y -> 343 px
+                text -> "renderer.hxx"
+                color -> #c7ccd3
+            end
+            text:
+                x -> 31 px
+                y -> 384 px
+                text -> "v"
+                color -> #c7ccd3
+            end
+            text:
+                x -> 72 px
+                y -> 384 px
+                text -> "Resource Files"
+                color -> #dfe7ef
+            end
+            text:
+                x -> 98 px
+                y -> 411 px
+                text -> "app.rc"
+                color -> #c7ccd3
+            end
+            text:
+                x -> 98 px
+                y -> 438 px
+                text -> "testing34.mxs"
+                color -> #c7ccd3
+            end
+        end
+
+        panel editor:
+            x -> 342 px
+            y -> 108 px
+            width -> 1364 px
+            right -> 342 px
+            height -> 833 px
+            bottom -> 184 px
+            background -> #1e1e1e
+            border -> #50555d
+
+            text:
+                x -> 612 px
+                y -> 391 px
+                text -> "No file is open."
+                color -> #93a2b5
+            end
+            text:
+                x -> 542 px
+                y -> 417 px
+                text -> "Use File > New File... to start editing."
+                color -> #93a2b5
+            end
+            text:
+                x -> 616 px
+                y -> 463 px
+                text -> "Create New File"
+                color -> #dfe7ef
+            end
+        end
+
+        panel output:
+            x -> 342 px
+            y -> 941 px
+            width -> 1364 px
+            right -> 342 px
+            height -> 184 px
+            bottom -> 0 px
+            background -> #1e1e1e
+            border -> #50555d
+
+            rect:
+                x -> 0 px
+                y -> 0 px
+                width -> 1364 px
+                height -> 30 px
+                fill -> #252526
+            end
+            text:
+                x -> 22 px
+                y -> 8 px
+                text -> "Output"
+                color -> #78bbff
+            end
+            rect:
+                x -> 12 px
+                y -> 28 px
+                width -> 70 px
+                height -> 2 px
+                fill -> #007acc
+            end
+            text:
+                x -> 104 px
+                y -> 8 px
+                text -> "Problems"
+                color -> #c7ccd3
+            end
+            text:
+                x -> 194 px
+                y -> 8 px
+                text -> "Terminal"
+                color -> #c7ccd3
+            end
+            text:
+                x -> 290 px
+                y -> 8 px
+                text -> "Build"
+                color -> #c7ccd3
+            end
+            text:
+                x -> 12 px
+                y -> 48 px
+                text -> "Run a Python file or build CMake executable with Debug > Start Without Debugging or Ctrl+F5 to see process output here."
+                color -> #dfe7ef
+            end
+        end
+
+        panel properties:
+            x -> 1706 px
+            y -> 108 px
+            width -> 342 px
+            right -> 0 px
+            height -> 1017 px
+            bottom -> 0 px
+            background -> #252526
+            border -> #3f3f46
+
+            text:
+                x -> 12 px
+                y -> 20 px
+                text -> "PROPERTIES"
+                color -> #dfe7ef
+            end
+            text:
+                x -> 318 px
+                y -> 17 px
+                text -> "#"
+                color -> #a9b4c0
+            end
+            text:
+                x -> 38 px
+                y -> 64 px
+                text -> "(none)"
+                color -> #dfe7ef
+            end
+
+            property_grid:
+                x -> 12 px
+                y -> 88 px
+                key_width -> 132 px
+                value_width -> 184 px
+                row_height -> 32 px
+                key_fill -> #2d2d30
+                value_fill -> #1e1e1e
+                border -> #3f3f46
+                key_color -> #9399a1
+                value_color -> #c7ccd3
+
+                row:
+                    label -> "File Name"
+                    value -> "(none)"
+                end
+                row:
+                    label -> "Full Path"
+                    value -> "..."
+                end
+                row:
+                    label -> "Size"
+                    value -> "0 KB"
+                end
+                row:
+                    label -> "Encoding"
+                    value -> "UTF-8"
+                end
+                row:
+                    label -> "Item Type"
+                    value -> "None"
+                end
+            end
+
+            text:
+                x -> 12 px
+                y -> 272 px
+                text -> "ADVANCED"
+                color -> #dfe7ef
+            end
+            property_grid:
+                x -> 12 px
+                y -> 304 px
+                key_width -> 132 px
+                value_width -> 184 px
+                row_height -> 32 px
+                key_fill -> #2d2d30
+                value_fill -> #1e1e1e
+                border -> #3f3f46
+                key_color -> #9399a1
+                value_color -> #c7ccd3
+
+                row:
+                    label -> "Build Action"
+                    value -> "Compile"
+                end
+                row:
+                    label -> "Copy to Output"
+                    value -> "Do not copy"
+                end
+            end
+        end
+    end
+end

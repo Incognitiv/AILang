@@ -1,0 +1,515 @@
+import source.ui.ui_backend
+import stdlib.ui.effects
+
+const int UI_EVENT_CLOSE = 1
+const int UI_EVENT_MOUSE_MOVE = 3
+const int UI_EVENT_MOUSE_DOWN = 4
+const int UI_EVENT_MOUSE_UP = 5
+
+const int DESIGN_W = 1366
+const int DESIGN_H = 768
+const int TASKBAR_H = 48
+
+const int START_W = 410
+const int START_H = 500
+const int START_HEADER_H = 56
+const int START_FOOTER_H = 44
+const int START_ITEM_H = 30
+const int START_ORB = 42
+
+const int HIT_NONE = 0
+const int HIT_START = 1
+const int HIT_ICON_COMPUTER = 2
+const int HIT_ICON_RECYCLE = 3
+const int HIT_ICON_USER = 4
+const int HIT_ICON_DOCS = 5
+const int HIT_ICON_WEB = 6
+const int HIT_SHUTDOWN = 7
+
+static int hover = HIT_NONE
+static int pressed = HIT_NONE
+static int start_open = 1
+static int selected_icon = HIT_ICON_WEB
+static int quit_requested = 0
+static int W = DESIGN_W
+static int H = DESIGN_H
+static int TASKBAR_Y = DESIGN_H - TASKBAR_H
+
+
+def sync_view(window: int): int
+    next_w = ail_ui_window_width_px(window)
+    next_h = ail_ui_window_height_px(window)
+    changed = 0
+    if next_w > 0 then
+        if next_w != W then
+            changed = 1
+        end
+        W = next_w
+    end
+    if next_h > 0 then
+        if next_h != H then
+            changed = 1
+        end
+        H = next_h
+    end
+    TASKBAR_Y = H - TASKBAR_H
+    return changed
+end
+
+
+def contains(mx: int, my: int, x: int, y: int, width: int, height: int): int
+    if mx < x then
+        return 0
+    end
+    if my < y then
+        return 0
+    end
+    if mx >= x + width then
+        return 0
+    end
+    if my >= y + height then
+        return 0
+    end
+    return 1
+end
+
+
+def text(window: int, x: int, y: int, size_px: int, weight: int, color: int, value: string): void
+    ail_ui_draw_text_font(window, x, y, size_px, weight, color, "Segoe UI", value)
+end
+
+
+def text_shadow(window: int, x: int, y: int, size_px: int, weight: int, color: int, value: string): void
+    ui_effect_text_shadow(window, x, y, size_px, weight, color, 0x000000, "Segoe UI", value)
+end
+
+
+def wallpaper_segment(y: int, y0: int, y1: int, c0: int, c1: int): int
+    if y <= y0 then
+        return c0
+    end
+    if y >= y1 then
+        return c1
+    end
+    return ui_paint_lerp_color(c0, c1, y - y0, y1 - y0)
+end
+
+
+def wallpaper_color(y: int): int
+    p15 = (H * 15) / 100
+    p40 = (H * 40) / 100
+    p60 = (H * 60) / 100
+    p85 = (H * 85) / 100
+    if y < p15 then
+        return wallpaper_segment(y, 0, p15, 0x1a1a2e, 0x16213e)
+    end
+    if y < p40 then
+        return wallpaper_segment(y, p15, p40, 0x16213e, 0x0f3460)
+    end
+    if y < p60 then
+        return wallpaper_segment(y, p40, p60, 0x0f3460, 0x1a1a3e)
+    end
+    if y < p85 then
+        return wallpaper_segment(y, p60, p85, 0x1a1a3e, 0x141428)
+    end
+    return wallpaper_segment(y, p85, H, 0x141428, 0x0e0e1e)
+end
+
+
+def aurora_curve(window: int, start_x: int, slope: int, curve: int, thickness: int, color: int): void
+    yy = 0
+    while yy < H then
+        x = start_x + ((yy * slope) / H) + ((yy * yy * curve) / (H * H))
+        draw_y = H - yy - 1
+        px = 0
+        while px < thickness then
+            if x + px >= 0 and x + px < W then
+                ail_ui_draw_rect(window, x + px, draw_y, 1, 1, color)
+            end
+            px = px + 1
+        end
+        yy = yy + 1
+    end
+end
+
+
+def mddm_wallpaper(window: int): int
+    // Port of MDDM shell/qml/WallpaperBackground.qml preset "Midnight Blue".
+    yy = 0
+    while yy < H then
+        ail_ui_draw_rect(window, 0, yy, W, 1, wallpaper_color(yy))
+        yy = yy + 1
+    end
+    aurora_curve(window, (W * 30) / 100, 230, 320, 2, ui_effect_blend(0x16213e, 0x4d80ff, 220))
+    aurora_curve(window, (W * 40) / 100, 270, 220, 2, ui_effect_blend(0x16213e, 0x6ea8ff, 250))
+    aurora_curve(window, (W * 50) / 100, 220, 170, 2, ui_effect_blend(0x16213e, 0x8fb8ff, 280))
+    aurora_curve(window, (W * 55) / 100, 180, 130, 1, ui_effect_blend(0x16213e, 0x4d80ff, 150))
+    return 0x0e0e1e
+end
+
+
+def logo(window: int, x: int, y: int, tile: int): void
+    gap = 2
+    ail_ui_draw_rect(window, x, y, tile, tile, 0xf97316)
+    ail_ui_draw_rect(window, x + tile + gap, y, tile, tile, 0x22c55e)
+    ail_ui_draw_rect(window, x, y + tile + gap, tile, tile, 0x38bdf8)
+    ail_ui_draw_rect(window, x + tile + gap, y + tile + gap, tile, tile, 0xfacc15)
+end
+
+
+def glyph_computer(window: int, x: int, y: int): void
+    ui_effect_rounded_box(window, x + 9, y + 4, 34, 26, 2, 0xdbeafe, 0xffffff, 1)
+    ail_ui_draw_rect(window, x + 14, y + 9, 24, 14, 0x1d4f8f)
+    ail_ui_draw_rect(window, x + 23, y + 31, 8, 5, 0xa3aebc)
+    ail_ui_draw_rect(window, x + 17, y + 36, 20, 3, 0xd1d5db)
+end
+
+
+def glyph_recycle(window: int, x: int, y: int): void
+    ui_effect_rounded_box(window, x + 13, y + 3, 28, 36, 3, 0xdbe2ec, 0xffffff, 1)
+    ail_ui_draw_rect(window, x + 16, y + 8, 22, 3, 0x8c98a8)
+    ail_ui_draw_rect(window, x + 17, y + 15, 20, 2, 0x4b5563)
+    ail_ui_draw_rect(window, x + 18, y + 22, 18, 2, 0x4b5563)
+    ail_ui_draw_rect(window, x + 19, y + 29, 16, 2, 0x4b5563)
+end
+
+
+def glyph_user(window: int, x: int, y: int): void
+    ui_effect_rounded_rect(window, x + 18, y + 8, 18, 18, 9, 0x6b3c6a)
+    ail_ui_draw_rect(window, x + 12, y + 29, 30, 12, 0x6b3c6a)
+end
+
+
+def glyph_folder(window: int, x: int, y: int): void
+    ui_effect_rounded_box(window, x + 8, y + 12, 36, 26, 3, 0xffc43d, 0xffdf75, 1)
+    ail_ui_draw_rect(window, x + 9, y + 8, 18, 8, 0xffc43d)
+end
+
+
+def glyph_web(window: int, x: int, y: int): void
+    ui_effect_rounded_box(window, x + 9, y + 5, 36, 36, 18, 0x2d76c7, 0x9ed3ff, 1)
+    ail_ui_draw_rect(window, x + 15, y + 22, 24, 2, 0xc8edff)
+    ail_ui_draw_rect(window, x + 27, y + 10, 2, 26, 0xc8edff)
+    ui_effect_rounded_rect(window, x + 18, y + 13, 18, 24, 9, 0x2d76c7)
+end
+
+
+def icon_glyph(window: int, x: int, y: int, kind: int): void
+    if kind == HIT_ICON_COMPUTER then
+        glyph_computer(window, x, y)
+        return
+    end
+    if kind == HIT_ICON_RECYCLE then
+        glyph_recycle(window, x, y)
+        return
+    end
+    if kind == HIT_ICON_USER then
+        glyph_user(window, x, y)
+        return
+    end
+    if kind == HIT_ICON_DOCS then
+        glyph_folder(window, x, y)
+        return
+    end
+    glyph_web(window, x, y)
+end
+
+
+def desktop_icon(window: int, x: int, y: int, kind: int, label1: string, label2: string): void
+    selected = selected_icon == kind
+    hot = hover == kind
+    if selected or hot then
+        fill = ui_effect_blend(wallpaper_color(y + 36), 0x4d80ff, 350)
+        ui_effect_rounded_box(window, x - 5, y - 4, 64, 58, 3, fill, 0x6a93d8, 1)
+    end
+    icon_glyph(window, x, y, kind)
+    text_shadow(window, x - 1, y + 50, 9, 500, 0xffffff, label1)
+    if strlen(label2) > 0 then
+        text_shadow(window, x + 6, y + 64, 9, 500, 0xffffff, label2)
+    end
+end
+
+
+def desktop_icons(window: int): void
+    desktop_icon(window, 16, 18, HIT_ICON_COMPUTER, "My Computer", "")
+    desktop_icon(window, 16, 88, HIT_ICON_RECYCLE, "Recycle Bin", "")
+    desktop_icon(window, 16, 158, HIT_ICON_USER, "V", "")
+    desktop_icon(window, 16, 228, HIT_ICON_DOCS, "My", "Documents")
+    desktop_icon(window, 16, 298, HIT_ICON_WEB, "Internet", "")
+end
+
+
+def orb(window: int, x: int, y: int): void
+    fill_top = 0x3b8dd6
+    fill_mid = 0x1e6ab0
+    fill_bot = 0x0f4c8a
+    if hover == HIT_START then
+        fill_top = 0x5ba3e6
+        fill_mid = 0x2a7bc4
+        fill_bot = 0x1a5fa0
+    end
+    if pressed == HIT_START then
+        fill_top = 0x1e6ab0
+        fill_mid = 0x155a98
+        fill_bot = 0x0a315c
+    end
+    ui_effect_soft_shadow(window, x, y, START_ORB, START_ORB, 21, 0, 2, 6, 0x000000, 0x0e0e1e, 360)
+    ui_effect_rounded_box(window, x, y, START_ORB, START_ORB, 21, fill_mid, 0x8ab8e8, 1)
+    ui_effect_rounded_rect(window, x + 2, y + 2, START_ORB - 4, START_ORB / 2, 19, ui_effect_blend(fill_top, 0xffffff, 320))
+    ui_effect_rounded_rect(window, x + 4, y + 22, START_ORB - 8, 14, 14, fill_bot)
+    logo(window, x + 13, y + 13, 7)
+end
+
+
+def task_button(window: int, x: int, title: string, active: int): void
+    fill = 0x000000
+    border = 0x000000
+    if active == 1 then
+        fill = ui_effect_blend(0x000000, 0xffffff, 190)
+        border = ui_effect_blend(0x000000, 0xffffff, 150)
+    end
+    ui_effect_rounded_box(window, x, TASKBAR_Y + 6, 150, TASKBAR_H - 10, 3, fill, border, 1)
+    if active == 1 then
+        ail_ui_draw_rect(window, x + 16, TASKBAR_Y + TASKBAR_H - 5, 118, 2, 0x0ea5e9)
+    end
+    ail_ui_draw_rect(window, x + 10, TASKBAR_Y + 15, 14, 14, 0xcbd5e1)
+    text(window, x + 32, TASKBAR_Y + 13, 11, 400, 0xffffff, title)
+end
+
+
+def tray(window: int): void
+    x = W - 122
+    ail_ui_draw_rect(window, x - 1, TASKBAR_Y + 4, 1, TASKBAR_H - 8, 0x223044)
+    ail_ui_draw_rect(window, x + 14, TASKBAR_Y + 19, 8, 8, 0x4ea3ff)
+    ail_ui_draw_rect(window, x + 30, TASKBAR_Y + 18, 8, 10, 0x22c55e)
+    ail_ui_draw_rect(window, x + 46, TASKBAR_Y + 19, 8, 8, 0xf59e0b)
+    text(window, x + 70, TASKBAR_Y + 13, 11, 500, 0xffffff, "8:11 PM")
+end
+
+
+def taskbar(window: int): void
+    ail_ui_draw_rect(window, 0, TASKBAR_Y, W, TASKBAR_H, 0x000000)
+    ail_ui_draw_rect(window, 0, TASKBAR_Y, W, 1, 0x2c3340)
+    ail_ui_draw_rect(window, 0, TASKBAR_Y + 1, W, 1, ui_effect_blend(0x000000, 0xffffff, 70))
+    orb(window, 4, TASKBAR_Y + 3)
+    task_button(window, 58, "Computer", 1)
+    task_button(window, 214, "Command Prompt", 1)
+    tray(window)
+end
+
+
+def app_row(window: int, x: int, y: int, label: string, color: int, hot: int): void
+    fill = 0x000000
+    if hot == 1 then
+        fill = ui_effect_blend(0x000000, 0xffffff, 115)
+    end
+    ail_ui_draw_rect(window, x, y, 232, START_ITEM_H, fill)
+    ail_ui_draw_rect(window, x + 10, y + 8, 14, 14, color)
+    text(window, x + 34, y + 8, 10, 400, 0xeef2f7, label)
+end
+
+
+def side_row(window: int, x: int, y: int, label: string, color: int, bold: int): void
+    ail_ui_draw_rect(window, x, y, 164, 28, 0x000000)
+    ail_ui_draw_rect(window, x + 10, y + 8, 12, 12, color)
+    weight = 400
+    if bold == 1 then
+        weight = 700
+    end
+    text(window, x + 34, y + 7, 10, weight, 0xe8edf6, label)
+end
+
+
+def start_menu(window: int): void
+    if start_open == 0 then
+        return
+    end
+    x = 0
+    y = TASKBAR_Y - START_H
+    ui_effect_soft_shadow(window, x, y, START_W, START_H, 0, 8, 7, 10, 0x000000, wallpaper_color(y + START_H), 300)
+    ui_effect_fake_glass_panel(window, x, y, START_W, START_H, 0, wallpaper_color(y + START_H), 0x0b101c, 0x4d80ff, 920)
+    ui_draw_gradient_rect(window, x, y, START_W, START_HEADER_H, 0x335a8c, 0x203a60, 0)
+    ui_effect_rounded_box(window, x + 10, y + 8, 40, 40, 2, 0x2c6bac, 0xffffff, 2)
+    glyph_user(window, x + 3, y + 8)
+    text_shadow(window, x + 62, y + 15, 15, 700, 0xffffff, "V")
+
+    content_h = START_H - START_HEADER_H - START_FOOTER_H
+    left_w = 238
+    side_x = x + left_w + 1
+    content_y = y + START_HEADER_H
+    ail_ui_draw_rect(window, x, content_y, left_w, content_h, ui_effect_blend(0x0b101c, 0xffffff, 60))
+    ail_ui_draw_rect(window, x + left_w, content_y, 1, content_h, ui_effect_blend(0x000000, 0xffffff, 120))
+    ail_ui_draw_rect(window, side_x, content_y, START_W - left_w - 1, content_h, ui_effect_blend(0x000000, 0xffffff, 35))
+
+    app_y = content_y + 4
+    app_row(window, x + 4, app_y, "Internet Explorer", 0x38bdf8, 0)
+    app_row(window, x + 4, app_y + 30, "Windows Mail", 0x60a5fa, 0)
+    app_row(window, x + 4, app_y + 60, "Windows Media Player", 0xf472b6, 0)
+    app_row(window, x + 4, app_y + 90, "Windows Photo Viewer", 0x8b5cf6, 0)
+    app_row(window, x + 4, app_y + 120, "Calculator", 0xfacc15, 0)
+    app_row(window, x + 4, app_y + 150, "Notepad", 0xe5e7eb, 0)
+    app_row(window, x + 4, app_y + 180, "Paint", 0xef4444, 0)
+    app_row(window, x + 4, app_y + 210, "Command Prompt", 0x111827, 0)
+    app_row(window, x + 4, app_y + 240, "Windows Explorer", 0xf59e0b, 0)
+    app_row(window, x + 4, app_y + 270, "Task Manager", 0x94a3b8, 0)
+    app_row(window, x + 4, app_y + 300, "Control Panel", 0xa3a3a3, 0)
+    app_row(window, x + 4, app_y + 330, "Games", 0x8b5cf6, 0)
+    ail_ui_draw_rect(window, x + 18, y + START_H - START_FOOTER_H - 24, left_w - 36, 1, ui_effect_blend(0x000000, 0xffffff, 120))
+    text(window, x + 78, y + START_H - START_FOOTER_H - 18, 10, 400, 0xd6deea, "All Programs  >")
+
+    side_row(window, side_x + 10, content_y + 8, "V", 0x6b3c6a, 1)
+    side_row(window, side_x + 10, content_y + 38, "Documents", 0xdbeafe, 0)
+    side_row(window, side_x + 10, content_y + 68, "Pictures", 0x22c55e, 0)
+    side_row(window, side_x + 10, content_y + 98, "Music", 0xf472b6, 0)
+    side_row(window, side_x + 10, content_y + 128, "Games", 0x8b5cf6, 0)
+    side_row(window, side_x + 10, content_y + 158, "Computer", 0x38bdf8, 0)
+    side_row(window, side_x + 10, content_y + 188, "Control Panel", 0xa3a3a3, 0)
+    side_row(window, side_x + 10, content_y + 218, "Devices and Printers", 0xd1d5db, 0)
+    side_row(window, side_x + 10, content_y + 248, "Default Programs", 0xf59e0b, 0)
+    side_row(window, side_x + 10, content_y + 278, "Help and Support", 0xef4444, 0)
+
+    footer_y = y + START_H - START_FOOTER_H
+    ui_draw_gradient_rect(window, x, footer_y, START_W, START_FOOTER_H, 0x1e2d46, 0x101827, 1)
+    ui_effect_rounded_box(window, x + 8, footer_y + 8, 300, 28, 3, 0x09111e, 0x2b3d5a, 1)
+    text(window, x + 34, footer_y + 16, 10, 400, 0x9aa7bb, "Search programs and files")
+    shutdown_fill = 0x0f4c8a
+    if hover == HIT_SHUTDOWN then
+        shutdown_fill = 0x1a5fa0
+    end
+    ui_effect_rounded_box(window, x + START_W - 76, footer_y + 8, 68, 28, 3, shutdown_fill, 0x68a9e8, 1)
+    text(window, x + START_W - 68, footer_y + 16, 9, 500, 0xffffff, "Shut down")
+end
+
+
+def hit_test(mx: int, my: int): int
+    if contains(mx, my, 4, TASKBAR_Y + 3, START_ORB, START_ORB) == 1 then
+        return HIT_START
+    end
+    if start_open == 1 and contains(mx, my, START_W - 76, TASKBAR_Y - START_H + START_H - START_FOOTER_H + 8, 68, 28) == 1 then
+        return HIT_SHUTDOWN
+    end
+    if contains(mx, my, 16, 18, 64, 58) == 1 then
+        return HIT_ICON_COMPUTER
+    end
+    if contains(mx, my, 16, 88, 64, 58) == 1 then
+        return HIT_ICON_RECYCLE
+    end
+    if contains(mx, my, 16, 158, 64, 58) == 1 then
+        return HIT_ICON_USER
+    end
+    if contains(mx, my, 16, 228, 64, 72) == 1 then
+        return HIT_ICON_DOCS
+    end
+    if contains(mx, my, 16, 298, 64, 58) == 1 then
+        return HIT_ICON_WEB
+    end
+    return HIT_NONE
+end
+
+
+def activate(target: int): void
+    if target == HIT_START then
+        if start_open == 1 then
+            start_open = 0
+        else
+            start_open = 1
+        end
+        return
+    end
+    if target == HIT_SHUTDOWN then
+        quit_requested = 1
+        return
+    end
+    if target >= HIT_ICON_COMPUTER and target <= HIT_ICON_WEB then
+        selected_icon = target
+    end
+end
+
+
+def handle_event(kind: int): int
+    if kind == UI_EVENT_MOUSE_MOVE then
+        next_hover = hit_test(ail_ui_event_x(), ail_ui_event_y())
+        if next_hover != hover then
+            hover = next_hover
+            return 1
+        end
+    end
+    if kind == UI_EVENT_MOUSE_DOWN then
+        pressed = hit_test(ail_ui_event_x(), ail_ui_event_y())
+        return 1
+    end
+    if kind == UI_EVENT_MOUSE_UP then
+        target = hit_test(ail_ui_event_x(), ail_ui_event_y())
+        if target == pressed then
+            activate(target)
+        end
+        pressed = HIT_NONE
+        hover = target
+        return 1
+    end
+    return 0
+end
+
+
+def draw(window: int): void
+    mddm_wallpaper(window)
+    desktop_icons(window)
+    start_menu(window)
+    taskbar(window)
+end
+
+
+def main(): int
+    comptime if target_os() != "windows" and target_os() != "linux" then
+        print("ui backend unsupported")
+        return 0
+    end
+    if ui_backend_supported() == 0 then
+        print("ui backend unsupported")
+        return 0
+    end
+    if ail_ui_init() == 0 then
+        print("ui init failed")
+        return 1
+    end
+    ail_ui_set_font("Segoe UI")
+
+    window = ail_ui_open_window("mixtar-shell - AILang UI port", DESIGN_W, DESIGN_H)
+    if window == 0 then
+        print("window open failed")
+        ail_ui_shutdown()
+        return 1
+    end
+    sync_view(window)
+
+    dirty = 1
+    while ail_ui_window_alive(window) == 1 then
+        event_kind = ail_ui_poll_event(window)
+        if sync_view(window) == 1 then
+            dirty = 1
+        end
+        if event_kind == UI_EVENT_CLOSE then
+            break
+        end
+        if event_kind != 0 then
+            if handle_event(event_kind) == 1 then
+                dirty = 1
+            end
+        end
+        if quit_requested == 1 then
+            break
+        end
+        if dirty == 1 then
+            ail_ui_begin_frame(window, 0x0e0e1e)
+            draw(window)
+            ail_ui_end_frame(window)
+            dirty = 0
+        else
+            ail_ui_wait_event_ms(100)
+        end
+    end
+
+    ail_ui_close_window(window)
+    ail_ui_shutdown()
+    return 0
+end

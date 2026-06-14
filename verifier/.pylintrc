@@ -1,0 +1,17 @@
+[MAIN]
+# AILang verifier module configuration
+
+[MESSAGES CONTROL]
+# import-outside-toplevel: Lazy imports for optional dependencies is a standard
+# Python pattern. See PEP 690 and common practice in pytest, numpy, etc.
+# c-extension-no-member: mypy.api.run() exists but pylint can't see it
+disable=import-outside-toplevel,c-extension-no-member
+
+[FORMAT]
+# AILang syntax patterns warrant longer modules than typical Python
+max-module-lines=2000
+
+[DESIGN]
+# Allow comprehensive self-learning classes
+max-attributes=20
+max-public-methods=30

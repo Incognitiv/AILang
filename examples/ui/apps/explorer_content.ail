@@ -1,0 +1,542 @@
+@library("explorer_content")
+
+import stdlib.ui.layout
+import stdlib.ui.paint
+import stdlib.ui.platform
+
+// File Explorer-style content layer. It is intentionally drawn with the same
+// AILang primitive calls as the rest of the UI platform work.
+
+class ExplorerState then
+    public int active_tab = 1
+    public int active_row = 0
+    public int close_requested = 0
+
+    public def init():
+        this.active_tab = 1
+        this.active_row = 0
+        this.close_requested = 0
+    end
+
+    public def ~ExplorerState():
+    end
+end
+
+
+def explorer_state_free(state: ExplorerState): void
+    dealloc(state)
+end
+
+
+def explorer_border(window: int, x: int, y: int, width: int, height: int, fill: int, border: int): void
+    ail_ui_draw_rect(window, x, y, width, height, fill)
+    ail_ui_draw_rect(window, x, y, width, 1, border)
+    ail_ui_draw_rect(window, x, y + height - 1, width, 1, border)
+    ail_ui_draw_rect(window, x, y, 1, height, border)
+    ail_ui_draw_rect(window, x + width - 1, y, 1, height, border)
+end
+
+
+def explorer_text(window: int, x: int, y: int, scale: int, color: int, text: string): void
+    ail_ui_draw_text(window, x, y, scale, color, text)
+end
+
+
+def explorer_folder_icon(window: int, x: int, y: int): void
+    ail_ui_draw_rect(window, x, y + 5, 20, 13, 0xf3b82f)
+    ail_ui_draw_rect(window, x + 2, y + 3, 8, 4, 0xf9d36b)
+    ail_ui_draw_rect(window, x, y + 7, 20, 11, 0xffc83d)
+    ail_ui_draw_rect(window, x, y + 17, 20, 1, 0xd99a1a)
+end
+
+
+def explorer_file_icon(window: int, x: int, y: int, color: int): void
+    explorer_border(window, x + 2, y + 1, 16, 19, 0xffffff, 0x8a8a8a)
+    ail_ui_draw_rect(window, x + 13, y + 1, 5, 5, 0xe5eef8)
+    ail_ui_draw_rect(window, x + 5, y + 7, 10, 2, color)
+    ail_ui_draw_rect(window, x + 5, y + 12, 8, 1, 0x9ca3af)
+    ail_ui_draw_rect(window, x + 5, y + 15, 7, 1, 0x9ca3af)
+end
+
+
+def explorer_drive_icon(window: int, x: int, y: int, selected: int): void
+    icon_fill = 0x5f6f7a
+    if selected == 1 then
+        icon_fill = 0x303942
+    end
+    explorer_border(window, x, y + 8, 20, 8, 0xf8fafc, 0xa7aeb7)
+    ail_ui_draw_rect(window, x + 2, y + 13, 16, 3, icon_fill)
+    ail_ui_draw_rect(window, x + 4, y + 4, 4, 4, 0x0ea5e9)
+    ail_ui_draw_rect(window, x + 10, y + 4, 4, 4, 0x94a3b8)
+end
+
+
+def explorer_pin(window: int, x: int, y: int): void
+    ail_ui_draw_rect(window, x + 6, y + 2, 5, 5, 0x9aa3aa)
+    ail_ui_draw_rect(window, x + 8, y + 7, 2, 8, 0x9aa3aa)
+    ail_ui_draw_rect(window, x + 4, y + 9, 10, 2, 0x9aa3aa)
+end
+
+
+def explorer_control(window: int, frame: UiFrame, caption: UiCaptionPaint, id: int, x: int, kind: int): int
+    rect = ui_rect(x, 0, 46, 50)
+    clicked = ui_button_logic(frame, id, rect)
+    visual = ui_button_visual(frame, id, rect)
+
+    ui_draw_caption_button(window, caption, x, 0, 46, 50, kind, visual)
+    ui_rect_free(rect)
+    return clicked
+end
+
+
+def explorer_draw_tab(
+    window: int,
+    frame: UiFrame,
+    state: ExplorerState,
+    id: int,
+    tab_index: int,
+    x: int,
+    width: int,
+    label: string
+): int
+    rect = ui_rect(x, 8, width, 42)
+    clicked = ui_button_logic(frame, id, rect)
+    visual = ui_button_visual(frame, id, rect)
+    active = 0
+    fill = 0xdce5f4
+    border = 0xcbd5e1
+    text_color = 0x111827
+
+    if state.active_tab == tab_index then
+        active = 1
+        fill = 0xf8fafc
+        border = 0xd2dae8
+    end
+    if visual != 0 and active == 0 then
+        fill = 0xeaf1fb
+    end
+    if clicked == 1 then
+        state.active_tab = tab_index
+        state.active_row = 0
+    end
+
+    explorer_border(window, x, 8, width, 42, fill, border)
+    if active == 1 then
+        ail_ui_draw_rect(window, x + 1, 49, width - 2, 1, 0xf8fafc)
+    end
+    explorer_folder_icon(window, x + 14, 22)
+    explorer_text(window, x + 46, 22, 2, text_color, label)
+    ui_draw_caption_icon(window, 4, x + width - 20, 29, 0x374151)
+    ui_rect_free(rect)
+    return clicked
+end
+
+
+def explorer_draw_new_tab(window: int, frame: UiFrame, x: int): int
+    rect = ui_rect(x, 10, 42, 38)
+    clicked = ui_button_logic(frame, 2005, rect)
+    visual = ui_button_visual(frame, 2005, rect)
+    fill = 0xdce5f4
+    if visual != 0 then
+        fill = 0xeaf1fb
+    end
+    ail_ui_draw_rect(window, x, 10, 42, 38, fill)
+    ail_ui_draw_rect(window, x + 17, 28, 10, 2, 0x374151)
+    ail_ui_draw_rect(window, x + 21, 24, 2, 10, 0x374151)
+    ui_rect_free(rect)
+    return clicked
+end
+
+
+def explorer_draw_titlebar(window: int, width: int, frame: UiFrame, state: ExplorerState, caption: UiCaptionPaint): int
+    changed = 0
+    ail_ui_draw_rect(window, 0, 49, width, 1, 0xc3ccdb)
+
+    if explorer_draw_tab(window, frame, state, 2011, 1, 12, 252, "ui") == 1 then
+        changed = 1
+    end
+    if explorer_draw_tab(window, frame, state, 2012, 2, 266, 224, "out") == 1 then
+        changed = 1
+    end
+    if explorer_draw_new_tab(window, frame, 496) == 1 then
+        state.active_tab = 2
+        state.active_row = 0
+        changed = 1
+    end
+
+    explorer_control(window, frame, caption, 2001, width - 138, 1)
+    explorer_control(window, frame, caption, 2002, width - 92, 2)
+    if explorer_control(window, frame, caption, 2003, width - 46, 4) == 1 then
+        state.close_requested = 1
+        changed = 1
+    end
+    return changed
+end
+
+
+def explorer_draw_nav_button(window: int, x: int, y: int, label: string): void
+    explorer_text(window, x, y, 3, 0x4b5563, label)
+end
+
+
+def explorer_breadcrumb_segment(
+    window: int,
+    frame: UiFrame,
+    state: ExplorerState,
+    id: int,
+    x: int,
+    width: int,
+    label: string,
+    last: int
+): int
+    rect = ui_rect(x, 61, width, 40)
+    clicked = ui_button_logic(frame, id, rect)
+    visual = ui_button_visual(frame, id, rect)
+    fill = 0xffffff
+
+    if visual != 0 then
+        fill = 0xf3f7fd
+    end
+    if clicked == 1 then
+        state.active_row = 0
+    end
+
+    ail_ui_draw_rect(window, x, 61, width, 40, fill)
+    explorer_text(window, x + 12, 73, 2, 0x111827, label)
+    if last == 0 then
+        explorer_text(window, x + width - 18, 73, 2, 0x374151, ">")
+    end
+    ui_rect_free(rect)
+    return clicked
+end
+
+
+def explorer_draw_breadcrumbs(window: int, frame: UiFrame, state: ExplorerState): int
+    changed = 0
+    if explorer_breadcrumb_segment(window, frame, state, 2101, 260, 60, "PC", 0) == 1 then
+        changed = 1
+    end
+    if explorer_breadcrumb_segment(window, frame, state, 2102, 320, 58, "V", 0) == 1 then
+        changed = 1
+    end
+    if explorer_breadcrumb_segment(window, frame, state, 2103, 378, 90, "source", 0) == 1 then
+        changed = 1
+    end
+    if explorer_breadcrumb_segment(window, frame, state, 2104, 468, 80, "repos", 0) == 1 then
+        changed = 1
+    end
+    if explorer_breadcrumb_segment(window, frame, state, 2105, 548, 148, "AILang-Pure", 0) == 1 then
+        changed = 1
+    end
+    if explorer_breadcrumb_segment(window, frame, state, 2106, 696, 64, "out", 0) == 1 then
+        state.active_tab = 2
+        changed = 1
+    end
+    if state.active_tab == 1 then
+        if explorer_breadcrumb_segment(window, frame, state, 2107, 760, 122, "generated", 0) == 1 then
+            changed = 1
+        end
+        if explorer_breadcrumb_segment(window, frame, state, 2108, 882, 52, "ui", 1) == 1 then
+            changed = 1
+        end
+    else
+        if explorer_breadcrumb_segment(window, frame, state, 2109, 760, 52, "out", 1) == 1 then
+            changed = 1
+        end
+    end
+    return changed
+end
+
+
+def explorer_draw_top_path(window: int, width: int, frame: UiFrame, state: ExplorerState): int
+    changed = 0
+    path_w = width - 652
+    if path_w < 360 then
+        path_w = 360
+    end
+    ail_ui_draw_rect(window, 0, 50, width, 62, 0xf8fafc)
+    ail_ui_draw_rect(window, 0, 111, width, 1, 0xd7deea)
+
+    explorer_draw_nav_button(window, 28, 73, "<")
+    explorer_draw_nav_button(window, 88, 73, ">")
+    explorer_draw_nav_button(window, 148, 73, "^")
+    explorer_draw_nav_button(window, 209, 73, "C")
+
+    explorer_border(window, 252, 60, path_w, 42, 0xffffff, 0xe8edf5)
+    if explorer_draw_breadcrumbs(window, frame, state) == 1 then
+        changed = 1
+    end
+
+    explorer_border(window, width - 392, 60, 376, 42, 0xffffff, 0xe8edf5)
+    if state.active_tab == 1 then
+        explorer_text(window, width - 374, 72, 2, 0x6b7280, "Search ui")
+    else
+        explorer_text(window, width - 374, 72, 2, 0x6b7280, "Search out")
+    end
+    explorer_text(window, width - 48, 72, 2, 0x374151, "Q")
+    return changed
+end
+
+
+def explorer_draw_command_button(window: int, x: int, y: int, label: string): void
+    explorer_text(window, x, y, 2, 0x111827, label)
+end
+
+
+def explorer_draw_commandbar(window: int, width: int): void
+    ail_ui_draw_rect(window, 0, 112, width, 58, 0xffffff)
+    ail_ui_draw_rect(window, 0, 169, width, 1, 0xd1d9e6)
+
+    explorer_text(window, 24, 135, 2, 0x2563eb, "+")
+    explorer_draw_command_button(window, 54, 135, "New")
+    explorer_text(window, 145, 135, 2, 0x9fc5ec, "X")
+    explorer_text(window, 205, 135, 2, 0x9fc5ec, "[]")
+    explorer_text(window, 263, 135, 2, 0x9fc5ec, "[]")
+    explorer_text(window, 324, 135, 2, 0x9fc5ec, "A")
+    explorer_text(window, 386, 135, 2, 0x9fc5ec, ">")
+    explorer_text(window, 447, 135, 2, 0xc7cdd5, "D")
+    ail_ui_draw_rect(window, 487, 122, 1, 38, 0xe5e7eb)
+    explorer_text(window, 508, 135, 2, 0x2563eb, "<>")
+    explorer_draw_command_button(window, 548, 135, "Sort")
+    explorer_text(window, 616, 135, 2, 0x374151, "===")
+    explorer_draw_command_button(window, 646, 135, "View")
+    ail_ui_draw_rect(window, 717, 122, 1, 38, 0xe5e7eb)
+    explorer_text(window, 737, 135, 2, 0x111827, "...")
+    explorer_text(window, width - 100, 135, 2, 0x2563eb, "[]")
+    explorer_draw_command_button(window, width - 74, 135, "Details")
+end
+
+
+def explorer_nav_item(
+    window: int,
+    x: int,
+    y: int,
+    label: string,
+    kind: int,
+    selected: int,
+    pinned: int
+): void
+    if selected == 1 then
+        ail_ui_draw_rect(window, x - 8, y - 8, 190, 40, 0xeceff4)
+    end
+
+    if kind == 1 then
+        explorer_folder_icon(window, x, y)
+    end
+    if kind == 2 then
+        explorer_drive_icon(window, x, y, selected)
+    end
+    if kind == 3 then
+        ail_ui_draw_rect(window, x + 2, y + 3, 18, 16, 0x1d9bf0)
+        ail_ui_draw_rect(window, x + 4, y + 11, 14, 8, 0x0ea5e9)
+    end
+    if kind == 4 then
+        ail_ui_draw_rect(window, x + 2, y + 7, 18, 12, 0x2563eb)
+        ail_ui_draw_rect(window, x + 6, y + 3, 10, 8, 0x93c5fd)
+    end
+
+    explorer_text(window, x + 28, y + 3, 2, 0x111827, label)
+    if pinned == 1 then
+        explorer_pin(window, x + 132, y + 3)
+    end
+end
+
+
+def explorer_draw_sidebar(window: int, height: int): void
+    ail_ui_draw_rect(window, 0, 170, 218, height - 200, 0xffffff)
+    ail_ui_draw_rect(window, 217, 170, 1, height - 200, 0xe5e7eb)
+    explorer_nav_item(window, 44, 190, "Home", 3, 0, 0)
+    explorer_nav_item(window, 44, 230, "Gallery", 3, 0, 0)
+    explorer_text(window, 18, 272, 2, 0x6b7280, ">")
+    explorer_nav_item(window, 44, 270, "OneDrive", 4, 0, 0)
+    ail_ui_draw_rect(window, 14, 318, 172, 1, 0xd1d5db)
+
+    explorer_nav_item(window, 44, 350, "Desktop", 1, 0, 1)
+    explorer_nav_item(window, 44, 390, "Downloads", 1, 0, 1)
+    explorer_nav_item(window, 44, 430, "Documents", 1, 0, 1)
+    explorer_nav_item(window, 44, 470, "Pictures", 1, 0, 1)
+    explorer_nav_item(window, 44, 510, "Videos", 1, 0, 1)
+    explorer_nav_item(window, 44, 550, "Memes", 1, 0, 1)
+    explorer_nav_item(window, 44, 590, "Satornian's Lega", 1, 0, 1)
+    explorer_nav_item(window, 44, 630, "repos", 1, 0, 1)
+    explorer_nav_item(window, 44, 670, "Music", 3, 0, 1)
+    explorer_nav_item(window, 44, 710, "L&D", 1, 0, 1)
+    explorer_nav_item(window, 44, 750, "Life and Death", 1, 0, 1)
+    explorer_nav_item(window, 44, 790, "Stranger", 1, 0, 1)
+    explorer_nav_item(window, 44, 830, "Videos", 1, 0, 1)
+
+    ail_ui_draw_rect(window, 14, 878, 172, 1, 0xd1d5db)
+    explorer_text(window, 18, 912, 2, 0x111827, "v")
+    explorer_text(window, 44, 910, 2, 0x111827, "This PC")
+    explorer_text(window, 28, 952, 2, 0x6b7280, ">")
+    explorer_nav_item(window, 54, 948, "Windows (C:)", 2, 1, 0)
+    explorer_text(window, 28, 992, 2, 0x6b7280, ">")
+    explorer_nav_item(window, 54, 988, "Windows Server", 2, 0, 0)
+    explorer_text(window, 28, 1032, 2, 0x6b7280, ">")
+    explorer_nav_item(window, 54, 1028, "Programming (X:)", 2, 0, 0)
+    explorer_text(window, 28, 1072, 2, 0x6b7280, ">")
+    explorer_nav_item(window, 54, 1068, "Everything (Z:)", 2, 0, 0)
+end
+
+
+def explorer_draw_header(window: int, width: int): void
+    x = 218
+    ail_ui_draw_rect(window, x, 170, width - x, 32, 0xffffff)
+    ail_ui_draw_rect(window, x, 201, width - x, 1, 0xe5e7eb)
+    explorer_text(window, 258, 181, 2, 0x1f4c7a, "Name")
+    explorer_text(window, 568, 181, 2, 0x1f4c7a, "Date modified")
+    explorer_text(window, 750, 181, 2, 0x1f4c7a, "Type")
+    explorer_text(window, 908, 181, 2, 0x1f4c7a, "Size")
+    ail_ui_draw_rect(window, 560, 170, 1, 32, 0xe5e7eb)
+    ail_ui_draw_rect(window, 742, 170, 1, 32, 0xe5e7eb)
+    ail_ui_draw_rect(window, 890, 170, 1, 32, 0xe5e7eb)
+end
+
+
+def explorer_file_row(
+    window: int,
+    frame: UiFrame,
+    state: ExplorerState,
+    id: int,
+    width: int,
+    y: int,
+    name: string,
+    date: string,
+    kind: string,
+    size: string,
+    icon_kind: int
+): int
+    rect = ui_rect(218, y - 2, width - 218, 34)
+    clicked = ui_button_logic(frame, id, rect)
+    visual = ui_button_visual(frame, id, rect)
+    selected = 0
+
+    if state.active_row == id then
+        selected = 1
+    end
+    if clicked == 1 then
+        state.active_row = id
+        selected = 1
+    end
+    if visual != 0 and selected == 0 then
+        ail_ui_draw_rect(window, 218, y - 2, width - 218, 34, 0xf5f9ff)
+    end
+    if selected == 1 then
+        ail_ui_draw_rect(window, 218, y - 2, width - 218, 34, 0xe8f2ff)
+    end
+    if icon_kind == 1 then
+        explorer_folder_icon(window, 246, y + 5)
+    else
+        explorer_file_icon(window, 246, y + 3, 0x60a5fa)
+    end
+    explorer_text(window, 272, y + 7, 2, 0x111827, name)
+    explorer_text(window, 568, y + 7, 2, 0x6b4f3d, date)
+    explorer_text(window, 750, y + 7, 2, 0x4b5563, kind)
+    explorer_text(window, 952, y + 7, 2, 0x6b4f3d, size)
+    ui_rect_free(rect)
+    return clicked
+end
+
+
+def explorer_draw_rows(window: int, width: int, frame: UiFrame, state: ExplorerState): int
+    changed = 0
+    if state.active_tab == 1 then
+        if explorer_file_row(window, frame, state, 3001, width, 212, "out", "08.05.2026 21:28", "File folder", "", 1) == 1 then
+            changed = 1
+        end
+        if explorer_file_row(window, frame, state, 3002, width, 249, "ail_ui_win32_min.o", "08.05.2026 21:35", "O File", "9 KB", 2) == 1 then
+            changed = 1
+        end
+        if explorer_file_row(window, frame, state, 3003, width, 286, "ail_ui_win32_min_check.o", "08.05.2026 22:05", "O File", "14 KB", 2) == 1 then
+            changed = 1
+        end
+        if explorer_file_row(window, frame, state, 3004, width, 323, "micro_platform_demo", "08.05.2026 21:34", "Application", "269 KB", 2) == 1 then
+            changed = 1
+        end
+        if explorer_file_row(window, frame, state, 3005, width, 360, "micro_platform_desktop", "08.05.2026 23:07", "C Source File", "59 KB", 2) == 1 then
+            changed = 1
+        end
+        if explorer_file_row(window, frame, state, 3006, width, 397, "micro_platform_loop", "08.05.2026 21:35", "C Source File", "27 KB", 2) == 1 then
+            changed = 1
+        end
+        if explorer_file_row(window, frame, state, 3007, width, 434, "svg_demo", "08.05.2026 21:08", "Application", "283 KB", 2) == 1 then
+            changed = 1
+        end
+        if explorer_file_row(window, frame, state, 3008, width, 471, "svg_demo", "08.05.2026 21:08", "Firefox HTML Doc...", "3 KB", 2) == 1 then
+            changed = 1
+        end
+        if explorer_file_row(window, frame, state, 3009, width, 508, "micro_platform_desktop_demo", "08.05.2026 23:07", "Application", "295 KB", 2) == 1 then
+            changed = 1
+        end
+        if explorer_file_row(window, frame, state, 3010, width, 545, "ui_desktop", "08.05.2026 23:18", "C Source File", "59 KB", 2) == 1 then
+            changed = 1
+        end
+        if explorer_file_row(window, frame, state, 3011, width, 582, "ui_desktop_demo", "08.05.2026 23:18", "Application", "295 KB", 2) == 1 then
+            changed = 1
+        end
+    else
+        if explorer_file_row(window, frame, state, 3101, width, 212, "generated", "08.05.2026 23:18", "File folder", "", 1) == 1 then
+            changed = 1
+        end
+        if explorer_file_row(window, frame, state, 3102, width, 249, "package", "08.05.2026 22:41", "File folder", "", 1) == 1 then
+            changed = 1
+        end
+        if explorer_file_row(window, frame, state, 3103, width, 286, "ui_desktop_demo", "08.05.2026 23:18", "Application", "295 KB", 2) == 1 then
+            changed = 1
+        end
+        if explorer_file_row(window, frame, state, 3104, width, 323, "svg_demo", "08.05.2026 21:08", "Application", "283 KB", 2) == 1 then
+            changed = 1
+        end
+    end
+    return changed
+end
+
+
+def explorer_draw_status(window: int, width: int, height: int, state: ExplorerState): void
+    ail_ui_draw_rect(window, 0, height - 30, width, 30, 0xffffff)
+    if state.active_tab == 1 then
+        if state.active_row == 0 then
+            explorer_text(window, 18, height - 22, 2, 0x111827, "11 items")
+        else
+            explorer_text(window, 18, height - 22, 2, 0x111827, "11 items    1 item selected")
+        end
+    else
+        if state.active_row == 0 then
+            explorer_text(window, 18, height - 22, 2, 0x111827, "4 items")
+        else
+            explorer_text(window, 18, height - 22, 2, 0x111827, "4 items    1 item selected")
+        end
+    end
+    explorer_border(window, width - 68, height - 24, 30, 24, 0xf3f4f6, 0xd1d5db)
+    explorer_text(window, width - 60, height - 19, 1, 0x374151, "===")
+    explorer_border(window, width - 28, height - 24, 18, 24, 0xffffff, 0xd1d5db)
+end
+
+
+def explorer_draw_content(window: int, width: int, height: int, frame: UiFrame, state: ExplorerState): int
+    changed = 0
+    style = new UiFramePaint()
+    caption = new UiCaptionPaint()
+    style.frame_color = 0xdce5f4
+    style.background_color = 0xffffff
+    ui_frame_paint_set_border(style, 0xc3ccdb, 1)
+    ui_frame_paint_set_gradient(style, 0xdce5f4, 0xf5f7fb, 3, 1)
+    ui_frame_paint_surface(window, style, 0, 0, width, height, 50)
+
+    if explorer_draw_titlebar(window, width, frame, state, caption) == 1 then
+        changed = 1
+    end
+    if explorer_draw_top_path(window, width, frame, state) == 1 then
+        changed = 1
+    end
+    explorer_draw_commandbar(window, width)
+    explorer_draw_sidebar(window, height)
+    explorer_draw_header(window, width)
+    if explorer_draw_rows(window, width, frame, state) == 1 then
+        changed = 1
+    end
+    explorer_draw_status(window, width, height, state)
+    ui_caption_paint_free(caption)
+    ui_frame_paint_free(style)
+    return changed
+end
