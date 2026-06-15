@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/syscall.h>
 #include <sys/mman.h>
 #include <wayland-client.h>
 #include "generated/wayland/xdg-shell-client-protocol.h"
@@ -109,6 +110,10 @@ _Static_assert(sizeof(((struct xdg_wm_base_listener*)0)->ping) == 8u, "xdg_wm_ba
 
 int32_t ail_c_strcmp(const char * left, const char * right) {
     return (int32_t)(strcmp(left, right));
+}
+
+int ail_wayland_memfd_create(const char * name, unsigned int flags) {
+    return (int)(syscall(SYS_memfd_create, name, flags));
 }
 
 void ail_wl_buffer_destroy(void * buffer) {

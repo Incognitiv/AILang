@@ -12,7 +12,7 @@ const int QML_BRIDGE_RUNNER_NOT_FOUND = 127
 
 
 string qml_bridge_default_scene():
-    return "examples/ui/qml/mixtar_visual_kernel.qml"
+    return "examples/ui/qml/ailang_qml_smoke.qml"
 end
 
 

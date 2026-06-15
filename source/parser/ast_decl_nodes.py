@@ -574,7 +574,7 @@ class CAbiHeader(ASTNode):
     """AILang-owned C ABI header description.
 
     This is intentionally not a general preprocessor. It describes the C ABI
-    surface Mixtar needs to expose to unchanged BSD userland sources.
+    surface an embedding runtime needs to expose to unchanged C sources.
     """
 
     def __init__(

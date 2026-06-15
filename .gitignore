@@ -48,9 +48,6 @@ benchmarks/benchmark_results_wsl.json
 benchmarks/results/
 benchmarks/sessions/
 
-# MixtarRVS generated reports/artifacts
-Server/Generated/
-
 # Local DB/log/temp files
 test.db
 *.db

@@ -8,7 +8,6 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 AILANG = REPO_ROOT / "ailang.py"
 
-
 def _compile_run(src: str, tmp_path: Path) -> subprocess.CompletedProcess[str]:
     source = tmp_path / "process_run_argv_probe.ail"
     out_stem = tmp_path / "process_run_argv_probe"
@@ -42,7 +41,6 @@ def _compile_run(src: str, tmp_path: Path) -> subprocess.CompletedProcess[str]:
         check=False,
     )
 
-
 def test_process_run_argv_returns_child_exit_status(tmp_path: Path) -> None:
     if os.name == "nt":
         setup = '\n    args = str_array_push(args, "cmd.exe")\n    args = str_array_push(args, "/C")\n    args = str_array_push(args, "exit")\n    args = str_array_push(args, "7")'
@@ -62,7 +60,6 @@ end
     assert proc.returncode == 7, proc.stderr
     assert "POSSIBLE LEAK" not in proc.stderr
 
-
 def test_process_run_argv_missing_command_is_127(tmp_path: Path) -> None:
     proc = _compile_run(
         """\
@@ -78,7 +75,6 @@ end
     )
     assert proc.returncode == 127, proc.stderr
     assert "POSSIBLE LEAK" not in proc.stderr
-
 
 def test_process_last_exec_errno_reports_missing_command(tmp_path: Path) -> None:
     proc = _compile_run(
@@ -100,7 +96,6 @@ end
     )
     assert proc.returncode == 0, proc.stderr
     assert "POSSIBLE LEAK" not in proc.stderr
-
 
 def test_process_capture_argv_preserves_space_arguments(tmp_path: Path) -> None:
     python_exe = str(Path(sys.executable)).replace("\\", "/")
@@ -134,7 +129,6 @@ end
     assert proc.returncode == 0, proc.stderr
     assert "POSSIBLE LEAK" not in proc.stderr
 
-
 def test_process_errno_class_helpers_are_available(tmp_path: Path) -> None:
     proc = _compile_run(
         """\
@@ -152,7 +146,6 @@ end
     )
     assert proc.returncode == 0, proc.stderr
     assert "POSSIBLE LEAK" not in proc.stderr
-
 
 def test_process_last_exec_errno_reports_enoexec_on_posix(tmp_path: Path) -> None:
     if os.name == "nt":
@@ -179,7 +172,6 @@ end
     )
     assert proc.returncode == 0, proc.stderr
     assert "POSSIBLE LEAK" not in proc.stderr
-
 
 def test_process_pipeline_reports_tail_permission_errno_on_posix(tmp_path: Path) -> None:
     if os.name == "nt":
@@ -220,7 +212,6 @@ end
     )
     assert proc.returncode == 0, proc.stderr
     assert "POSSIBLE LEAK" not in proc.stderr
-
 
 def test_process_run_argv_redirs_writes_file(tmp_path: Path) -> None:
     if os.name == "nt":
@@ -269,7 +260,6 @@ end
     assert proc.returncode == 0, proc.stderr
     assert "POSSIBLE LEAK" not in proc.stderr
 
-
 def test_process_run_argv_redirs_feeds_heredoc_stdin(tmp_path: Path) -> None:
     if os.name == "nt":
         setup = '\n    args = str_array_push(args, "cmd.exe")\n    args = str_array_push(args, "/C")\n    args = str_array_push(args, "findstr hello")'
@@ -294,7 +284,6 @@ end
     )
     assert proc.returncode == 0, proc.stderr
     assert "POSSIBLE LEAK" not in proc.stderr
-
 
 def test_process_capture_argv_env_redirs_captures_stdout(tmp_path: Path) -> None:
     if os.name == "nt":
@@ -327,7 +316,6 @@ end
     assert proc.returncode == 0, proc.stderr
     assert "POSSIBLE LEAK" not in proc.stderr
 
-
 def test_process_capture_argv_env_redirs_reports_child_status(tmp_path: Path) -> None:
     if os.name == "nt":
         setup = '\n    args = str_array_push(args, "cmd.exe")\n    args = str_array_push(args, "/C")\n    args = str_array_push(args, "echo nope && exit 7")'
@@ -358,7 +346,6 @@ end
     )
     assert proc.returncode == 0, proc.stderr
     assert "POSSIBLE LEAK" not in proc.stderr
-
 
 def test_process_capture_argv_env_redirs_supports_input_offset(tmp_path: Path) -> None:
     if os.name == "nt":
@@ -394,7 +381,6 @@ end
     assert proc.returncode == 0, proc.stderr
     assert "POSSIBLE LEAK" not in proc.stderr
 
-
 def test_process_set_last_capture_status_updates_runtime_status(tmp_path: Path) -> None:
     proc = _compile_run(
         """\
@@ -411,7 +397,6 @@ end
     )
     assert proc.returncode == 0, proc.stderr
     assert "POSSIBLE LEAK" not in proc.stderr
-
 
 def test_process_capture_pipeline_argv_redirs_captures_last_stdout(tmp_path: Path) -> None:
     if os.name == "nt":
@@ -451,7 +436,6 @@ end
     )
     assert proc.returncode == 0, proc.stderr
     assert "POSSIBLE LEAK" not in proc.stderr
-
 
 def test_process_capture_pipeline_argv_env_redirs_passes_env(tmp_path: Path) -> None:
     if os.name == "nt":
@@ -495,7 +479,6 @@ end
     assert proc.returncode == 0, proc.stderr
     assert "POSSIBLE LEAK" not in proc.stderr
 
-
 def test_process_pipe_argv_redirs_returns_right_status(tmp_path: Path) -> None:
     if os.name == "nt":
         left_setup = '\n    left = str_array_push(left, "cmd.exe")\n    left = str_array_push(left, "/C")\n    left = str_array_push(left, "echo hello")'
@@ -522,7 +505,6 @@ end
     )
     assert proc.returncode == 0, proc.stderr
     assert "POSSIBLE LEAK" not in proc.stderr
-
 
 def test_process_pipeline_argv_redirs_runs_three_stage_pipeline(tmp_path: Path) -> None:
     if os.name == "nt":
@@ -559,7 +541,6 @@ end
     assert proc.returncode == 0, proc.stderr
     assert "POSSIBLE LEAK" not in proc.stderr
 
-
 def test_process_pipeline_argv_env_redirs_passes_env(tmp_path: Path) -> None:
     if os.name == "nt":
         setup = '\n    args = str_array_push(args, "cmd.exe")\n    args = str_array_push(args, "/C")\n    args = str_array_push(args, "echo %AILANG_PIPE_ENV_UNIT%")\n    args = str_array_push(args, "findstr")\n    args = str_array_push(args, "env-unit")'
@@ -595,7 +576,6 @@ end
     )
     assert proc.returncode == 0, proc.stderr
     assert "POSSIBLE LEAK" not in proc.stderr
-
 
 def test_process_spawn_pipeline_argv_env_redirs_waits_tail(tmp_path: Path) -> None:
     if os.name == "nt":
@@ -636,7 +616,6 @@ end
     assert proc.returncode == 5, proc.stderr
     assert "POSSIBLE LEAK" not in proc.stderr
 
-
 def test_process_spawn_wait_returns_child_exit_status(tmp_path: Path) -> None:
     if os.name == "nt":
         setup = '\n    args = str_array_push(args, "cmd.exe")\n    args = str_array_push(args, "/C")\n    args = str_array_push(args, "exit")\n    args = str_array_push(args, "7")'
@@ -665,7 +644,6 @@ end
     )
     assert proc.returncode == 7, proc.stderr
     assert "POSSIBLE LEAK" not in proc.stderr
-
 
 def test_process_poll_observes_completed_child(tmp_path: Path) -> None:
     if os.name == "nt":
@@ -698,7 +676,6 @@ end
     )
     assert proc.returncode == 3, proc.stderr
     assert "POSSIBLE LEAK" not in proc.stderr
-
 
 def test_process_kill_terminates_spawned_child(tmp_path: Path) -> None:
     if os.name == "nt":
@@ -737,7 +714,6 @@ end
     )
     assert proc.returncode == 0, proc.stderr
     assert "POSSIBLE LEAK" not in proc.stderr
-
 
 def test_process_exec_replace_runs_target(tmp_path: Path) -> None:
     if os.name == "nt":

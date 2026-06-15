@@ -3,6 +3,7 @@
 #cinclude <stdint.h>
 #cinclude <string.h>
 #cinclude <unistd.h>
+#cinclude <sys/syscall.h>
 #cinclude <sys/mman.h>
 #cinclude <wayland-client.h>
 #cinclude "generated/wayland/xdg-shell-client-protocol.h"
@@ -117,6 +118,8 @@ extern fn munmap(addr: ptr, length: uint): short
 extern fn usleep(usec: ushort): short
 
 extern fn ail_c_strcmp(left: string, right: string): short
+
+extern fn ail_wayland_memfd_create(name: string, flags: ushort): short
 
 extern fn ail_wl_buffer_destroy(buffer: ptr): void
 

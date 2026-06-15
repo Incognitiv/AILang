@@ -16,7 +16,7 @@ _POSIX_ID_SYMBOLS: dict[str, str] = {
     "geteuid": "geteuid",
     "getgid": "getgid",
     "getegid": "getegid",
-    # Compatibility alias for the spelling requested in the Mixtar flow.
+    # Compatibility alias for a historically requested spelling.
     "getgeid": "getegid",
 }
 

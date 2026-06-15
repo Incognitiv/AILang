@@ -11,6 +11,14 @@ const int AIL_UI_EVENT_MOUSE_DOWN = 4
 const int AIL_UI_EVENT_MOUSE_UP = 5
 const int AIL_UI_EVENT_KEY_DOWN = 6
 const int AIL_UI_EVENT_KEY_UP = 7
+const int AIL_UI_WAYLAND_BUTTON_PRESSED = 1
+const int AIL_UI_WAYLAND_KEY_PRESSED = 1
+const int AIL_UI_WAYLAND_MAP_SHARED = 1
+const int AIL_UI_WAYLAND_PROT_READ = 1
+const int AIL_UI_WAYLAND_PROT_WRITE = 2
+const int AIL_UI_WAYLAND_SEAT_CAP_POINTER = 1
+const int AIL_UI_WAYLAND_SEAT_CAP_KEYBOARD = 2
+const int AIL_UI_WAYLAND_SHM_FORMAT_XRGB8888 = 1
 static int g_wayland_display = 0
 static int g_wayland_registry = 0
 static int g_wayland_compositor = 0
@@ -178,7 +186,7 @@ end
 @export
 def wayland_pointer_button(data: ptr, pointer: ptr, serial: ushort, event_time: ushort, button: ushort, state: ushort): void
     kind = AIL_UI_EVENT_MOUSE_UP
-    if state == AIL_WAYLAND_POINTER_BUTTON_PRESSED then
+    if state == AIL_UI_WAYLAND_BUTTON_PRESSED then
         kind = AIL_UI_EVENT_MOUSE_DOWN
     end
     wayland_set_pending_event(kind, g_wayland_mouse_x, g_wayland_mouse_y, button, 0, 0)
@@ -229,7 +237,7 @@ end
 @export
 def wayland_keyboard_key(data: ptr, keyboard: ptr, serial: ushort, event_time: ushort, key: ushort, state: ushort): void
     kind = AIL_UI_EVENT_KEY_UP
-    if state == AIL_WAYLAND_KEYBOARD_KEY_PRESSED then
+    if state == AIL_UI_WAYLAND_KEY_PRESSED then
         kind = AIL_UI_EVENT_KEY_DOWN
     end
     wayland_set_pending_event(kind, 0, 0, key, 0, 0)
@@ -276,7 +284,7 @@ end
 
 @export
 def wayland_seat_capabilities(data: ptr, seat: ptr, capabilities: ushort): void
-    if wayland_has_capability(capabilities, AIL_WAYLAND_SEAT_CAP_POINTER) == 1 then
+    if wayland_has_capability(capabilities, AIL_UI_WAYLAND_SEAT_CAP_POINTER) == 1 then
         if g_wayland_pointer == 0 then
             pointer = ail_wl_seat_get_pointer(seat)
             if reinterpret(int, pointer) != 0 then
@@ -288,7 +296,7 @@ def wayland_seat_capabilities(data: ptr, seat: ptr, capabilities: ushort): void
         wayland_release_pointer()
     end
 
-    if wayland_has_capability(capabilities, AIL_WAYLAND_SEAT_CAP_KEYBOARD) == 1 then
+    if wayland_has_capability(capabilities, AIL_UI_WAYLAND_SEAT_CAP_KEYBOARD) == 1 then
         if g_wayland_keyboard == 0 then
             keyboard = ail_wl_seat_get_keyboard(seat)
             if reinterpret(int, keyboard) != 0 then
@@ -398,7 +406,7 @@ def wayland_create_shm_buffer(width: int, height: int): int
         close(fd)
         return 0
     end
-    mapped = mmap(0, size, AIL_WAYLAND_PROT_READ + AIL_WAYLAND_PROT_WRITE, AIL_WAYLAND_MAP_SHARED, fd, 0)
+    mapped = mmap(0, size, AIL_UI_WAYLAND_PROT_READ + AIL_UI_WAYLAND_PROT_WRITE, AIL_UI_WAYLAND_MAP_SHARED, fd, 0)
     pixels = reinterpret(int, mapped)
     if pixels == -1 then
         close(fd)
@@ -411,7 +419,7 @@ def wayland_create_shm_buffer(width: int, height: int): int
         return 0
     end
 
-    buffer = ail_wl_shm_pool_create_buffer(pool, 0, width, height, stride, AIL_WAYLAND_SHM_FORMAT_XRGB8888)
+    buffer = ail_wl_shm_pool_create_buffer(pool, 0, width, height, stride, AIL_UI_WAYLAND_SHM_FORMAT_XRGB8888)
     ail_wl_shm_pool_destroy(pool)
     close(fd)
     if reinterpret(int, buffer) == 0 then

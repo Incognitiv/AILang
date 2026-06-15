@@ -17,14 +17,14 @@
 
 namespace {
 
-constexpr const char *kDefaultScene = "examples/ui/qml/mixtar_visual_kernel.qml";
+constexpr const char *kDefaultScene = "examples/ui/qml/ailang_qml_smoke.qml";
 constexpr const char *kEnvScene = "AILANG_QML_SCENE";
 constexpr const char *kEnvQuitAfterMs = "AILANG_QML_QUIT_AFTER_MS";
 constexpr const char *kContextRuntime = "ailangRuntime";
 constexpr const char *kContextRuntimeValue = "AILang";
-constexpr const char *kContextSessionUser = "mixtarSessionUser";
-constexpr const char *kContextSessionUserValue = "Administrator";
-constexpr const char *kContextPreviewMode = "mixtarPreviewMode";
+constexpr const char *kContextSessionUser = "ailangSessionUser";
+constexpr const char *kContextSessionUserValue = "AILang";
+constexpr const char *kContextPreviewMode = "ailangPreviewMode";
 
 class AilQmlHost {
 public:

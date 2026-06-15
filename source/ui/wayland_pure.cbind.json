@@ -4,6 +4,7 @@
     "<stdint.h>",
     "<string.h>",
     "<unistd.h>",
+    "<sys/syscall.h>",
     "<sys/mman.h>",
     "<wayland-client.h>",
     {
@@ -317,6 +318,24 @@
     }
   ],
   "wrappers": [
+    {
+      "name": "ail_wayland_memfd_create",
+      "return_type": "short",
+      "abi_return_type": "int",
+      "params": [
+        {
+          "name": "name",
+          "type": "string",
+          "abi_type": "const char *"
+        },
+        {
+          "name": "flags",
+          "type": "ushort",
+          "abi_type": "unsigned int"
+        }
+      ],
+      "expr": "syscall(SYS_memfd_create, name, flags)"
+    },
     {
       "name": "ail_wl_display_connect_default",
       "return_type": "ptr",

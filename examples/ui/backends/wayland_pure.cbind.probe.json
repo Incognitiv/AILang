@@ -123,6 +123,10 @@
       "system": true
     },
     {
+      "path": "sys/syscall.h",
+      "system": true
+    },
+    {
       "path": "sys/mman.h",
       "system": true
     },
@@ -478,6 +482,25 @@
           "abi_type": "const char *",
           "name": "right",
           "type": "string"
+        }
+      ],
+      "return_type": "short"
+    },
+    {
+      "abi_return_type": "int",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_wayland_memfd_create",
+      "params": [
+        {
+          "abi_type": "const char *",
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "abi_type": "unsigned int",
+          "name": "flags",
+          "type": "ushort"
         }
       ],
       "return_type": "short"

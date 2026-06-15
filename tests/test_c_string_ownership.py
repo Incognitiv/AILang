@@ -11,7 +11,6 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 AILANG = REPO_ROOT / "ailang.py"
 LIVE_AT_EXIT_RE = re.compile(r"live at exit:\s*(\d+)\s*bytes", re.IGNORECASE)
 
-
 def _compile_c(source: str, out_stem: Path) -> Path:
     src_path = out_stem.with_suffix(".ail")
     src_path.write_text(source, encoding="utf-8")
@@ -33,7 +32,6 @@ def _compile_c(source: str, out_stem: Path) -> Path:
     assert proc.returncode == 0, proc.stdout + proc.stderr
     return out_stem.with_suffix(".exe") if os.name == "nt" else out_stem
 
-
 def _compile_c_with_generated_source(source: str, out_stem: Path) -> tuple[Path, str]:
     generated_dir = REPO_ROOT / "out" / "generated" / "c_backend"
     before = set(generated_dir.glob("*.c")) if generated_dir.exists() else set()
@@ -43,7 +41,6 @@ def _compile_c_with_generated_source(source: str, out_stem: Path) -> tuple[Path,
     assert candidates, "C backend did not emit a generated .c file"
     generated = max(candidates, key=lambda path: path.stat().st_mtime)
     return exe, generated.read_text(encoding="utf-8")
-
 
 def _run_with_leak_report(exe: Path) -> tuple[int, str]:
     env = dict(os.environ)
@@ -59,12 +56,10 @@ def _run_with_leak_report(exe: Path) -> tuple[int, str]:
     )
     return proc.returncode, f"{proc.stdout}\n{proc.stderr}"
 
-
 def _live_bytes(output: str) -> int:
     match = LIVE_AT_EXIT_RE.search(output)
     assert match is not None, output
     return int(match.group(1))
-
 
 def test_c_backend_does_not_free_literal_string_return() -> None:
     source = """\
@@ -83,7 +78,6 @@ end
     assert rc == 2
     assert _live_bytes(output) == 0
 
-
 def test_c_backend_frees_owned_user_string_return() -> None:
     source = """\
 def make_text(): string
@@ -101,7 +95,6 @@ end
     assert rc == 7
     assert _live_bytes(output) == 0
 
-
 def test_c_backend_frees_typed_owned_string_local() -> None:
     source = """\
 def main(): int
@@ -114,7 +107,6 @@ end
         rc, output = _run_with_leak_report(exe)
     assert rc == 7
     assert _live_bytes(output) == 0
-
 
 def test_c_backend_runs_destructor_for_typed_class_local() -> None:
     source = """\
@@ -136,7 +128,6 @@ end
     assert rc == 6
     assert _live_bytes(output) == 0
 
-
 def test_c_backend_auto_cleans_owned_string_field_without_destructor() -> None:
     source = """\
 class Session then
@@ -153,7 +144,6 @@ end
         rc, output = _run_with_leak_report(exe)
     assert rc == 6
     assert _live_bytes(output) == 0
-
 
 def test_c_backend_does_not_free_borrowed_string_field_without_destructor() -> None:
     source = """\
@@ -172,7 +162,6 @@ end
     assert rc == 7
     assert _live_bytes(output) == 0
 
-
 def test_c_backend_empty_destructor_still_auto_cleans_owned_string_field() -> None:
     source = """\
 class Session then
@@ -190,7 +179,6 @@ end
         rc, output = _run_with_leak_report(exe)
     assert rc == 6
     assert _live_bytes(output) == 0
-
 
 def test_c_backend_transfers_owned_init_string_param_to_field() -> None:
     source = """\
@@ -211,7 +199,6 @@ end
         rc, output = _run_with_leak_report(exe)
     assert rc == 6
     assert _live_bytes(output) == 0
-
 
 def test_c_backend_transfers_owned_method_string_param_to_field() -> None:
     source = """\
@@ -237,7 +224,6 @@ end
     assert rc == 6
     assert _live_bytes(output) == 0
 
-
 def test_c_backend_auto_cleans_nested_class_field() -> None:
     source = """\
 class Child then
@@ -261,7 +247,6 @@ end
         rc, output = _run_with_leak_report(exe)
     assert rc == 6
     assert _live_bytes(output) == 0
-
 
 def test_c_backend_transfers_owned_locals_to_fields() -> None:
     source = """\
@@ -295,7 +280,6 @@ end
     assert rc == 11
     assert _live_bytes(output) == 0
 
-
 def test_c_backend_cleans_untransferred_owned_class_param_before_return() -> None:
     source = """\
 class Child then
@@ -321,7 +305,6 @@ end
     assert rc == 3
     assert _live_bytes(output) == 0
 
-
 def test_c_backend_auto_cleans_dynamic_array_field() -> None:
     source = """\
 class Bag then
@@ -342,7 +325,6 @@ end
         rc, output = _run_with_leak_report(exe)
     assert rc == 1
     assert _live_bytes(output) == 0
-
 
 def test_c_backend_stack_backs_fixed_constructor_array_field() -> None:
     source = """\
@@ -379,7 +361,6 @@ end
     assert "ailang_strlen(p->label)" not in c_text
     assert _live_bytes(output) == 0
 
-
 def test_c_backend_auto_cleans_str_array_field() -> None:
     source = """\
 class Words then
@@ -401,7 +382,6 @@ end
     assert rc == 1
     assert _live_bytes(output) == 0
 
-
 def test_c_backend_auto_cleans_dict_field() -> None:
     source = """\
 class Store then
@@ -422,7 +402,6 @@ end
     assert rc == 0
     assert _live_bytes(output) == 0
 
-
 def test_c_backend_auto_cleans_typed_dict_literal_local() -> None:
     source = """\
 def main(): int
@@ -435,7 +414,6 @@ end
         rc, output = _run_with_leak_report(exe)
     assert rc == 1
     assert _live_bytes(output) == 0
-
 
 def test_c_backend_cleans_redeclared_class_local_in_loop() -> None:
     source = """\
@@ -466,7 +444,6 @@ end
     assert rc == 88
     assert _live_bytes(output) == 0
 
-
 def test_c_backend_cleans_redeclared_owned_string_local_in_loop() -> None:
     source = """\
 def main(): int
@@ -486,7 +463,6 @@ end
     assert rc == 188
     assert _live_bytes(output) == 0
 
-
 def test_c_backend_cleans_redeclared_dict_literal_local_in_loop() -> None:
     source = """\
 def main(): int
@@ -505,7 +481,6 @@ end
         rc, output = _run_with_leak_report(exe)
     assert rc == 100
     assert _live_bytes(output) == 0
-
 
 def test_c_backend_cleans_redeclared_dynamic_array_local_in_loop() -> None:
     source = """\
@@ -527,7 +502,6 @@ end
     assert rc == 100
     assert _live_bytes(output) == 0
 
-
 def test_c_backend_fuses_literal_plus_str_i64_without_temp_string() -> None:
     source = """\
 def main(): int
@@ -544,7 +518,6 @@ end
     assert _live_bytes(output) == 0
     assert 'ailang_strcat_lit_i64("pkt_", 4u, 42LL)' in c_text
     assert 'ailang_strcat_consuming("pkt_", ailang_int_to_str' not in c_text
-
 
 def test_c_backend_virtualizes_strlen_literal_plus_str_i64() -> None:
     source = """\
@@ -563,7 +536,6 @@ end
     assert "ailang_i64_decimal_len(i)" in c_text
     assert "ailang_strcat_lit_i64(" not in c_text
     assert "ailang_strlen(ailang_strcat" not in c_text
-
 
 def test_c_backend_length_only_str_int_local_skips_materialization() -> None:
     source = """\
@@ -589,7 +561,6 @@ end
     assert "ailang_strlen(s)" not in c_text
     assert "__ailang_strlen_s = ailang_i64_decimal_len(i);" in c_text
 
-
 def test_c_backend_cached_str_int_length_is_assignment_time_value() -> None:
     source = """\
 def main(): int
@@ -608,7 +579,6 @@ end
         rc, output = _run_with_leak_report(exe)
     assert rc == 0
     assert _live_bytes(output) == 0
-
 
 def test_c_backend_branch_assignment_drops_outer_strlen_cache() -> None:
     source = """\
@@ -633,7 +603,6 @@ end
     assert rc == 0
     assert _live_bytes(output) == 0
     assert "n = ailang_strlen(s);" in c_text
-
 
 def test_c_backend_caches_string_field_length_through_constructor() -> None:
     source = """\
@@ -668,7 +637,6 @@ end
     assert "ailang_strlen(self->label)" not in c_text
     assert "ailang_strlen(p->label)" not in c_text
 
-
 def test_c_backend_cleans_class_returned_from_function() -> None:
     source = """\
 class Packet then
@@ -701,7 +669,6 @@ end
     assert "if (p) { Packet_destructor(p); ailang_safe_free(p); }" in c_text
     assert _live_bytes(output) == 0
 
-
 def test_c_backend_mutating_array_method_blocks_stack_array_scalarization() -> None:
     source = """\
 class Packet then
@@ -731,7 +698,6 @@ end
     assert "Packet_init(&__ailang_stack_p" in c_text
     assert "ailang_dyn_array_free(&self->values);" in c_text
     assert _live_bytes(output) == 0
-
 
 def test_c_backend_lowers_self_field_array_push_in_place() -> None:
     source = """\

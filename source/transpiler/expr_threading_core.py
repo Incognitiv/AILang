@@ -258,7 +258,7 @@ def visit_Await(self, node: Await) -> ir.Value:
     syntactic support for async/await patterns while the underlying runtime
     can be extended later to support true cooperative scheduling.
 
-    For RTOS use (Mixtar), this can be extended to:
+    For RTOS use, this can be extended to:
     - Yield to scheduler
     - Resume when operation completes
     - Integrate with event loops

@@ -36,7 +36,15 @@ def target_matches(directive_target: str | None, current_os: str | None) -> bool
     target = normalize_os_name(directive_target)
     if target is None or target in {"*", "all", "any"}:
         return True
-    return target == normalize_os_name(current_os)
+    os_name = normalize_os_name(current_os)
+    capability_targets = {
+        # X11 is a window-system capability, not an OS. Keep the directive
+        # readable while allowing checked bindings on Unix-like hosts.
+        "x11": {"linux", "freebsd", "macos"},
+    }
+    if target in capability_targets:
+        return os_name in capability_targets[target]
+    return target == os_name
 
 
 def os_from_platform(platform: str | None = None) -> str:

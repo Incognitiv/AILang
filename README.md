@@ -5,10 +5,10 @@ strict verification gates. The previous self-hosted AILang-in-AILang work is
 kept under `archived/` for history/reference (excluded from clean release
 packages by default).
 
-Current public line: AILang `1.8.0` (`RVS Serious App Proof`). Treat `1.8.x`
-as the final release line for now: future work should land as maintenance,
-validation, optimization, Mixtar/RVS integration, or bug-fix updates unless a
-real product requirement proves that a new numbered release line is necessary.
+Current public line: AILang `1.8.0`. Treat `1.8.x` as the final release line
+for now: future work should land as maintenance, validation, optimization,
+integration, or bug-fix updates unless a real product requirement proves that a
+new numbered release line is necessary.
 
 ## Repository Layout
 

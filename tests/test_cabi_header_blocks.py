@@ -146,8 +146,8 @@ abi header "sys/event.h":
 end
 
 abi header "libcasper.h":
-    typedef cap_channel_t = "struct mixtar_cap_channel"
-    struct mixtar_cap_channel:
+    typedef cap_channel_t = "struct ailang_cap_channel"
+    struct ailang_cap_channel:
         unused: int
     end
     prototype "cap_channel_t *" cap_init()

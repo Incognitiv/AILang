@@ -57,7 +57,7 @@ end
         encoding="utf-8",
     )
     sample = tmp_path / "sample.txt"
-    sample.write_bytes(b"Mixtar cat smoke\r\n")
+    sample.write_bytes(b"AILang cat smoke\r\n")
 
     c_out = tmp_path / "read_file_c"
     llvm_out = tmp_path / "read_file_llvm"
@@ -84,7 +84,7 @@ end
     def normalize_newlines(data: bytes) -> bytes:
         return data.replace(b"\r\n", b"\n").replace(b"\r", b"")
 
-    expected = b"Mixtar cat smoke\n\n"
+    expected = b"AILang cat smoke\n\n"
     assert normalize_newlines(c_run.stdout) == expected
     assert normalize_newlines(llvm_run.stdout) == expected
 
