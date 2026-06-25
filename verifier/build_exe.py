@@ -13,11 +13,13 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import importlib
 import importlib.util
 import os
 import shutil
 import sys
 from pathlib import Path
+from typing import Any, cast
 
 
 def check_pyinstaller() -> bool:
@@ -270,7 +272,7 @@ def report_result(source_dir: Path, exe_base: str, onefile: bool) -> bool:
 def build_executable(exe_base: str, onefile: bool = True) -> bool:
     """Build the executable using PyInstaller."""
     try:
-        import PyInstaller.__main__
+        pyinstaller_main = cast(Any, importlib.import_module("PyInstaller.__main__"))
     except ImportError:
         print("ERROR: PyInstaller not installed")
         print("Install with: python -m pip install --user pyinstaller")
@@ -293,7 +295,7 @@ def build_executable(exe_base: str, onefile: bool = True) -> bool:
     print()
 
     try:
-        PyInstaller.__main__.run(args)
+        pyinstaller_main.run(args)
     except SystemExit as exc:
         if exc.code != 0:
             print(f"\nBuild failed with code {exc.code}")

@@ -623,6 +623,54 @@ class BuiltinArrayEmitter:
         result.add_incoming(result_ptr, nonempty_end)
         return result
 
+    def builtin_dealloc_str_array(self, args: list[ASTNode]) -> ir.Value:
+        """Free a str_array container without freeing borrowed elements."""
+        if len(args) != 1:
+            raise CodeGenError("dealloc_str_array() expects (array)")
+        (array_arg,) = args
+        data_ptr = self.generate_expr(array_arg)
+        char_ptr_ty = ir.IntType(8).as_pointer()
+        char_pp_ty = char_ptr_ty.as_pointer()
+        i64 = ir.IntType(64)
+        zero64 = ir.Constant(i64, 0)
+
+        if isinstance(data_ptr.type, ir.IntType):
+            data_ptr = self.current_builder.inttoptr(
+                self.ensure_int64(data_ptr), char_pp_ty, name="sarr_free_ptr"
+            )
+        elif data_ptr.type != char_pp_ty:
+            data_ptr = self.current_builder.bitcast(
+                data_ptr, char_pp_ty, name="sarr_free_ptr"
+            )
+
+        raw_value = self.current_builder.ptrtoint(data_ptr, i64, name="sarr_free_raw")
+        is_null = self.current_builder.icmp_unsigned(
+            "==", raw_value, zero64, name="sarr_free_is_null"
+        )
+        func = self.current_function
+        null_block = func.append_basic_block("sarr_free_null")
+        ok_block = func.append_basic_block("sarr_free_ok")
+        done_block = func.append_basic_block("sarr_free_done")
+        self.current_builder.cbranch(is_null, null_block, ok_block)
+
+        self.current_builder.position_at_end(null_block)
+        self.current_builder.branch(done_block)
+
+        self.current_builder.position_at_end(ok_block)
+        hdr = self._str_array_header_ptr(data_ptr)
+        raw_base = self.current_builder.bitcast(hdr, char_ptr_ty, name="sarr_free_base")
+        self.current_builder.call(self._get_free(), [raw_base])
+        self.current_builder.branch(done_block)
+
+        self.current_builder.position_at_end(done_block)
+        if isinstance(array_arg, Variable):
+            local = getattr(self._cg, "locals", {}).get(array_arg.name)
+            if local is not None and hasattr(local, "type"):
+                pointee = getattr(local.type, "pointee", None)
+                if pointee == char_pp_ty:
+                    self.current_builder.store(ir.Constant(char_pp_ty, None), local)
+        return zero64
+
     def builtin_str_array_set(self, args: list[ASTNode]) -> ir.Value:
         """Set string at index in string dynamic array.
 

@@ -13,8 +13,8 @@ def emit_safety_helpers(self) -> None:
     # not a leak) from a normal exit with leaked memory.
     # Abnormal-exit flags cover Ctrl+C/console-close/SIGTERM cleanup skips.
     self._output.append("/* Active Armor: catchable safety errors */")
-    self._output.append("static int __ailang_in_try = 0;")
-    self._output.append("static const char *__ailang_trap_msg = NULL;")
+    self._output.append("AILANG_UNUSED static int __ailang_in_try = 0;")
+    self._output.append("AILANG_UNUSED static const char *__ailang_trap_msg = NULL;")
     self._output.append("#ifndef AILANG_FREESTANDING")
     self._output.append("static volatile sig_atomic_t __ailang_abnormal_exit = 0;")
     self._output.append("static volatile sig_atomic_t __ailang_abnormal_code = 0;")
@@ -59,6 +59,7 @@ def emit_safety_helpers(self) -> None:
     self._output.append("#endif")
     self._output.append("")
     self._output.append("static void __ailang_safety_trap(const char *msg) {")
+    self._output.append("#ifndef AILANG_FREESTANDING")
     self._output.append("    if (__ailang_in_try) {")
     self._output.append("        __ailang_exc_msg = msg;")
     self._output.append("        __ailang_exc_type = 1355569627u;  /* SafetyError */")
@@ -66,6 +67,10 @@ def emit_safety_helpers(self) -> None:
     self._output.append("    }")
     self._output.append("    __ailang_trap_msg = msg;")
     self._output.append("    exit(1);")
+    self._output.append("#else")
+    self._output.append("    (void)msg;")
+    self._output.append("    for (;;) { }")
+    self._output.append("#endif")
     self._output.append("}")
     self._output.append("")
     # Null-guarded peek/poke helpers (Active Armor Item 3)
@@ -74,9 +79,11 @@ def emit_safety_helpers(self) -> None:
         "AILANG_UNUSED static int64_t ailang_peek64(int64_t ptr, int64_t off) {"
     )
     self._output.append("    if (ptr == 0) {")
+    self._output.append("#ifndef AILANG_FREESTANDING")
     self._output.append(
         '        fprintf(stderr, "Error: null pointer dereference in peek64\\n");'
     )
+    self._output.append("#endif")
     self._output.append(
         '        __ailang_safety_trap("Null pointer dereference in peek64");'
     )
@@ -89,9 +96,11 @@ def emit_safety_helpers(self) -> None:
         "(int64_t ptr, int64_t off, int64_t val) {"
     )
     self._output.append("    if (ptr == 0) {")
+    self._output.append("#ifndef AILANG_FREESTANDING")
     self._output.append(
         '        fprintf(stderr, "Error: null pointer dereference in poke64\\n");'
     )
+    self._output.append("#endif")
     self._output.append(
         '        __ailang_safety_trap("Null pointer dereference in poke64");'
     )
@@ -106,9 +115,11 @@ def emit_safety_helpers(self) -> None:
         "AILANG_UNUSED static int64_t ailang_peek32(int64_t ptr, int64_t off) {"
     )
     self._output.append("    if (ptr == 0) {")
+    self._output.append("#ifndef AILANG_FREESTANDING")
     self._output.append(
         '        fprintf(stderr, "Error: null pointer dereference in peek32\\n");'
     )
+    self._output.append("#endif")
     self._output.append(
         '        __ailang_safety_trap("Null pointer dereference in peek32");'
     )
@@ -123,9 +134,11 @@ def emit_safety_helpers(self) -> None:
         "(int64_t ptr, int64_t off, int64_t val) {"
     )
     self._output.append("    if (ptr == 0) {")
+    self._output.append("#ifndef AILANG_FREESTANDING")
     self._output.append(
         '        fprintf(stderr, "Error: null pointer dereference in poke32\\n");'
     )
+    self._output.append("#endif")
     self._output.append(
         '        __ailang_safety_trap("Null pointer dereference in poke32");'
     )
@@ -142,9 +155,11 @@ def emit_safety_helpers(self) -> None:
         "AILANG_UNUSED static int64_t ailang_peek8(int64_t ptr, int64_t off) {"
     )
     self._output.append("    if (ptr == 0) {")
+    self._output.append("#ifndef AILANG_FREESTANDING")
     self._output.append(
         '        fprintf(stderr, "Error: null pointer dereference in peek8\\n");'
     )
+    self._output.append("#endif")
     self._output.append(
         '        __ailang_safety_trap("Null pointer dereference in peek8");'
     )
@@ -159,9 +174,11 @@ def emit_safety_helpers(self) -> None:
         "(int64_t ptr, int64_t off, int64_t val) {"
     )
     self._output.append("    if (ptr == 0) {")
+    self._output.append("#ifndef AILANG_FREESTANDING")
     self._output.append(
         '        fprintf(stderr, "Error: null pointer dereference in poke8\\n");'
     )
+    self._output.append("#endif")
     self._output.append(
         '        __ailang_safety_trap("Null pointer dereference in poke8");'
     )
@@ -202,7 +219,9 @@ def emit_safety_helpers(self) -> None:
     self._output.append(
         "/* Query the actual size of an allocation (for free-tracking). */"
     )
-    self._output.append("#ifdef _WIN32")
+    self._output.append("#if defined(AILANG_FREESTANDING)")
+    self._output.append("#define AILANG_MALLOC_USABLE_SIZE(p) ((size_t)0)")
+    self._output.append("#elif defined(_WIN32)")
     self._output.append("#include <malloc.h>")
     self._output.append("#define AILANG_MALLOC_USABLE_SIZE(p) _msize(p)")
     self._output.append("#elif defined(__APPLE__)")
@@ -219,6 +238,36 @@ def emit_safety_helpers(self) -> None:
     self._output.append("#define AILANG_MALLOC_USABLE_SIZE(p) ((size_t)0)")
     self._output.append("#endif")
     self._output.append("")
+    self._output.append("#ifdef AILANG_FREESTANDING")
+    self._output.append("AILANG_UNUSED static void *ailang_safe_malloc(size_t size) {")
+    self._output.append("    (void)size;")
+    self._output.append(
+        '    __ailang_safety_trap("allocation unavailable in freestanding mode");'
+    )
+    self._output.append("    return NULL;")
+    self._output.append("}")
+    self._output.append(
+        "AILANG_UNUSED static void *ailang_safe_calloc(size_t n, size_t size) {"
+    )
+    self._output.append("    (void)n; (void)size;")
+    self._output.append(
+        '    __ailang_safety_trap("allocation unavailable in freestanding mode");'
+    )
+    self._output.append("    return NULL;")
+    self._output.append("}")
+    self._output.append(
+        "AILANG_UNUSED static void *ailang_safe_realloc(void *ptr, size_t size) {"
+    )
+    self._output.append("    (void)ptr; (void)size;")
+    self._output.append(
+        '    __ailang_safety_trap("allocation unavailable in freestanding mode");'
+    )
+    self._output.append("    return NULL;")
+    self._output.append("}")
+    self._output.append("AILANG_UNUSED static void ailang_safe_free(void *ptr) {")
+    self._output.append("    (void)ptr;")
+    self._output.append("}")
+    self._output.append("#else")
     self._output.append("AILANG_UNUSED static void *ailang_safe_malloc(size_t size) {")
     self._output.append("    if (size > AILANG_MAX_ALLOC_SIZE) {")
     self._output.append("#ifndef AILANG_FREESTANDING")
@@ -450,6 +499,7 @@ def emit_safety_helpers(self) -> None:
     self._output.append("#endif")
     self._output.append("    free(ptr);")
     self._output.append("}")
+    self._output.append("#endif")
     self._output.append("")
 
     # Definitions for the dyn_array / str_array free helpers that
@@ -588,6 +638,7 @@ def emit_safety_helpers(self) -> None:
     self._output.append(
         "AILANG_UNUSED static inline void __ailang_check_recursion(const char *func_name) {"
     )
+    self._output.append("    (void)func_name;")
     self._output.append("    __ailang_recursion_depth++;")
     self._output.append(
         "    if (__ailang_recursion_depth > AILANG_MAX_RECURSION_DEPTH) {"

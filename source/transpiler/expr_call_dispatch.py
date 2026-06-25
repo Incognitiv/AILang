@@ -120,6 +120,7 @@ class ExprBuiltinCallDispatcher:
             "str_array_set": cg.builtin_str_array_set,
             "str_array_pop": cg.builtin_str_array_pop,
             "str_array_join": cg.builtin_str_array_join,
+            "dealloc_str_array": cg.builtin_dealloc_str_array,
             # Strings
             "char_at": lambda n: cg.builtin_char_at(n),
             "unsafe_char_at": lambda n: cg.builtin_unsafe_char_at(n),

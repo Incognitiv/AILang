@@ -1,6 +1,5 @@
 """
 BuiltinStringEmitter - scalar string builtins for LLVM codegen.
-
 Phase A8 extraction from ``CodeGen``:
 - char_at / unsafe_char_at / index_of / substr / concat
 - ord / chr / strlen / str
@@ -133,26 +132,32 @@ class BuiltinStringEmitter:
 
     def builtin_index_of(self, args: list[ASTNode]) -> ir.Value:
         """Find first occurrence of substring, return index or -1."""
-        if len(args) != 2:
-            raise CodeGenError("index_of() expects (haystack, needle)")
-        haystack_arg, needle_arg = args
-        hay = self.generate_expr(haystack_arg)
-        needle = self.generate_expr(needle_arg)
-        found_ptr = self.current_builder.call(
-            self.get_strstr(), [hay, needle], name="idx_strstr"
-        )
-        null_ptr = ir.Constant(found_ptr.type, None)
-        is_null = self.current_builder.icmp_unsigned("==", found_ptr, null_ptr)
+        if len(args) == 2:
+            haystack_arg, needle_arg = args
+            hay = self.generate_expr(haystack_arg)
+            needle = self.generate_expr(needle_arg)
+            found_ptr = self.current_builder.call(
+                self.get_strstr(), [hay, needle], name="idx_strstr"
+            )
+            null_ptr = ir.Constant(found_ptr.type, None)
+            is_null = self.current_builder.icmp_unsigned("==", found_ptr, null_ptr)
 
-        base_int = self.current_builder.ptrtoint(hay, ir.IntType(64), name="idx_base")
-        found_int = self.current_builder.ptrtoint(
-            found_ptr, ir.IntType(64), name="idx_found"
-        )
-        diff = self.current_builder.sub(found_int, base_int, name="idx_diff")
-        idx = self.current_builder.trunc(diff, ir.IntType(64), name="idx64")
+            base_int = self.current_builder.ptrtoint(
+                hay, ir.IntType(64), name="idx_base"
+            )
+            found_int = self.current_builder.ptrtoint(
+                found_ptr, ir.IntType(64), name="idx_found"
+            )
+            diff = self.current_builder.sub(found_int, base_int, name="idx_diff")
+            idx = self.current_builder.trunc(diff, ir.IntType(64), name="idx64")
 
-        minus_one = ir.Constant(ir.IntType(64), -1)
-        return self.current_builder.select(is_null, minus_one, idx, name="index_of")
+            minus_one = ir.Constant(ir.IntType(64), -1)
+            return self.current_builder.select(is_null, minus_one, idx, name="index_of")
+        if len(args) == 3:
+            return self.builtin_index_of_from(args)
+        raise CodeGenError(
+            "index_of() expects (haystack, needle) or (haystack, needle, start)"
+        )
 
     def builtin_index_of_from(self, args: list[ASTNode]) -> ir.Value:
         """Find first occurrence of substring from byte offset, return index or -1."""

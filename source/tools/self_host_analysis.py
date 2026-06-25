@@ -105,7 +105,7 @@ def analyze_llvm_usage(source: str) -> List[str]:
     return list(set(patterns))
 
 
-def analyze_file(filepath: Path) -> DependencyAnalysis:
+def analyze_file(filepath: Path, base_dir: Path) -> DependencyAnalysis:
     """Analyze a single Python file for self-hosting feasibility."""
     source = filepath.read_text(encoding="utf-8")
     all_imports, python_only, ffi_required = analyze_imports(source)
@@ -124,7 +124,7 @@ def analyze_file(filepath: Path) -> DependencyAnalysis:
         feasibility = "easy"
 
     return DependencyAnalysis(
-        file=filepath.name,
+        file=filepath.relative_to(base_dir).as_posix(),
         imports=all_imports,
         python_only=python_only,
         transpilable=transpilable,
@@ -136,16 +136,17 @@ def analyze_file(filepath: Path) -> DependencyAnalysis:
 
 def analyze_ailang_codebase() -> Dict[str, DependencyAnalysis]:
     """Analyze the entire AILang codebase."""
-    ailang_dir = Path(__file__).parent
+    ailang_dir = Path(__file__).resolve().parents[1]
     results: Dict[str, DependencyAnalysis] = {}
 
-    for py_file in sorted(ailang_dir.glob("*.py")):
+    for py_file in sorted(ailang_dir.rglob("*.py")):
         if py_file.name.startswith("__"):
             continue
         try:
-            results[py_file.name] = analyze_file(py_file)
+            rel_path = py_file.relative_to(ailang_dir).as_posix()
+            results[rel_path] = analyze_file(py_file, ailang_dir)
         except SyntaxError as e:
-            print(f"Syntax error in {py_file.name}: {e}")
+            print(f"Syntax error in {py_file.relative_to(ailang_dir).as_posix()}: {e}")
 
     return results
 
@@ -162,24 +163,24 @@ def print_report(results: Dict[str, DependencyAnalysis]) -> None:
     hard = [r for r in results.values() if r.feasibility == "hard"]
     ffi = [r for r in results.values() if r.feasibility == "requires_ffi"]
 
-    print(f"\n✅ EASY TO TRANSPILE ({len(easy)} files):")
+    print(f"\n[OK] EASY TO TRANSPILE ({len(easy)} files):")
     print("-" * 40)
     for r in easy:
         print(f"  {r.file}")
 
-    print(f"\n⚠️  MEDIUM DIFFICULTY ({len(medium)} files):")
+    print(f"\n[WARN] MEDIUM DIFFICULTY ({len(medium)} files):")
     print("-" * 40)
     for r in medium:
         print(f"  {r.file}")
         print(f"    Python-only: {', '.join(r.python_only)}")
 
-    print(f"\n🔶 HARD ({len(hard)} files):")
+    print(f"\n[HARD] HARD ({len(hard)} files):")
     print("-" * 40)
     for r in hard:
         print(f"  {r.file}")
         print(f"    Python-only: {', '.join(r.python_only[:5])}")
 
-    print(f"\n🔴 REQUIRES FFI ({len(ffi)} files):")
+    print(f"\n[FFI] REQUIRES FFI ({len(ffi)} files):")
     print("-" * 40)
     for r in ffi:
         print(f"  {r.file}")
@@ -193,10 +194,10 @@ def print_report(results: Dict[str, DependencyAnalysis]) -> None:
     print("SUMMARY")
     print("=" * 70)
     print(f"Total files: {len(results)}")
-    print(f"  ✅ Easy:        {len(easy)}")
-    print(f"  ⚠️  Medium:      {len(medium)}")
-    print(f"  🔶 Hard:        {len(hard)}")
-    print(f"  🔴 Requires FFI: {len(ffi)}")
+    print(f"  [OK] Easy:        {len(easy)}")
+    print(f"  [WARN] Medium:      {len(medium)}")
+    print(f"  [HARD] Hard:        {len(hard)}")
+    print(f"  [FFI] Requires FFI: {len(ffi)}")
 
     # Self-hosting path
     print("\n" + "=" * 70)

@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import ast
-from typing import Any, Dict, List
+import importlib
+from typing import Any, Dict, List, cast
 
 from .common import read_file, validate_filepath
 
@@ -11,8 +12,8 @@ from .common import read_file, validate_filepath
 def run_radon(filepath: str, _actual_name: str) -> Dict[str, Any]:
     """Run radon using its Python API."""
     try:
-        from radon.complexity import cc_visit
-        from radon.metrics import mi_visit
+        complexity_mod = cast(Any, importlib.import_module("radon.complexity"))
+        metrics_mod = cast(Any, importlib.import_module("radon.metrics"))
     except ImportError:
         return {"error": "radon not installed"}
     validated_path, err = validate_filepath(filepath)
@@ -20,14 +21,14 @@ def run_radon(filepath: str, _actual_name: str) -> Dict[str, Any]:
         return {"error": f"Validation failed: {err}"}
     try:
         code = read_file(validated_path)
-        cc_results = cc_visit(code)
+        cc_results = complexity_mod.cc_visit(code)
         if cc_results:
             max_cc = max(r.complexity for r in cc_results)
             avg_cc = sum(r.complexity for r in cc_results) / len(cc_results)
         else:
             max_cc = 0
             avg_cc = 0.0
-        mi_score = mi_visit(code, multi=False)
+        mi_score = metrics_mod.mi_visit(code, multi=False)
         passed = max_cc <= 25 and mi_score >= 20.0
         issues = []
         if not passed:

@@ -33,6 +33,8 @@ class _CodeGenFunctionMixin:
         self._string_arena: Any = None
         self._request_arena_slot: Any = None
         self._current_function_name: Optional[str] = None
+        self.argc_global: Optional[ir.GlobalVariable] = None
+        self.argv_global: Optional[ir.GlobalVariable] = None
         self._stack_class_locals: set[str] = set()
         self._stack_class_cleanup_plans: dict[str, Any] = {}
         self._stack_array_field_values: dict[tuple[str, str], tuple[Any, ...]] = {}
@@ -387,6 +389,8 @@ class _CodeGenFunctionMixin:
         src_path, node_line = self._record_source_location(node)
         self._prepare_pending_di(node, src_path, node_line)
         saved_state = self._save_function_generation_state()
+        saved_strlen_cache = getattr(self, "_llvm_strlen_cache", None)
+        self._llvm_strlen_cache = {}
         self._initialize_function_context(node)
         decorators = getattr(node, "decorators", [])
         self._apply_function_decorators(decorators)
@@ -401,6 +405,11 @@ class _CodeGenFunctionMixin:
             self.stmt_generator.generate_stmt(stmt)
         self._emit_implicit_return_if_needed(node.name)
         self._restore_function_generation_state(saved_state)
+        if saved_strlen_cache is None:
+            if hasattr(self, "_llvm_strlen_cache"):
+                delattr(self, "_llvm_strlen_cache")
+        else:
+            self._llvm_strlen_cache = saved_strlen_cache
 
     def generate_stmt(self: Any, node: ASTNode) -> None:
         """Delegates statement generation to StmtGenerator."""

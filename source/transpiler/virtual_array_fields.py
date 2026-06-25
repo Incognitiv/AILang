@@ -15,6 +15,7 @@ from typing import Any, Iterable
 from ast_access import arg_at, body_at
 from transpiler.optimizer_decisions import record_virtual_string_arg
 
+_llvmlite_ir: Any
 try:
     from llvmlite import ir as _llvmlite_ir
 except ModuleNotFoundError:  # C backend can run on hosts without LLVM bindings.

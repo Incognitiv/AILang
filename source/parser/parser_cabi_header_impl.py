@@ -24,7 +24,7 @@ def parse_cabi_header(self) -> CAbiHeader:
 
     Example:
       abi header "sys/event.h":
-          guard MIXTAR_SYS_EVENT_H
+          guard AILANG_SYS_EVENT_H
           define EV_ADD = 0x0001
           struct kevent:
               ident: uintptr_t

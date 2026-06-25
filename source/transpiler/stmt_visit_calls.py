@@ -356,6 +356,12 @@ def _emit_print_call(self, node: A.Call) -> None:
             reason=fallback_reason,
             fallback_func="printf",
         )
+    self.emit("#else")
+    self.emit("    {")
+    for expr in expr_args:
+        if expr:
+            self.emit(f"        (void)({expr});")
+    self.emit("    }")
     self.emit("#endif")
 
 

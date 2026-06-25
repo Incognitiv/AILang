@@ -21,7 +21,7 @@ def test_cabi_header_block_emits_bridge_header(tmp_path: Path) -> None:
     src.write_text(
         '''\
 abi header "sys/event.h":
-    guard MIXTAR_BRIDGE_SYS_EVENT_H
+    guard AILANG_BRIDGE_SYS_EVENT_H
     include <time.h>
     define EVFILT_READ = -1
     define EV_ADD = 0x0001
@@ -92,7 +92,7 @@ end
     assert proc.returncode == 0, proc.stderr or proc.stdout
     header = out / "sys" / "event.h"
     text = header.read_text(encoding="utf-8")
-    assert "#ifndef MIXTAR_BRIDGE_SYS_EVENT_H" in text
+    assert "#ifndef AILANG_BRIDGE_SYS_EVENT_H" in text
     assert "#include <time.h>" in text
     assert "#define EVFILT_READ -1" in text
     assert "#define EV_ADD 0x0001" in text

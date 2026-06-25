@@ -200,7 +200,8 @@ class CExprEmitter:
         helper skip strlen() on parts whose length is known at compile
         time (string literals). perf showed strlen at ~17% of CPU after
         the SQLite/printf wins; literals account for ~half of strcat_n
-        parts in the status hot path. SIZE_MAX = "unknown, call strlen"."""
+        parts in the status hot path. `(size_t)-1` means
+        "unknown, call strlen"."""
         rendered: List[str] = []
         owned: List[str] = []
         lens: List[str] = []
@@ -208,7 +209,7 @@ class CExprEmitter:
             rendered.append(f"(const char *)({self.expr(p)})")
             owned.append("1" if self._is_owned_string_alloc(p) else "0")
             known_len = static_string_byte_length(p)
-            lens.append(str(known_len) if known_len is not None else "SIZE_MAX")
+            lens.append(str(known_len) if known_len is not None else "(size_t)-1")
         parts_lit = "(const char *const []){" + ", ".join(rendered) + "}"
         owned_lit = "(const int []){" + ", ".join(owned) + "}"
         lens_lit = "(const size_t []){" + ", ".join(lens) + "}"

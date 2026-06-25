@@ -36,7 +36,7 @@ from .codegen_errors import CodeGenError
 class _CodeGenSupportMixin:
     def __init__(self: Any) -> None:
         # Linter-only declaration for mixin-owned lazy attribute.
-        self.free_func = None
+        self.free_func: Optional[ir.Function] = None
 
     def _get_free(self: Any) -> ir.Function:
         """Lazy declaration of free for temporary string cleanup."""

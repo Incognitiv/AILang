@@ -106,8 +106,10 @@ def visit_Function(self, node: A.Function) -> None:
     # Fires only on real leaks by default; AILANG_LEAK_REPORT=1 forces
     # the report even when zero bytes are live.
     if is_main:
+        self.emit("#ifndef AILANG_FREESTANDING")
         self.emit("atexit(__ailang_leak_report);")
         self.emit("__ailang_install_abnormal_exit_handlers();")
+        self.emit("#endif")
         # Force stdout/stdin to binary mode on Windows. Default text
         # mode translates \n -> \r\n on output and \r\n -> \n on input,
         # which silently breaks byte-equivalent comparisons (the
@@ -116,7 +118,10 @@ def visit_Function(self, node: A.Function) -> None:
         # place for it: every AILang program gets it for free, and
         # `.ail` source never needs `#template` blocks with raw
         # `_setmode(_fileno(stdout), _O_BINARY)`. Added 30-04-2026.
-        self.emit("#if defined(_WIN32) || defined(_WIN64) || defined(__CYGWIN__)")
+        self.emit(
+            "#if (defined(_WIN32) || defined(_WIN64) || defined(__CYGWIN__)) "
+            "&& !defined(AILANG_FREESTANDING)"
+        )
         self.emit("    _setmode(_fileno(stdout), _O_BINARY);")
         self.emit("    _setmode(_fileno(stdin),  _O_BINARY);")
         self.emit("#endif")

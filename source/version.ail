@@ -1,0 +1,36 @@
+// AILang-native version metadata.
+// This is the first self-hosting seed: metadata that no longer needs Python
+// objects to be consumed by AILang-side tooling.
+
+const string AILANG_VERSION = "1.8.0"
+const int AILANG_VERSION_MAJOR = 1
+const int AILANG_VERSION_MINOR = 8
+const int AILANG_VERSION_PATCH = 0
+
+const string AILANG_RELEASE_NAME = "RVS Serious App Proof"
+const string AILANG_RELEASE_DATE = "2026-05-15"
+const string AILANG_CODENAME = "FreeBSD Homecoming"
+
+const int AILANG_FEATURE_COUNT = 41
+const int AILANG_ENABLED_FEATURE_COUNT = 41
+
+def get_version_string():
+    return "AILang " + AILANG_VERSION + " (" + AILANG_RELEASE_NAME + ")"
+end
+
+def get_feature_status():
+    return "41/41 features enabled"
+end
+
+def main():
+    print get_version_string()
+    print get_feature_status()
+    print AILANG_RELEASE_DATE
+    print AILANG_CODENAME
+    print AILANG_VERSION_MAJOR
+    print AILANG_VERSION_MINOR
+    print AILANG_VERSION_PATCH
+    print AILANG_FEATURE_COUNT
+    print AILANG_ENABLED_FEATURE_COUNT
+    return 0
+end

@@ -25,7 +25,6 @@ from .tools import (
     run_isort,
     run_magic_index_check,
     run_mypy,
-    run_pip_audit,
     run_positional_access_audit,
     run_pyflakes,
     run_radon,
@@ -133,12 +132,11 @@ class EnhancedPythonVerifier:
             ("consistency", run_consistency_check, True),
             ("todo", run_todo_check, True),  # Track incomplete implementations
         ]
-        jobs.extend(
-            [
-                ("pip_audit", run_pip_audit, False),
-                ("detect_secrets", run_detect_secrets, False),
-            ]
-        )
+        # `pip_audit` scans the entire Python environment and may touch network
+        # services. Running it once per source file turns a code verifier into a
+        # slow environment scanner, and a single blocked audit can freeze the
+        # whole run. Keep per-file verification strictly file-local.
+        jobs.append(("detect_secrets", run_detect_secrets, False))
         return jobs
 
     def _execute_tools_parallel(
@@ -210,6 +208,13 @@ class EnhancedPythonVerifier:
         results = self._execute_tools_parallel(
             jobs, filepath, display_name, check_imports=check_imports
         )
+        results["pip_audit"] = {
+            "passed": True,
+            "vulnerabilities_count": 0,
+            "issues": [],
+            "source": "skipped-per-file",
+            "note": "Environment audit is intentionally not run per file.",
+        }
         results["syntax"] = syntax_result
         results["suppressions"] = suppressions
         results["overall_score"] = self._calculate_score(results, preset=base_preset)
@@ -297,7 +302,7 @@ class EnhancedPythonVerifier:
         # High=15pts, Medium=5pts, Low=1pt penalty each
         deduction = (high * 15) + (medium * 5) + (low * 1)
 
-        # NOTE: pip_audit checks system-wide packages, not project code quality
+        # pip_audit checks system-wide packages, not project code quality.
         # So we don't penalize score for it - it's informational only
 
         detect = results.get("detect_secrets") or {}
@@ -506,7 +511,7 @@ class EnhancedPythonVerifier:
             ),
         )
 
-        # Note: pip_audit and detect_secrets check the ENVIRONMENT, not the code
+        # pip_audit and detect_secrets check the environment, not the code.
         # They are informational only and should NOT cause pass/fail
         # (A file can be 100/100 perfect code but run in an environment with CVEs)
 
@@ -524,6 +529,6 @@ class EnhancedPythonVerifier:
 
 
 if __name__ == "__main__":
-    from cli import main
+    from verifier.cli import main
 
     main()

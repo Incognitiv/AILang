@@ -6,6 +6,7 @@ from parser import ast as A
 
 from ast_access import arg_at
 from callback_types import callback_parts, resolve_callback_alias
+from runtime.modes import CompilationContext
 from target_info import os_from_platform
 from transpiler.arithmetic_literal_proofs import int_literal_value
 from transpiler.expr_gen_call_builtin_map import c_builtin_mappings
@@ -269,6 +270,14 @@ def _generate_call(self, node: A.Call) -> str:
     # print() used in expression position (rare): keep this total by
     # returning 0 after output, with a typed writer fast path.
     if node.name == "print" and call_args:
+        if CompilationContext.is_freestanding() and not CompilationContext.is_jit():
+            self._record_format_decision(
+                node,
+                format_kind="print",
+                decision="freestanding_noop",
+                reason="no_hosted_stdout",
+            )
+            return "0"
         self._record_format_decision(
             node,
             format_kind="print",

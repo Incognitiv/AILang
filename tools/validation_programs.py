@@ -689,8 +689,10 @@ def decorated(value: int): int
     return value + 1
 end
 
+static int decorator_seed = 41
+
 def main(): int
-    print(decorated(41))
+    print(decorated(decorator_seed))
     return 0
 end
 """,

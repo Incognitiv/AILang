@@ -239,7 +239,7 @@ class RuntimeDeclsThreadSyncMixin:
             }
 
         name, ftype = func_map[op]
-        if name is None:
+        if name is None or ftype is None:
             self._cg._cond_funcs[op] = None
             return None
         func = ir.Function(self._cg.module, ftype, name)
@@ -315,7 +315,7 @@ class RuntimeDeclsThreadSyncMixin:
             }
 
         name, ftype = func_map[op]
-        if name is None:
+        if name is None or ftype is None:
             self._cg._rwlock_funcs[op] = None
             return None
         func = ir.Function(self._cg.module, ftype, name)
