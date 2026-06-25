@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import ast
+import importlib
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from .common import read_file, validate_filepath
 
@@ -82,7 +83,7 @@ def run_todo_check(filepath: str, actual_name: str) -> Dict[str, Any]:
 def run_vulture(filepath: str, actual_name: str) -> Dict[str, Any]:
     """Run vulture using its Python API."""
     try:
-        from vulture import Vulture
+        vulture_mod = cast(Any, importlib.import_module("vulture"))
     except ImportError:
         return {"error": "vulture not installed"}
     validated_path, err = validate_filepath(filepath)
@@ -90,7 +91,7 @@ def run_vulture(filepath: str, actual_name: str) -> Dict[str, Any]:
         return {"error": f"Validation failed: {err}"}
     try:
         code = read_file(validated_path)
-        vult = Vulture()
+        vult = vulture_mod.Vulture()
         vult.scan(code, filename=validated_path)
         issues = []
         count = 0
@@ -118,7 +119,7 @@ def run_vulture_project(
         related_files: Additional files to scan together (auto-detected if None)
     """
     try:
-        from vulture import Vulture
+        vulture_mod = cast(Any, importlib.import_module("vulture"))
     except ImportError:
         return {"error": "vulture not installed"}
 
@@ -127,7 +128,7 @@ def run_vulture_project(
         return {"error": f"Validation failed: {err}"}
 
     try:
-        vult = Vulture()
+        vult = vulture_mod.Vulture()
         scanned_files: List[str] = []
 
         # Scan the primary file

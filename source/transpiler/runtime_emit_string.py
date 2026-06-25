@@ -223,7 +223,7 @@ def emit_runtime_string(self) -> None:
         self._output.append("    for (int i = 0; i < count; i++) {")
         self._output.append("        size_t pl = precomp_lens[i];")
         self._output.append(
-            "        lens[i] = (pl == SIZE_MAX) ? strlen(parts[i]) : pl;"
+            "        lens[i] = (pl == (size_t)-1) ? strlen(parts[i]) : pl;"
         )
         self._output.append("        total += lens[i];")
         self._output.append("    }")

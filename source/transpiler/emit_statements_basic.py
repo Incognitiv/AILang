@@ -18,6 +18,7 @@ from parser.ast import (
     TupleAssign,
     TypeAlias,
     VarDecl,
+    Variable,
     parsed_type_to_str,
 )
 from typing import cast
@@ -37,9 +38,40 @@ from .stack_class_lowering import _try_emit_stack_class_vardecl
 
 def visit_Return(self, node: Return):
     ret_type = self.func.function_type.return_type
-    _cleanup_all_stack_class_locals(self)
+    value = None
+    skip_cleanup_names: set[str] = set()
+    if node.value is not None and not isinstance(ret_type, ir.VoidType):
+        # Evaluate the return value before RAII cleanup. If the returned value
+        # is a local class pointer, ownership escapes to the caller, so its
+        # destructor must not run in this callee.
+        value = self.codegen.generate_expr(node.value)
+        if isinstance(value, tuple) and len(value) == 3:
+            value = value[0]
+        if isinstance(node.value, Variable):
+            local_type = getattr(self.codegen, "local_decl_types", {}).get(
+                node.value.name
+            )
+            if isinstance(local_type, str) and local_type in getattr(
+                self.codegen, "class_types", {}
+            ):
+                skip_cleanup_names.add(node.value.name)
+            else:
+                local_value = getattr(self.codegen, "locals", {}).get(node.value.name)
+                if local_value is not None and isinstance(
+                    getattr(local_value, "type", None), ir.PointerType
+                ):
+                    pointee = local_value.type.pointee
+                    if isinstance(pointee, ir.PointerType):
+                        struct_type = pointee.pointee
+                        if isinstance(struct_type, ir.LiteralStructType):
+                            class_name = self.codegen.get_record_name_from_type(
+                                struct_type
+                            )
+                            if class_name in getattr(self.codegen, "class_types", {}):
+                                skip_cleanup_names.add(node.value.name)
+    _cleanup_all_stack_class_locals(self, skip_names=skip_cleanup_names)
     # Call destructors for all objects in current scope before returning (RAII)
-    self.codegen.cleanup_all_scopes()
+    self.codegen.cleanup_all_scopes(skip_names=skip_cleanup_names)
     # Unlock @synchronized mutex before returning (Ada protected exit)
     if self.codegen._synchronized_mutex_ptr is not None:
         unlock_func = self.codegen.get_mutex_func("unlock")
@@ -63,10 +95,8 @@ def visit_Return(self, node: Return):
         self.builder.ret_void()
         return
     if node.value is not None:
-        # Evaluate return value FIRST (may contain recursive calls)
-        value = self.codegen.generate_expr(node.value)
-        if isinstance(value, tuple) and len(value) == 3:
-            value = value[0]
+        if value is None:
+            raise StmtGenError("return value expression produced no value")
         if value.type != ret_type:
             value = self.codegen.cast_value(value, ret_type)
         # Decrement recursion depth AFTER evaluating, BEFORE returning
@@ -115,13 +145,16 @@ def _cleanup_current_loop_stack_class_locals(self) -> None:
         _emit_stack_class_cleanup(self, var_name)
 
 
-def _cleanup_all_stack_class_locals(self) -> None:
+def _cleanup_all_stack_class_locals(self, skip_names: set[str] | None = None) -> None:
     plans = getattr(self.codegen, "_stack_class_cleanup_plans", {})
     if not plans:
         return
     from .emit_statements_control_data import _emit_stack_class_cleanup
 
+    skip_names = skip_names or set()
     for var_name in reversed(list(plans)):
+        if var_name in skip_names:
+            continue
         _emit_stack_class_cleanup(self, var_name)
 
 
@@ -490,6 +523,24 @@ def visit_TypeAlias(self, node: TypeAlias) -> None:
         self.codegen.type_aliases[node.name] = node.target_type
 
 
+def _infer_decl_type_from_expr(node) -> str | None:
+    if isinstance(node, NewExpr):
+        return node.type_name
+    if isinstance(node, Call):
+        name = node.name
+        if name in {"str_array_new", "str_array_push", "str_array_set"}:
+            return "str_array"
+        if name in {"array_new", "array_push", "array_set"}:
+            return "array"
+        if name == "split":
+            return "stringarray"
+        if name == "split_ints":
+            return "intarray"
+        if name in {"split_str_get", "str_array_get", "substr", "chr", "str"}:
+            return "string"
+    return None
+
+
 def visit_Assign(self, node: Assign):
     # Check if RHS is a NewExpr to track for RAII cleanup
     class_name: str | None = None
@@ -521,6 +572,9 @@ def visit_Assign(self, node: Assign):
             if value.type != target_type:
                 value = self.codegen.cast_value(value, target_type)
             self.codegen.locals[node.var_name] = value
+        inferred_decl_type = _infer_decl_type_from_expr(node.value)
+        if inferred_decl_type is not None:
+            self.codegen.local_decl_types[node.var_name] = inferred_decl_type
     elif node.var_name in self.codegen.globals:
         # Assign to existing global variable
         global_var = self.codegen.globals[node.var_name]
@@ -536,6 +590,9 @@ def visit_Assign(self, node: Assign):
         var_ptr = self.codegen.alloca_in_entry_block(value.type, node.var_name)
         self.builder.store(value, var_ptr)
         self.codegen.locals[node.var_name] = var_ptr
+        inferred_decl_type = _infer_decl_type_from_expr(node.value)
+        if inferred_decl_type is not None:
+            self.codegen.local_decl_types[node.var_name] = inferred_decl_type
         # Best effort: inherit signedness from RHS if detectable, else assume signed
         inferred_unsigned = self.codegen.is_unsigned_value(value)
         self.codegen.var_signedness[node.var_name] = (

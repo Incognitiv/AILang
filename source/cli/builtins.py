@@ -93,7 +93,7 @@ def _print_builtins():
         "chr(n)              - ASCII code to character",
         "substr(s, start, n) - Substring",
         "concat(a, b)        - Concatenate strings",
-        "index_of(s, sub)    - Find substring",
+        "index_of(s, sub[, start]) - Find substring from optional start offset",
         "startswith(s, pre)  - Check prefix",
         "endswith(s, suf)    - Check suffix",
         "str_replace(s,o,n)  - Replace in string",

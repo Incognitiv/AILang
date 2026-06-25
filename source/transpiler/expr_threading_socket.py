@@ -231,7 +231,7 @@ def _build_sockaddr_in(
 def _builtin_tcp_listen(self, args) -> ir.Value:
     """tcp_listen(port) -> int handle (0 on error).
 
-    Opens a socket, binds it to 0.0.0.0:port, and starts listening
+    Opens a socket, binds it to 127.0.0.1:port, and starts listening
     with backlog=16. Mirrors the C backend's ailang_tcp_listen.
     """
     if len(args) != 1:
@@ -270,7 +270,8 @@ def _builtin_tcp_listen(self, args) -> ir.Value:
     err_end = self.builder.block
 
     self.builder.position_at_end(ok_block)
-    sockaddr_ptr = self._build_sockaddr_in(port_val)
+    loopback_addr = ir.Constant(ir.IntType(32), 0x0100007F)
+    sockaddr_ptr = self._build_sockaddr_in(port_val, loopback_addr)
 
     bind_ty = ir.FunctionType(
         ir.IntType(32), [sock_ty, ir.IntType(8).as_pointer(), ir.IntType(32)]

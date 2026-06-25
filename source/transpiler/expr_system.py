@@ -43,15 +43,21 @@ from .expr_system_process import _builtin_getgid as _m_builtin_getgid
 from .expr_system_process import _builtin_getppid as _m_builtin_getppid
 from .expr_system_process import _builtin_getuid as _m_builtin_getuid
 from .expr_system_process import _builtin_process_umask as _m_builtin_process_umask
+from .expr_system_split import _begin_split_parse_loop as _m_begin_split_parse_loop
 from .expr_system_split import _builtin_split as _m_builtin_split
 from .expr_system_split import _builtin_split_get as _m_builtin_split_get
 from .expr_system_split import _builtin_split_ints as _m_builtin_split_ints
 from .expr_system_split import _builtin_split_len as _m_builtin_split_len
 from .expr_system_split import _builtin_split_set as _m_builtin_split_set
 from .expr_system_split import _builtin_split_str_get as _m_builtin_split_str_get
+from .expr_system_split import (
+    _continue_split_parse_loop as _m_continue_split_parse_loop,
+)
+from .expr_system_split import _create_split_common as _m_create_split_common
 from .expr_system_split import _create_split_helper as _m_create_split_helper
 from .expr_system_split import _create_split_ints_helper as _m_create_split_ints_helper
 from .expr_system_split import _ensure_libc_functions as _m_ensure_libc_functions
+from .expr_system_split import _finish_split_helper as _m_finish_split_helper
 from .expr_system_status import _builtin_errno_clear as _m_builtin_errno_clear
 from .expr_system_status import _builtin_errno_get as _m_builtin_errno_get
 from .expr_system_status import _builtin_errno_set as _m_builtin_errno_set
@@ -218,6 +224,10 @@ class ExprBuiltinSystemEmitter:
     _builtin_split_str_get = _m_builtin_split_str_get
     _builtin_split_set = _m_builtin_split_set
     _ensure_libc_functions = _m_ensure_libc_functions
+    _create_split_common = _m_create_split_common
+    _begin_split_parse_loop = _m_begin_split_parse_loop
+    _continue_split_parse_loop = _m_continue_split_parse_loop
+    _finish_split_helper = _m_finish_split_helper
     _create_split_helper = _m_create_split_helper
     _create_split_ints_helper = _m_create_split_ints_helper
 

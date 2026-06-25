@@ -74,13 +74,16 @@ class ContextEmitter:
         """Enter a new scope. Track objects for cleanup."""
         self._cg.scope_cleanup_stack.append([])
 
-    def pop_scope(self) -> None:
+    def pop_scope(self, skip_names: set[str] | None = None) -> None:
         """Exit scope. Call destructors for all objects in reverse order."""
         if not self._cg.scope_cleanup_stack:
             return
 
+        skip_names = skip_names or set()
         scope_objects = self._cg.scope_cleanup_stack.pop()
-        for _, class_name, obj_ptr in reversed(scope_objects):
+        for var_name, class_name, obj_ptr in reversed(scope_objects):
+            if var_name in skip_names:
+                continue
             destructor = self._cg.class_destructors.get(class_name)
             if destructor is not None:
                 self.current_builder.call(destructor, [obj_ptr])
@@ -92,7 +95,7 @@ class ContextEmitter:
         if class_name in self._cg.class_destructors and self._cg.scope_cleanup_stack:
             self._cg.scope_cleanup_stack[-1].append((var_name, class_name, obj_ptr))
 
-    def cleanup_all_scopes(self) -> None:
+    def cleanup_all_scopes(self, skip_names: set[str] | None = None) -> None:
         """Cleanup all remaining scopes (for example at function return)."""
         while self._cg.scope_cleanup_stack:
-            self.pop_scope()
+            self.pop_scope(skip_names=skip_names)

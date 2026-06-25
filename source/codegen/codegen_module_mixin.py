@@ -489,6 +489,7 @@ class _CodeGenModuleMixin:
         """Generate a global array from an ArrayLit AST node."""
         from parser.ast import Bool, Number, StringLit
 
+        elem_type: ir.Type
         if not array_lit.elements:
             # Empty array
             elem_type = ir.IntType(64)
@@ -545,6 +546,8 @@ class _CodeGenModuleMixin:
 
         var_name = node.var_name
         value = node.value
+        elem_type: ir.Type
+        llvm_type: ir.Type
         if isinstance(value, ArrayLit):
             # Global array - create as global constant array
             if not value.elements:

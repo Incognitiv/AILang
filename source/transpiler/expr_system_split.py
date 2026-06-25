@@ -2,10 +2,19 @@
 
 from __future__ import annotations
 
+from parser.ast import Variable
 from typing import Any
 
 from llvmlite import ir
 from transpiler.expr_common import ARG_FIRST, ARG_SECOND, ARG_THIRD, ExprGenError
+
+
+def _decl_type_for_arg(self, arg) -> str:
+    if isinstance(arg, Variable):
+        declared = getattr(self.codegen, "local_decl_types", {}).get(arg.name)
+        if isinstance(declared, str):
+            return declared.strip().lower()
+    return ""
 
 
 def _builtin_split(self, args):
@@ -83,6 +92,8 @@ def _builtin_split_len(self, args):
     """
     if len(args) != 1:
         raise ExprGenError("split_len() expects exactly 1 argument")
+    if _decl_type_for_arg(self, args[ARG_FIRST]) == "str_array":
+        return self.codegen.builtin_str_array_len(args)
 
     i64 = ir.IntType(64)
     i64_ptr = i64.as_pointer()
@@ -132,6 +143,8 @@ def _builtin_split_str_get(self, args):
         raise ExprGenError(
             "split_str_get() expects 2 arguments: split_str_get(arr, idx)"
         )
+    if _decl_type_for_arg(self, args[ARG_FIRST]) == "str_array":
+        return self.codegen.builtin_str_array_get(args)
 
     i64 = ir.IntType(64)
     i64_ptr = i64.as_pointer()

@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import contextlib
+import importlib
 import io
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, cast
 
 from .common import validate_filepath
 
@@ -17,17 +18,16 @@ def run_pip_audit(_filepath: str) -> Dict[str, Any]:
     This is informational only - doesn't affect code quality score.
     """
     try:
-        from pip_audit._audit import Auditor
-        from pip_audit._dependency_source import PipSource
-        from pip_audit._service import VulnerabilityService
-        from pip_audit._service.pypi import PyPIService
+        audit_mod = cast(Any, importlib.import_module("pip_audit._audit"))
+        source_mod = cast(Any, importlib.import_module("pip_audit._dependency_source"))
+        pypi_mod = cast(Any, importlib.import_module("pip_audit._service.pypi"))
 
         # Suppress logging noise
         logging.getLogger("pip_audit").setLevel(logging.CRITICAL)
 
-        source = PipSource()
-        service: VulnerabilityService = PyPIService()
-        auditor = Auditor(service)
+        source = source_mod.PipSource()
+        service = pypi_mod.PyPIService()
+        auditor = audit_mod.Auditor(service)
 
         vulnerabilities = []
         with contextlib.redirect_stdout(io.StringIO()):
@@ -61,7 +61,7 @@ def run_pip_audit(_filepath: str) -> Dict[str, Any]:
 def run_detect_secrets(filepath: str) -> Dict[str, Any]:
     """Run detect-secrets using its Python API."""
     try:
-        from detect_secrets.core.scan import scan_file
+        scan_mod = cast(Any, importlib.import_module("detect_secrets.core.scan"))
     except ImportError:
         return {
             "error": "detect-secrets not installed",
@@ -86,7 +86,7 @@ def run_detect_secrets(filepath: str) -> Dict[str, Any]:
     try:
         with contextlib.redirect_stdout(io.StringIO()):
             with contextlib.redirect_stderr(io.StringIO()):
-                secrets = list(scan_file(validated_path))
+                secrets = list(scan_mod.scan_file(validated_path))
         issues = [f"Potential secret: {s.type}" for s in secrets[:100]]
         return {"passed": not secrets, "secrets_count": len(secrets), "issues": issues}
     except (OSError, IOError, ValueError) as exc:

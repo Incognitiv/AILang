@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import importlib
 import io
 import json
 import os
 import re
 import shutil
 import sys
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, cast
 
 from .common import validate_filepath
 
@@ -37,7 +38,9 @@ def _is_frozen() -> bool:
 # =============================================================================
 
 
-def _run_subprocess(cmd: List[str], timeout: int = 30) -> tuple:
+def _run_subprocess(
+    cmd: List[str], timeout: int = 30, env: Optional[Dict[str, str]] = None
+) -> tuple:
     """Run subprocess and return (stdout, stderr, returncode) or error dict.
 
     The verifier intentionally invokes external static-analysis tools.
@@ -55,6 +58,7 @@ def _run_subprocess(cmd: List[str], timeout: int = 30) -> tuple:
             timeout=timeout,
             check=False,
             shell=False,
+            env=env,
         )
         return result.stdout, result.stderr, result.returncode
     except FileNotFoundError:
@@ -73,8 +77,8 @@ def _run_subprocess(cmd: List[str], timeout: int = 30) -> tuple:
 def _run_pyflakes_api(filepath: str, actual_name: str) -> Dict[str, Any]:
     """Run pyflakes using Python API."""
     try:
-        from pyflakes import api as pyflakes_api
-        from pyflakes import reporter as pyflakes_reporter
+        pyflakes_api = cast(Any, importlib.import_module("pyflakes.api"))
+        pyflakes_reporter = cast(Any, importlib.import_module("pyflakes.reporter"))
     except ImportError:
         return {"error": "pyflakes not installed"}
     try:
@@ -103,8 +107,8 @@ def _run_pylint_api(
     """Run pylint using Python API."""
     del actual_name
     try:
-        from pylint import lint as pylint_lint
-        from pylint.reporters.text import TextReporter
+        pylint_lint = cast(Any, importlib.import_module("pylint.lint"))
+        pylint_reporters = cast(Any, importlib.import_module("pylint.reporters.text"))
     except ImportError:
         return {"error": "pylint not installed"}
     try:
@@ -127,7 +131,7 @@ def _run_pylint_api(
         pylintrc_path = os.path.join(file_dir, ".pylintrc")
         if os.path.exists(pylintrc_path):
             args.append(f"--rcfile={pylintrc_path}")
-        reporter = TextReporter(output)
+        reporter = pylint_reporters.TextReporter(output)
         captured_out, captured_err = io.StringIO(), io.StringIO()
         old_out, old_err = sys.stdout, sys.stderr
         try:
@@ -166,6 +170,38 @@ INCOMPLETE_STUB_MODULES = {"black", "isort", "mypy"}
 FILTERED_MYPY_ERRORS = {"import-untyped", "import-not-found"}
 
 
+def _mypy_env_for(filepath: str) -> Dict[str, str]:
+    """Build a mypy environment that can resolve repo-local import roots."""
+    env = os.environ.copy()
+    cwd = os.path.abspath(os.getcwd())
+    del filepath
+    candidate_roots = [
+        os.path.join(cwd, "typings"),
+        os.path.join(cwd, "source"),
+        cwd,
+        os.path.join(cwd, "tests"),
+    ]
+    existing = env.get("MYPYPATH", "")
+    if existing:
+        candidate_roots.extend(p for p in existing.split(os.pathsep) if p)
+
+    seen: set[str] = set()
+    roots: List[str] = []
+    for root in candidate_roots:
+        norm = os.path.normcase(os.path.abspath(root))
+        if norm in seen or not os.path.isdir(root):
+            continue
+        seen.add(norm)
+        roots.append(root)
+    env["MYPYPATH"] = os.pathsep.join(roots)
+    return env
+
+
+def _mypy_cache_dir() -> str:
+    """Use a verifier-owned cache namespace so option/env changes cannot stale."""
+    return os.path.join(os.getcwd(), ".mypy_cache", "verifier-v2")
+
+
 def _run_mypy_api(
     filepath: str, actual_name: str, check_imports: bool = False
 ) -> Dict[str, Any]:
@@ -187,7 +223,7 @@ def _run_mypy_api(
             # First call populates, subsequent calls reuse parsed dependencies.
             "--incremental",
             "--cache-dir",
-            os.path.join(os.getcwd(), ".mypy_cache"),
+            _mypy_cache_dir(),
         ]
         if not check_imports:
             args.append("--ignore-missing-imports")
@@ -195,7 +231,15 @@ def _run_mypy_api(
         # stdout and stderr (mypy writes errors to stdout in some modes
         # and stderr in others) and ignore the exit code (we count
         # errors directly from the parsed output).
-        stdout, stderr, _exit = mypy_api.run(args)
+        old_mypy_path = os.environ.get("MYPYPATH")
+        os.environ["MYPYPATH"] = _mypy_env_for(filepath)["MYPYPATH"]
+        try:
+            stdout, stderr, _exit = mypy_api.run(args)
+        finally:
+            if old_mypy_path is None:
+                os.environ.pop("MYPYPATH", None)
+            else:
+                os.environ["MYPYPATH"] = old_mypy_path
         output = (stdout or "") + (stderr or "")
         errors: List[str] = []
         for line in output.split("\n"):
@@ -223,8 +267,8 @@ def _run_mypy_api(
 def _run_bandit_api(filepath: str, _actual_name: str) -> Dict[str, Any]:
     """Run bandit using Python API."""
     try:
-        from bandit.core import config as bandit_config
-        from bandit.core import manager as bandit_manager
+        bandit_config = cast(Any, importlib.import_module("bandit.core.config"))
+        bandit_manager = cast(Any, importlib.import_module("bandit.core.manager"))
     except ImportError:
         return {"error": "bandit not installed"}
     try:
@@ -312,7 +356,7 @@ def _run_pylint_subprocess(
     pylintrc_path = os.path.join(file_dir, ".pylintrc")
     if os.path.exists(pylintrc_path):
         cmd.append(f"--rcfile={pylintrc_path}")
-    stdout, stderr, rc = _run_subprocess(cmd, timeout=60)
+    stdout, stderr, rc = _run_subprocess(cmd, timeout=60, env=_mypy_env_for(filepath))
     if isinstance(rc, dict):
         return rc
     issues: List[str] = []
@@ -357,11 +401,11 @@ def _run_mypy_subprocess(
         # Incremental cache: dramatic speedup on subsequent runs.
         "--incremental",
         "--cache-dir",
-        os.path.join(os.getcwd(), ".mypy_cache"),
+        _mypy_cache_dir(),
     ]
     if not check_imports:
         cmd.append("--ignore-missing-imports")
-    stdout, stderr, rc = _run_subprocess(cmd, timeout=60)
+    stdout, stderr, rc = _run_subprocess(cmd, timeout=60, env=_mypy_env_for(filepath))
     if isinstance(rc, dict):
         return rc
     output = (stdout or "") + (stderr or "")

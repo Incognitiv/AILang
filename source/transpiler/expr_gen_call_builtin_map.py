@@ -17,6 +17,18 @@ def _emit_ptr_array(args: list[str]) -> str:
     return f"((int64_t)(uintptr_t)((const char *[]){{{entries}NULL}}))"
 
 
+def _emit_index_of(args: list[str]) -> str:
+    if len(args) == 2:
+        haystack, needle = args
+        return f"ailang_index_of({haystack}, {needle})"
+    if len(args) == 3:
+        haystack, needle, start = args
+        return f"ailang_index_of_from({haystack}, {needle}, {start})"
+    raise ValueError(
+        f"index_of() expects (haystack, needle) or (haystack, needle, start), got {len(args)} args"
+    )
+
+
 def c_builtin_mappings(self: Any) -> dict[str, Callable[[list[str]], str]]:
     return {
         "strlen": lambda a: f"ailang_strlen({a[0]})",
@@ -71,7 +83,7 @@ def c_builtin_mappings(self: Any) -> dict[str, Callable[[list[str]], str]]:
             )
         ),
         # String search
-        "index_of": lambda a: f"ailang_index_of({a[0]}, {a[1]})",
+        "index_of": _emit_index_of,
         "index_of_from": lambda a: (f"ailang_index_of_from({a[0]}, {a[1]}, {a[2]})"),
         # String prefix/suffix checks
         "startswith": lambda a: f"ailang_startswith({a[0]}, {a[1]})",

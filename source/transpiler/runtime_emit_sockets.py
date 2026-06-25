@@ -199,7 +199,7 @@ def emit_runtime_sockets(emitter: Any) -> None:
     emitter._output.append("    struct sockaddr_in addr;")
     emitter._output.append("    memset(&addr, 0, sizeof(addr));")
     emitter._output.append("    addr.sin_family = AF_INET;")
-    emitter._output.append("    addr.sin_addr.s_addr = htonl(INADDR_ANY);")
+    emitter._output.append("    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);")
     emitter._output.append("    addr.sin_port = htons((unsigned short)port);")
     emitter._output.append(
         "    if (bind(s, (struct sockaddr *)&addr, sizeof(addr)) != 0) {"

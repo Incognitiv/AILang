@@ -98,7 +98,7 @@ archived/
 /p.out
 /pytest_full.log
 /UsersVAppDataLocalTempmsh-*.out
-/UsersVsourcereposMixtarRVSoutservermsh_redir_probe.txt
+/*msh_redir_probe.txt
 /verifier_source_strict*.log
 /verifier/diag_out.txt
 /verifier/score.txt

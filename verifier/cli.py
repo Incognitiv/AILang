@@ -10,6 +10,10 @@ import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    __package__ = "verifier"
+
 from .cache import VerificationCache
 from .core import EnhancedPythonVerifier
 from .tools import run_project_clone_audit
@@ -328,6 +332,8 @@ def verify_directory(
 
     if worker_count == 1:
         for py_file in python_files:
+            if not json_mode:
+                print(f"[RUN] {_short_path(str(py_file), directory)}", flush=True)
             result = _verify_one_serial(verifier, py_file, preset, cache, check_imports)
             results_list.append(result)
             _emit_result(py_file, result, directory, json_mode)

@@ -81,7 +81,16 @@ def visit_FieldAssign(self, node: A.FieldAssign) -> None:
             node.value, node.object_expr, node.field_name, kind
         )
         self.emit(f"{{ typeof({owner}) __field_owner = {owner};")
-        self.emit(f"  typeof(__field_owner->{node.field_name}) __field_new = {val};")
+        val_text = str(val).strip() if isinstance(val, str) else str(val)
+        if kind in {"array", "str_array", "dict"} and val_text in {"0", "0LL"}:
+            self.emit(
+                f"  typeof(__field_owner->{node.field_name}) __field_new = "
+                f"(typeof(__field_owner->{node.field_name})) {{0}};"
+            )
+        else:
+            self.emit(
+                f"  typeof(__field_owner->{node.field_name}) __field_new = {val};"
+            )
         if preserves_storage:
             rhs_owned = f"__field_owner->{flag}"
         elif kind is not None:
