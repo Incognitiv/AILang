@@ -1,0 +1,49 @@
+name: Sync b91 working truth
+
+on:
+  push:
+    branches:
+      - agent/upload-b91-staging
+    paths:
+      - .sync/READY
+
+permissions:
+  contents: write
+
+jobs:
+  reconstruct:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout transport branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reconstruct and verify exact source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE=4485abf8bc29b5dc671c8d88a8f4fa89b5c741d8
+          EXPECTED_TREE=5fa8888e05d1ac7e025d8b3f2a1ab258ac42f410
+          EXPECTED_ARCHIVE_SHA256=7024b907ef506db4a9c0721fed672a30ceedba7e3303ed5c17a733394921c1b1
+
+          cat .sync/chunks/*.b64 | base64 --decode > /tmp/b91_source.tar.xz
+          printf '%s  %s\n' "$EXPECTED_ARCHIVE_SHA256" /tmp/b91_source.tar.xz | sha256sum --check --strict
+
+          git rm -rf .
+          tar -xJf /tmp/b91_source.tar.xz -C .
+          test "$(find . -type f -not -path './.git/*' | wc -l)" -eq 635
+          test -f stdlib/core/bigint.ail
+          test "$(wc -c < stdlib/core/bigint.ail)" -eq 48802
+
+          git add -A
+          ACTUAL_TREE="$(git write-tree)"
+          echo "expected tree: $EXPECTED_TREE"
+          echo "actual tree:   $ACTUAL_TREE"
+          test "$ACTUAL_TREE" = "$EXPECTED_TREE"
+
+          git config user.name 'AILang working-truth sync'
+          git config user.email 'sync@ai-lang.dev'
+          COMMIT="$(printf '%s\n' 'Sync verified b91 working-truth snapshot' | git commit-tree "$ACTUAL_TREE" -p "$BASE")"
+          echo "candidate commit: $COMMIT"
+          git push origin "$COMMIT:refs/heads/agent/upload-b91-staging" --force
