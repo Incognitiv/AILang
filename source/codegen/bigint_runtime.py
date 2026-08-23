@@ -152,7 +152,7 @@ class BigIntRuntime:
 
     def _get_bigint_pow(self) -> ir.Function:
         p = self._get_bigint_type()
-        return self._adapter("_bigint_pow_func", "ailang_bigint_pow", p, [p, ir.IntType(64)])
+        return self._adapter("_bigint_pow_func", "ailang_bigint_pow_unbounded", p, [p, p])
 
     def _get_bigint_shl(self) -> ir.Function:
         p = self._get_bigint_type()

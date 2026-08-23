@@ -157,17 +157,19 @@ def _wide_binary_expr(self, node: A.BinaryOp, left: str, right: str):
     return None
 
 
-
 def _bigint_binary_expr(self, node: A.BinaryOp) -> str:
     op = node.op
     if op == "ushr":
         raise ValueError("logical right shift 'ushr' is undefined for unbounded integers; use >>")
     left = owned_bigint_expr(self, node.left)
-    if op in ("**", "^", "<<", "shl", ">>", "shr"):
-        # The count is also materialized as a BigInt, then checked to a
-        # non-negative i64. This avoids any silent wide->i64 truncation.
+    if op in ("**", "^"):
+        exponent = owned_bigint_expr(self, node.right)
+        return f"ailang_bigint_pow_unbounded_take({left}, {exponent})"
+    if op in ("<<", "shl", ">>", "shr"):
+        # Shift counts are intentionally machine-bounded. Materialize as BigInt
+        # first and narrow through the checked helper so no wide value truncates.
         count = f"ailang_bigint_count_take({owned_bigint_expr(self, node.right)})"
-        fn = "pow" if op in ("**", "^") else ("shl" if op in ("<<", "shl") else "shr")
+        fn = "shl" if op in ("<<", "shl") else "shr"
         return f"ailang_bigint_{fn}_take({left}, {count})"
     right = owned_bigint_expr(self, node.right)
     if op in ("+", "plus", "-", "minus", "*", "star", "/", "//", "%"):

@@ -20,7 +20,7 @@ from transpiler.expr_calls import ExprCallEmitter
 from transpiler.expr_collections import ExprCollectionEmitter
 from transpiler.expr_common import ExprGenError
 from transpiler.expr_literals import ExprLiteralEmitter
-from transpiler.expr_ops import ExprOpsEmitter
+from transpiler.expr_ops_unbounded import UnboundedPowExprOpsEmitter
 from transpiler.expr_simd import _SimdBuiltinsMixin
 from transpiler.expr_system import ExprBuiltinSystemEmitter
 from transpiler.expr_threading import ExprBuiltinThreadingEmitter
@@ -49,7 +49,7 @@ class ExprGenerator(_SimdBuiltinsMixin):
 
         self.type_emitter: ExprTypeHelperEmitter = ExprTypeHelperEmitter(self)
         self.literal_emitter: ExprLiteralEmitter = ExprLiteralEmitter(self)
-        self.ops_emitter: ExprOpsEmitter = ExprOpsEmitter(self)
+        self.ops_emitter: UnboundedPowExprOpsEmitter = UnboundedPowExprOpsEmitter(self)
         self.meta_emitter: ExprBuiltinMetaEmitter = ExprBuiltinMetaEmitter(self)
         self.call_emitter: ExprCallEmitter = ExprCallEmitter(self)
         self.collection_emitter: ExprCollectionEmitter = ExprCollectionEmitter(self)
