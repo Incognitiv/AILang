@@ -1,0 +1,63 @@
+// Example shape for a live UI loop.
+//
+// This file is intentionally not part of the regression corpus. To link it,
+// compile the generated C together with examples/ui/backends/ail_ui_win32_min.c
+// and the platform libraries required by that backend.
+
+extern fn ail_ui_init(): int
+extern fn ail_ui_shutdown(): void
+extern fn ail_ui_open_window(title: string, width: int, height: int): int
+extern fn ail_ui_close_window(window: int): void
+extern fn ail_ui_window_alive(window: int): int
+extern fn ail_ui_poll_event(window: int): int
+extern fn ail_ui_begin_frame(window: int, color: int): void
+extern fn ail_ui_draw_rect(window: int, x: int, y: int, width: int, height: int, color: int): void
+extern fn ail_ui_draw_text(window: int, x: int, y: int, scale: int, color: int, text: string): void
+extern fn ail_ui_end_frame(window: int): void
+extern fn ail_ui_wait_event_ms(ms: int): void
+
+
+def draw_demo(window: int): void
+    ail_ui_begin_frame(window, 0xf5f7fb)
+    ail_ui_draw_rect(window, 40, 40, 360, 220, 0xffffff)
+    ail_ui_draw_rect(window, 64, 82, 210, 42, 0x111827)
+    ail_ui_draw_text(window, 78, 96, 2, 0xffffff, "AILang UI")
+    ail_ui_draw_rect(window, 64, 150, 92, 34, 0x2563eb)
+    ail_ui_draw_text(window, 78, 162, 1, 0xffffff, "Preview")
+    ail_ui_draw_rect(window, 174, 150, 92, 34, 0x10b981)
+    ail_ui_draw_text(window, 188, 162, 1, 0xffffff, "Export")
+    ail_ui_end_frame(window)
+end
+
+
+def main(): int
+    if ail_ui_init() == 0 then
+        print("ui init failed")
+        return 1
+    end
+
+    window = ail_ui_open_window("AILang UI", 900, 600)
+    if window == 0 then
+        print("window open failed")
+        return 1
+    end
+
+    dirty = 1
+    while ail_ui_window_alive(window) == 1 then
+        event_kind = ail_ui_poll_event(window)
+        if event_kind != 0 then
+            dirty = 1
+        end
+
+        if dirty == 1 then
+            draw_demo(window)
+            dirty = 0
+        else
+            ail_ui_wait_event_ms(100)
+        end
+    end
+
+    ail_ui_close_window(window)
+    ail_ui_shutdown()
+    return 0
+end

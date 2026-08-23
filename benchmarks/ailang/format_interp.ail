@@ -1,0 +1,20 @@
+def format_interp_bench(iterations):
+    i = 0
+    sink = 0
+    while i < iterations then
+        si = str(i)
+        s = "v=#{si}"
+        n = len(s)
+        sink = sink + n + ord(char_at(s, n - 1))
+        i = i + 1
+    end
+    return sink
+end
+
+
+def main(): int
+    iterations = 1000
+    result = format_interp_bench(iterations)
+    print(result)
+    return 0
+end

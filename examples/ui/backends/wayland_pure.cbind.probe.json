@@ -1,0 +1,1305 @@
+{
+  "compiler": "/usr/bin/gcc",
+  "constants": [],
+  "enums": [],
+  "errors": [],
+  "functions": [
+    {
+      "decorators": [],
+      "name": "close",
+      "params": [
+        {
+          "name": "fd",
+          "type": "short"
+        }
+      ],
+      "return_type": "short",
+      "variadic": false
+    },
+    {
+      "decorators": [],
+      "name": "ftruncate",
+      "params": [
+        {
+          "name": "fd",
+          "type": "short"
+        },
+        {
+          "name": "length",
+          "type": "int"
+        }
+      ],
+      "return_type": "short",
+      "variadic": false
+    },
+    {
+      "decorators": [],
+      "name": "memfd_create",
+      "params": [
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "flags",
+          "type": "ushort"
+        }
+      ],
+      "return_type": "short",
+      "variadic": false
+    },
+    {
+      "decorators": [],
+      "name": "mmap",
+      "params": [
+        {
+          "name": "addr",
+          "type": "ptr"
+        },
+        {
+          "name": "length",
+          "type": "uint"
+        },
+        {
+          "name": "prot",
+          "type": "short"
+        },
+        {
+          "name": "flags",
+          "type": "short"
+        },
+        {
+          "name": "fd",
+          "type": "short"
+        },
+        {
+          "name": "offset",
+          "type": "int"
+        }
+      ],
+      "return_type": "ptr",
+      "variadic": false
+    },
+    {
+      "decorators": [],
+      "name": "munmap",
+      "params": [
+        {
+          "name": "addr",
+          "type": "ptr"
+        },
+        {
+          "name": "length",
+          "type": "uint"
+        }
+      ],
+      "return_type": "short",
+      "variadic": false
+    },
+    {
+      "decorators": [],
+      "name": "usleep",
+      "params": [
+        {
+          "name": "usec",
+          "type": "ushort"
+        }
+      ],
+      "return_type": "short",
+      "variadic": false
+    }
+  ],
+  "headers": [
+    {
+      "path": "stdint.h",
+      "system": true
+    },
+    {
+      "path": "string.h",
+      "system": true
+    },
+    {
+      "path": "unistd.h",
+      "system": true
+    },
+    {
+      "path": "sys/syscall.h",
+      "system": true
+    },
+    {
+      "path": "sys/mman.h",
+      "system": true
+    },
+    {
+      "path": "wayland-client.h",
+      "system": true
+    },
+    {
+      "path": "generated/wayland/xdg-shell-client-protocol.h",
+      "system": false
+    }
+  ],
+  "link_flags": [
+    "-lwayland-client"
+  ],
+  "macros": [
+    {
+      "expr": "WL_KEYBOARD_KEY_STATE_PRESSED",
+      "kind": "constant",
+      "name": "AIL_WAYLAND_KEYBOARD_KEY_PRESSED",
+      "value": 1
+    },
+    {
+      "expr": "WL_KEYBOARD_KEY_STATE_RELEASED",
+      "kind": "constant",
+      "name": "AIL_WAYLAND_KEYBOARD_KEY_RELEASED",
+      "value": 0
+    },
+    {
+      "expr": "MAP_SHARED",
+      "kind": "constant",
+      "name": "AIL_WAYLAND_MAP_SHARED",
+      "value": 1
+    },
+    {
+      "expr": "WL_POINTER_BUTTON_STATE_PRESSED",
+      "kind": "constant",
+      "name": "AIL_WAYLAND_POINTER_BUTTON_PRESSED",
+      "value": 1
+    },
+    {
+      "expr": "WL_POINTER_BUTTON_STATE_RELEASED",
+      "kind": "constant",
+      "name": "AIL_WAYLAND_POINTER_BUTTON_RELEASED",
+      "value": 0
+    },
+    {
+      "expr": "PROT_READ",
+      "kind": "constant",
+      "name": "AIL_WAYLAND_PROT_READ",
+      "value": 1
+    },
+    {
+      "expr": "PROT_WRITE",
+      "kind": "constant",
+      "name": "AIL_WAYLAND_PROT_WRITE",
+      "value": 2
+    },
+    {
+      "expr": "WL_SEAT_CAPABILITY_KEYBOARD",
+      "kind": "constant",
+      "name": "AIL_WAYLAND_SEAT_CAP_KEYBOARD",
+      "value": 2
+    },
+    {
+      "expr": "WL_SEAT_CAPABILITY_POINTER",
+      "kind": "constant",
+      "name": "AIL_WAYLAND_SEAT_CAP_POINTER",
+      "value": 1
+    },
+    {
+      "expr": "WL_SHM_FORMAT_ARGB8888",
+      "kind": "constant",
+      "name": "AIL_WAYLAND_SHM_FORMAT_ARGB8888",
+      "value": 0
+    },
+    {
+      "expr": "WL_SHM_FORMAT_XRGB8888",
+      "kind": "constant",
+      "name": "AIL_WAYLAND_SHM_FORMAT_XRGB8888",
+      "value": 1
+    }
+  ],
+  "ok": true,
+  "records": [
+    {
+      "align": 8,
+      "c_name": "struct wl_keyboard_listener",
+      "fields": [
+        {
+          "c_name": "enter",
+          "name": "enter",
+          "offset": 8,
+          "size": 8,
+          "type": "ptr"
+        },
+        {
+          "c_name": "key",
+          "name": "key",
+          "offset": 24,
+          "size": 8,
+          "type": "ptr"
+        },
+        {
+          "c_name": "keymap",
+          "name": "keymap",
+          "offset": 0,
+          "size": 8,
+          "type": "ptr"
+        },
+        {
+          "c_name": "leave",
+          "name": "leave",
+          "offset": 16,
+          "size": 8,
+          "type": "ptr"
+        },
+        {
+          "c_name": "modifiers",
+          "name": "modifiers",
+          "offset": 32,
+          "size": 8,
+          "type": "ptr"
+        },
+        {
+          "c_name": "repeat_info",
+          "name": "repeat_info",
+          "offset": 40,
+          "size": 8,
+          "type": "ptr"
+        }
+      ],
+      "kind": "extern",
+      "name": "wl_keyboard_listener",
+      "size": 48
+    },
+    {
+      "align": 8,
+      "c_name": "struct wl_pointer_listener",
+      "fields": [
+        {
+          "c_name": "axis",
+          "name": "axis",
+          "offset": 32,
+          "size": 8,
+          "type": "ptr"
+        },
+        {
+          "c_name": "axis_discrete",
+          "name": "axis_discrete",
+          "offset": 64,
+          "size": 8,
+          "type": "ptr"
+        },
+        {
+          "c_name": "axis_relative_direction",
+          "name": "axis_relative_direction",
+          "offset": 80,
+          "size": 8,
+          "type": "ptr"
+        },
+        {
+          "c_name": "axis_source",
+          "name": "axis_source",
+          "offset": 48,
+          "size": 8,
+          "type": "ptr"
+        },
+        {
+          "c_name": "axis_stop",
+          "name": "axis_stop",
+          "offset": 56,
+          "size": 8,
+          "type": "ptr"
+        },
+        {
+          "c_name": "axis_value120",
+          "name": "axis_value120",
+          "offset": 72,
+          "size": 8,
+          "type": "ptr"
+        },
+        {
+          "c_name": "button",
+          "name": "button",
+          "offset": 24,
+          "size": 8,
+          "type": "ptr"
+        },
+        {
+          "c_name": "enter",
+          "name": "enter",
+          "offset": 0,
+          "size": 8,
+          "type": "ptr"
+        },
+        {
+          "c_name": "frame",
+          "name": "frame",
+          "offset": 40,
+          "size": 8,
+          "type": "ptr"
+        },
+        {
+          "c_name": "leave",
+          "name": "leave",
+          "offset": 8,
+          "size": 8,
+          "type": "ptr"
+        },
+        {
+          "c_name": "motion",
+          "name": "motion",
+          "offset": 16,
+          "size": 8,
+          "type": "ptr"
+        }
+      ],
+      "kind": "extern",
+      "name": "wl_pointer_listener",
+      "size": 88
+    },
+    {
+      "align": 8,
+      "c_name": "struct wl_registry_listener",
+      "fields": [
+        {
+          "c_name": "global",
+          "name": "global",
+          "offset": 0,
+          "size": 8,
+          "type": "ptr"
+        },
+        {
+          "c_name": "global_remove",
+          "name": "global_remove",
+          "offset": 8,
+          "size": 8,
+          "type": "ptr"
+        }
+      ],
+      "kind": "extern",
+      "name": "wl_registry_listener",
+      "size": 16
+    },
+    {
+      "align": 8,
+      "c_name": "struct wl_seat_listener",
+      "fields": [
+        {
+          "c_name": "capabilities",
+          "name": "capabilities",
+          "offset": 0,
+          "size": 8,
+          "type": "ptr"
+        },
+        {
+          "c_name": "name",
+          "name": "name",
+          "offset": 8,
+          "size": 8,
+          "type": "ptr"
+        }
+      ],
+      "kind": "extern",
+      "name": "wl_seat_listener",
+      "size": 16
+    },
+    {
+      "align": 8,
+      "c_name": "struct xdg_surface_listener",
+      "fields": [
+        {
+          "c_name": "configure",
+          "name": "configure",
+          "offset": 0,
+          "size": 8,
+          "type": "ptr"
+        }
+      ],
+      "kind": "extern",
+      "name": "xdg_surface_listener",
+      "size": 8
+    },
+    {
+      "align": 8,
+      "c_name": "struct xdg_toplevel_listener",
+      "fields": [
+        {
+          "c_name": "close",
+          "name": "close",
+          "offset": 8,
+          "size": 8,
+          "type": "ptr"
+        },
+        {
+          "c_name": "configure",
+          "name": "configure",
+          "offset": 0,
+          "size": 8,
+          "type": "ptr"
+        },
+        {
+          "c_name": "configure_bounds",
+          "name": "configure_bounds",
+          "offset": 16,
+          "size": 8,
+          "type": "ptr"
+        },
+        {
+          "c_name": "wm_capabilities",
+          "name": "wm_capabilities",
+          "offset": 24,
+          "size": 8,
+          "type": "ptr"
+        }
+      ],
+      "kind": "extern",
+      "name": "xdg_toplevel_listener",
+      "size": 32
+    },
+    {
+      "align": 8,
+      "c_name": "struct xdg_wm_base_listener",
+      "fields": [
+        {
+          "c_name": "ping",
+          "name": "ping",
+          "offset": 0,
+          "size": 8,
+          "type": "ptr"
+        }
+      ],
+      "kind": "extern",
+      "name": "xdg_wm_base_listener",
+      "size": 8
+    }
+  ],
+  "spec_name": "wayland_pure",
+  "wrappers": [
+    {
+      "abi_return_type": "int32_t",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_c_strcmp",
+      "params": [
+        {
+          "abi_type": "const char *",
+          "name": "left",
+          "type": "string"
+        },
+        {
+          "abi_type": "const char *",
+          "name": "right",
+          "type": "string"
+        }
+      ],
+      "return_type": "short"
+    },
+    {
+      "abi_return_type": "int",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_wayland_memfd_create",
+      "params": [
+        {
+          "abi_type": "const char *",
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "abi_type": "unsigned int",
+          "name": "flags",
+          "type": "ushort"
+        }
+      ],
+      "return_type": "short"
+    },
+    {
+      "abi_return_type": "void",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_wl_buffer_destroy",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "buffer",
+          "type": "ptr"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "abi_return_type": "void *",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_wl_compositor_create_surface",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "compositor",
+          "type": "ptr"
+        }
+      ],
+      "return_type": "ptr"
+    },
+    {
+      "abi_return_type": "void",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_wl_compositor_destroy",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "compositor",
+          "type": "ptr"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "abi_return_type": "void *",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_wl_display_connect_default",
+      "params": [],
+      "return_type": "ptr"
+    },
+    {
+      "abi_return_type": "void",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_wl_display_disconnect",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "display",
+          "type": "ptr"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "abi_return_type": "int32_t",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_wl_display_dispatch",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "display",
+          "type": "ptr"
+        }
+      ],
+      "return_type": "short"
+    },
+    {
+      "abi_return_type": "int32_t",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_wl_display_dispatch_pending",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "display",
+          "type": "ptr"
+        }
+      ],
+      "return_type": "short"
+    },
+    {
+      "abi_return_type": "int32_t",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_wl_display_flush",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "display",
+          "type": "ptr"
+        }
+      ],
+      "return_type": "short"
+    },
+    {
+      "abi_return_type": "void *",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_wl_display_get_registry",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "display",
+          "type": "ptr"
+        }
+      ],
+      "return_type": "ptr"
+    },
+    {
+      "abi_return_type": "int32_t",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_wl_display_roundtrip",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "display",
+          "type": "ptr"
+        }
+      ],
+      "return_type": "short"
+    },
+    {
+      "abi_return_type": "int32_t",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_wl_keyboard_add_listener",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "keyboard",
+          "type": "ptr"
+        },
+        {
+          "abi_type": "void *",
+          "name": "listener",
+          "type": "ptr"
+        },
+        {
+          "abi_type": "void *",
+          "name": "data",
+          "type": "ptr"
+        }
+      ],
+      "return_type": "short"
+    },
+    {
+      "abi_return_type": "void",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_wl_keyboard_release",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "keyboard",
+          "type": "ptr"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "abi_return_type": "int32_t",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_wl_pointer_add_listener",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "pointer",
+          "type": "ptr"
+        },
+        {
+          "abi_type": "void *",
+          "name": "listener",
+          "type": "ptr"
+        },
+        {
+          "abi_type": "void *",
+          "name": "data",
+          "type": "ptr"
+        }
+      ],
+      "return_type": "short"
+    },
+    {
+      "abi_return_type": "void",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_wl_pointer_release",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "pointer",
+          "type": "ptr"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "abi_return_type": "int32_t",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_wl_registry_add_listener",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "registry",
+          "type": "ptr"
+        },
+        {
+          "abi_type": "void *",
+          "name": "listener",
+          "type": "ptr"
+        },
+        {
+          "abi_type": "void *",
+          "name": "data",
+          "type": "ptr"
+        }
+      ],
+      "return_type": "short"
+    },
+    {
+      "abi_return_type": "void *",
+      "body_kind": "body",
+      "decorators": [],
+      "name": "ail_wl_registry_bind_compositor",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "registry",
+          "type": "ptr"
+        },
+        {
+          "abi_type": "uint32_t",
+          "name": "name",
+          "type": "ushort"
+        },
+        {
+          "abi_type": "uint32_t",
+          "name": "version",
+          "type": "ushort"
+        }
+      ],
+      "return_type": "ptr"
+    },
+    {
+      "abi_return_type": "void *",
+      "body_kind": "body",
+      "decorators": [],
+      "name": "ail_wl_registry_bind_seat",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "registry",
+          "type": "ptr"
+        },
+        {
+          "abi_type": "uint32_t",
+          "name": "name",
+          "type": "ushort"
+        },
+        {
+          "abi_type": "uint32_t",
+          "name": "version",
+          "type": "ushort"
+        }
+      ],
+      "return_type": "ptr"
+    },
+    {
+      "abi_return_type": "void *",
+      "body_kind": "body",
+      "decorators": [],
+      "name": "ail_wl_registry_bind_shm",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "registry",
+          "type": "ptr"
+        },
+        {
+          "abi_type": "uint32_t",
+          "name": "name",
+          "type": "ushort"
+        },
+        {
+          "abi_type": "uint32_t",
+          "name": "version",
+          "type": "ushort"
+        }
+      ],
+      "return_type": "ptr"
+    },
+    {
+      "abi_return_type": "void *",
+      "body_kind": "body",
+      "decorators": [],
+      "name": "ail_wl_registry_bind_xdg_wm_base",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "registry",
+          "type": "ptr"
+        },
+        {
+          "abi_type": "uint32_t",
+          "name": "name",
+          "type": "ushort"
+        },
+        {
+          "abi_type": "uint32_t",
+          "name": "version",
+          "type": "ushort"
+        }
+      ],
+      "return_type": "ptr"
+    },
+    {
+      "abi_return_type": "void",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_wl_registry_destroy",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "registry",
+          "type": "ptr"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "abi_return_type": "int32_t",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_wl_seat_add_listener",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "seat",
+          "type": "ptr"
+        },
+        {
+          "abi_type": "void *",
+          "name": "listener",
+          "type": "ptr"
+        },
+        {
+          "abi_type": "void *",
+          "name": "data",
+          "type": "ptr"
+        }
+      ],
+      "return_type": "short"
+    },
+    {
+      "abi_return_type": "void *",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_wl_seat_get_keyboard",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "seat",
+          "type": "ptr"
+        }
+      ],
+      "return_type": "ptr"
+    },
+    {
+      "abi_return_type": "void *",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_wl_seat_get_pointer",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "seat",
+          "type": "ptr"
+        }
+      ],
+      "return_type": "ptr"
+    },
+    {
+      "abi_return_type": "void",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_wl_seat_release",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "seat",
+          "type": "ptr"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "abi_return_type": "void *",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_wl_shm_create_pool",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "shm",
+          "type": "ptr"
+        },
+        {
+          "abi_type": "int32_t",
+          "name": "fd",
+          "type": "short"
+        },
+        {
+          "abi_type": "int32_t",
+          "name": "size",
+          "type": "short"
+        }
+      ],
+      "return_type": "ptr"
+    },
+    {
+      "abi_return_type": "void *",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_wl_shm_pool_create_buffer",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "pool",
+          "type": "ptr"
+        },
+        {
+          "abi_type": "int32_t",
+          "name": "offset",
+          "type": "short"
+        },
+        {
+          "abi_type": "int32_t",
+          "name": "width",
+          "type": "short"
+        },
+        {
+          "abi_type": "int32_t",
+          "name": "height",
+          "type": "short"
+        },
+        {
+          "abi_type": "int32_t",
+          "name": "stride",
+          "type": "short"
+        },
+        {
+          "abi_type": "uint32_t",
+          "name": "format",
+          "type": "ushort"
+        }
+      ],
+      "return_type": "ptr"
+    },
+    {
+      "abi_return_type": "void",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_wl_shm_pool_destroy",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "pool",
+          "type": "ptr"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "abi_return_type": "void",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_wl_shm_release",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "shm",
+          "type": "ptr"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "abi_return_type": "void",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_wl_surface_attach",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "surface",
+          "type": "ptr"
+        },
+        {
+          "abi_type": "void *",
+          "name": "buffer",
+          "type": "ptr"
+        },
+        {
+          "abi_type": "int32_t",
+          "name": "x",
+          "type": "short"
+        },
+        {
+          "abi_type": "int32_t",
+          "name": "y",
+          "type": "short"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "abi_return_type": "void",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_wl_surface_commit",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "surface",
+          "type": "ptr"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "abi_return_type": "void",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_wl_surface_damage_buffer",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "surface",
+          "type": "ptr"
+        },
+        {
+          "abi_type": "int32_t",
+          "name": "x",
+          "type": "short"
+        },
+        {
+          "abi_type": "int32_t",
+          "name": "y",
+          "type": "short"
+        },
+        {
+          "abi_type": "int32_t",
+          "name": "width",
+          "type": "short"
+        },
+        {
+          "abi_type": "int32_t",
+          "name": "height",
+          "type": "short"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "abi_return_type": "void",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_wl_surface_destroy",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "surface",
+          "type": "ptr"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "abi_return_type": "void",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_xdg_surface_ack_configure",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "xdg_surface",
+          "type": "ptr"
+        },
+        {
+          "abi_type": "uint32_t",
+          "name": "serial",
+          "type": "ushort"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "abi_return_type": "int32_t",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_xdg_surface_add_listener",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "xdg_surface",
+          "type": "ptr"
+        },
+        {
+          "abi_type": "void *",
+          "name": "listener",
+          "type": "ptr"
+        },
+        {
+          "abi_type": "void *",
+          "name": "data",
+          "type": "ptr"
+        }
+      ],
+      "return_type": "short"
+    },
+    {
+      "abi_return_type": "void",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_xdg_surface_destroy",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "xdg_surface",
+          "type": "ptr"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "abi_return_type": "void *",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_xdg_surface_get_toplevel",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "xdg_surface",
+          "type": "ptr"
+        }
+      ],
+      "return_type": "ptr"
+    },
+    {
+      "abi_return_type": "int32_t",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_xdg_toplevel_add_listener",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "toplevel",
+          "type": "ptr"
+        },
+        {
+          "abi_type": "void *",
+          "name": "listener",
+          "type": "ptr"
+        },
+        {
+          "abi_type": "void *",
+          "name": "data",
+          "type": "ptr"
+        }
+      ],
+      "return_type": "short"
+    },
+    {
+      "abi_return_type": "void",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_xdg_toplevel_destroy",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "toplevel",
+          "type": "ptr"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "abi_return_type": "void",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_xdg_toplevel_set_title",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "toplevel",
+          "type": "ptr"
+        },
+        {
+          "abi_type": "const char *",
+          "name": "title",
+          "type": "string"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "abi_return_type": "int32_t",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_xdg_wm_base_add_listener",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "wm_base",
+          "type": "ptr"
+        },
+        {
+          "abi_type": "void *",
+          "name": "listener",
+          "type": "ptr"
+        },
+        {
+          "abi_type": "void *",
+          "name": "data",
+          "type": "ptr"
+        }
+      ],
+      "return_type": "short"
+    },
+    {
+      "abi_return_type": "void",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_xdg_wm_base_destroy",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "wm_base",
+          "type": "ptr"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "abi_return_type": "void *",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_xdg_wm_base_get_xdg_surface",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "wm_base",
+          "type": "ptr"
+        },
+        {
+          "abi_type": "void *",
+          "name": "surface",
+          "type": "ptr"
+        }
+      ],
+      "return_type": "ptr"
+    },
+    {
+      "abi_return_type": "void",
+      "body_kind": "expr",
+      "decorators": [],
+      "name": "ail_xdg_wm_base_pong",
+      "params": [
+        {
+          "abi_type": "void *",
+          "name": "wm_base",
+          "type": "ptr"
+        },
+        {
+          "abi_type": "uint32_t",
+          "name": "serial",
+          "type": "ushort"
+        }
+      ],
+      "return_type": "void"
+    }
+  ]
+}

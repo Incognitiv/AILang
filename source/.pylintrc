@@ -1,0 +1,38 @@
+[MAIN]
+# AILang compiler module configuration
+# Compilers are inherently complex - these limits reflect that reality
+
+# Disable checks that don't apply to compiler architecture
+# - import-outside-toplevel: Needed for circular import avoidance
+# - too-many-lines: Parser/codegen are inherently large
+# - relative-beyond-top-level: False positive with package structure
+# - too-many-public-methods: Parser/CodeGen need many methods
+# - too-many-return-statements: Complex dispatch logic
+# - too-many-branches: Pattern matching and type dispatch
+# - too-many-statements: Code generation functions
+disable=import-outside-toplevel,too-many-lines,relative-beyond-top-level,too-many-public-methods,too-many-return-statements,too-many-branches,too-many-statements
+
+[FORMAT]
+# Compilers require substantial code per module
+max-line-length=120
+max-module-lines=9000
+
+[DESIGN]
+# Compiler classes manage many aspects of code generation
+# codegen.py: 90+ builtin functions, LLVM IR generation, type system
+# expr_generator.py: 100+ SIMD intrinsics + all expression types
+max-attributes=100
+max-public-methods=100
+max-args=10
+max-locals=60
+max-returns=30
+max-branches=30
+max-statements=120
+max-bool-expr=12
+max-nested-blocks=8
+
+[BASIC]
+# Allow visitor pattern method names (visit_NodeName)
+method-rgx=[a-z_][a-z0-9_]{2,}$|visit_[A-Z][a-zA-Z0-9]*$
+# Only allow underscore for intentionally unused variables
+good-names=_

@@ -1,0 +1,48 @@
+// Target-selected pure AILang UI backend facade.
+//
+// Import this file when the application should get the platform backend from
+// AILang source instead of linking a native C backend object.
+// The target-qualified imports keep exactly one ail_ui_* implementation in the
+// translation unit.
+
+import stdlib.ui.platform
+import windows win32_pure
+import linux wayland_pure
+
+const int UI_BACKEND_UNSUPPORTED = 0
+const int UI_BACKEND_WIN32 = 1
+const int UI_BACKEND_WAYLAND = 2
+
+
+def ui_backend_kind(): int
+    comptime if target_os() == "windows" then
+        return UI_BACKEND_WIN32
+    else
+        comptime if target_os() == "linux" then
+            return UI_BACKEND_WAYLAND
+        else
+            return UI_BACKEND_UNSUPPORTED
+        end
+    end
+end
+
+
+def ui_backend_name(): string
+    comptime if target_os() == "windows" then
+        return "win32"
+    else
+        comptime if target_os() == "linux" then
+            return "wayland"
+        else
+            return "unsupported"
+        end
+    end
+end
+
+
+def ui_backend_supported(): int
+    if ui_backend_kind() == UI_BACKEND_UNSUPPORTED then
+        return 0
+    end
+    return 1
+end

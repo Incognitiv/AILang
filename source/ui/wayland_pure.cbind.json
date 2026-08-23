@@ -1,0 +1,1123 @@
+{
+  "name": "wayland_pure",
+  "headers": [
+    "<stdint.h>",
+    "<string.h>",
+    "<unistd.h>",
+    "<sys/syscall.h>",
+    "<sys/mman.h>",
+    "<wayland-client.h>",
+    {
+      "path": "generated/wayland/xdg-shell-client-protocol.h",
+      "system": false
+    }
+  ],
+  "c_prelude": [
+    "#include \"generated/wayland/xdg-shell-protocol.c\""
+  ],
+  "link_flags": [
+    "-lwayland-client"
+  ],
+  "macros": [
+    {
+      "name": "AIL_WAYLAND_MAP_SHARED",
+      "expr": "MAP_SHARED"
+    },
+    {
+      "name": "AIL_WAYLAND_PROT_READ",
+      "expr": "PROT_READ"
+    },
+    {
+      "name": "AIL_WAYLAND_PROT_WRITE",
+      "expr": "PROT_WRITE"
+    },
+    {
+      "name": "AIL_WAYLAND_SHM_FORMAT_ARGB8888",
+      "expr": "WL_SHM_FORMAT_ARGB8888"
+    },
+    {
+      "name": "AIL_WAYLAND_SHM_FORMAT_XRGB8888",
+      "expr": "WL_SHM_FORMAT_XRGB8888"
+    },
+    {
+      "name": "AIL_WAYLAND_SEAT_CAP_POINTER",
+      "expr": "WL_SEAT_CAPABILITY_POINTER"
+    },
+    {
+      "name": "AIL_WAYLAND_SEAT_CAP_KEYBOARD",
+      "expr": "WL_SEAT_CAPABILITY_KEYBOARD"
+    },
+    {
+      "name": "AIL_WAYLAND_POINTER_BUTTON_PRESSED",
+      "expr": "WL_POINTER_BUTTON_STATE_PRESSED"
+    },
+    {
+      "name": "AIL_WAYLAND_POINTER_BUTTON_RELEASED",
+      "expr": "WL_POINTER_BUTTON_STATE_RELEASED"
+    },
+    {
+      "name": "AIL_WAYLAND_KEYBOARD_KEY_PRESSED",
+      "expr": "WL_KEYBOARD_KEY_STATE_PRESSED"
+    },
+    {
+      "name": "AIL_WAYLAND_KEYBOARD_KEY_RELEASED",
+      "expr": "WL_KEYBOARD_KEY_STATE_RELEASED"
+    }
+  ],
+  "records": [
+    {
+      "name": "wl_keyboard_listener",
+      "c_name": "struct wl_keyboard_listener",
+      "kind": "extern",
+      "fields": [
+        {
+          "name": "keymap",
+          "type": "ptr"
+        },
+        {
+          "name": "enter",
+          "type": "ptr"
+        },
+        {
+          "name": "leave",
+          "type": "ptr"
+        },
+        {
+          "name": "key",
+          "type": "ptr"
+        },
+        {
+          "name": "modifiers",
+          "type": "ptr"
+        },
+        {
+          "name": "repeat_info",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "wl_pointer_listener",
+      "c_name": "struct wl_pointer_listener",
+      "kind": "extern",
+      "fields": [
+        {
+          "name": "enter",
+          "type": "ptr"
+        },
+        {
+          "name": "leave",
+          "type": "ptr"
+        },
+        {
+          "name": "motion",
+          "type": "ptr"
+        },
+        {
+          "name": "button",
+          "type": "ptr"
+        },
+        {
+          "name": "axis",
+          "type": "ptr"
+        },
+        {
+          "name": "frame",
+          "type": "ptr"
+        },
+        {
+          "name": "axis_source",
+          "type": "ptr"
+        },
+        {
+          "name": "axis_stop",
+          "type": "ptr"
+        },
+        {
+          "name": "axis_discrete",
+          "type": "ptr"
+        },
+        {
+          "name": "axis_value120",
+          "type": "ptr"
+        },
+        {
+          "name": "axis_relative_direction",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "wl_registry_listener",
+      "c_name": "struct wl_registry_listener",
+      "kind": "extern",
+      "fields": [
+        {
+          "name": "global",
+          "type": "ptr"
+        },
+        {
+          "name": "global_remove",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "wl_seat_listener",
+      "c_name": "struct wl_seat_listener",
+      "kind": "extern",
+      "fields": [
+        {
+          "name": "capabilities",
+          "type": "ptr"
+        },
+        {
+          "name": "name",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "xdg_surface_listener",
+      "c_name": "struct xdg_surface_listener",
+      "kind": "extern",
+      "fields": [
+        {
+          "name": "configure",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "xdg_toplevel_listener",
+      "c_name": "struct xdg_toplevel_listener",
+      "kind": "extern",
+      "fields": [
+        {
+          "name": "configure",
+          "type": "ptr"
+        },
+        {
+          "name": "close",
+          "type": "ptr"
+        },
+        {
+          "name": "configure_bounds",
+          "type": "ptr"
+        },
+        {
+          "name": "wm_capabilities",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "xdg_wm_base_listener",
+      "c_name": "struct xdg_wm_base_listener",
+      "kind": "extern",
+      "fields": [
+        {
+          "name": "ping",
+          "type": "ptr"
+        }
+      ]
+    }
+  ],
+  "functions": [
+    {
+      "name": "memfd_create",
+      "return_type": "short",
+      "params": [
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "flags",
+          "type": "ushort"
+        }
+      ]
+    },
+    {
+      "name": "ftruncate",
+      "return_type": "short",
+      "params": [
+        {
+          "name": "fd",
+          "type": "short"
+        },
+        {
+          "name": "length",
+          "type": "int"
+        }
+      ]
+    },
+    {
+      "name": "mmap",
+      "return_type": "ptr",
+      "params": [
+        {
+          "name": "addr",
+          "type": "ptr"
+        },
+        {
+          "name": "length",
+          "type": "uint"
+        },
+        {
+          "name": "prot",
+          "type": "short"
+        },
+        {
+          "name": "flags",
+          "type": "short"
+        },
+        {
+          "name": "fd",
+          "type": "short"
+        },
+        {
+          "name": "offset",
+          "type": "int"
+        }
+      ]
+    },
+    {
+      "name": "munmap",
+      "return_type": "short",
+      "params": [
+        {
+          "name": "addr",
+          "type": "ptr"
+        },
+        {
+          "name": "length",
+          "type": "uint"
+        }
+      ]
+    },
+    {
+      "name": "close",
+      "return_type": "short",
+      "params": [
+        {
+          "name": "fd",
+          "type": "short"
+        }
+      ]
+    },
+    {
+      "name": "usleep",
+      "return_type": "short",
+      "params": [
+        {
+          "name": "usec",
+          "type": "ushort"
+        }
+      ]
+    }
+  ],
+  "wrappers": [
+    {
+      "name": "ail_wayland_memfd_create",
+      "return_type": "short",
+      "abi_return_type": "int",
+      "params": [
+        {
+          "name": "name",
+          "type": "string",
+          "abi_type": "const char *"
+        },
+        {
+          "name": "flags",
+          "type": "ushort",
+          "abi_type": "unsigned int"
+        }
+      ],
+      "expr": "syscall(SYS_memfd_create, name, flags)"
+    },
+    {
+      "name": "ail_wl_display_connect_default",
+      "return_type": "ptr",
+      "abi_return_type": "void *",
+      "params": [],
+      "expr": "wl_display_connect(NULL)"
+    },
+    {
+      "name": "ail_wl_display_disconnect",
+      "return_type": "void",
+      "abi_return_type": "void",
+      "params": [
+        {
+          "name": "display",
+          "type": "ptr",
+          "abi_type": "void *"
+        }
+      ],
+      "expr": "wl_display_disconnect((struct wl_display *)display)"
+    },
+    {
+      "name": "ail_wl_display_dispatch",
+      "return_type": "short",
+      "abi_return_type": "int32_t",
+      "params": [
+        {
+          "name": "display",
+          "type": "ptr",
+          "abi_type": "void *"
+        }
+      ],
+      "expr": "wl_display_dispatch((struct wl_display *)display)"
+    },
+    {
+      "name": "ail_wl_display_dispatch_pending",
+      "return_type": "short",
+      "abi_return_type": "int32_t",
+      "params": [
+        {
+          "name": "display",
+          "type": "ptr",
+          "abi_type": "void *"
+        }
+      ],
+      "expr": "wl_display_dispatch_pending((struct wl_display *)display)"
+    },
+    {
+      "name": "ail_wl_display_flush",
+      "return_type": "short",
+      "abi_return_type": "int32_t",
+      "params": [
+        {
+          "name": "display",
+          "type": "ptr",
+          "abi_type": "void *"
+        }
+      ],
+      "expr": "wl_display_flush((struct wl_display *)display)"
+    },
+    {
+      "name": "ail_wl_display_roundtrip",
+      "return_type": "short",
+      "abi_return_type": "int32_t",
+      "params": [
+        {
+          "name": "display",
+          "type": "ptr",
+          "abi_type": "void *"
+        }
+      ],
+      "expr": "wl_display_roundtrip((struct wl_display *)display)"
+    },
+    {
+      "name": "ail_wl_display_get_registry",
+      "return_type": "ptr",
+      "abi_return_type": "void *",
+      "params": [
+        {
+          "name": "display",
+          "type": "ptr",
+          "abi_type": "void *"
+        }
+      ],
+      "expr": "wl_display_get_registry((struct wl_display *)display)"
+    },
+    {
+      "name": "ail_wl_registry_add_listener",
+      "return_type": "short",
+      "abi_return_type": "int32_t",
+      "params": [
+        {
+          "name": "registry",
+          "type": "ptr",
+          "abi_type": "void *"
+        },
+        {
+          "name": "listener",
+          "type": "ptr",
+          "abi_type": "void *"
+        },
+        {
+          "name": "data",
+          "type": "ptr",
+          "abi_type": "void *"
+        }
+      ],
+      "expr": "wl_registry_add_listener((struct wl_registry *)registry, (const struct wl_registry_listener *)listener, data)"
+    },
+    {
+      "name": "ail_wl_registry_bind_compositor",
+      "return_type": "ptr",
+      "abi_return_type": "void *",
+      "params": [
+        {
+          "name": "registry",
+          "type": "ptr",
+          "abi_type": "void *"
+        },
+        {
+          "name": "name",
+          "type": "ushort",
+          "abi_type": "uint32_t"
+        },
+        {
+          "name": "version",
+          "type": "ushort",
+          "abi_type": "uint32_t"
+        }
+      ],
+      "body": [
+        "uint32_t use_version = version < 4u ? version : 4u;",
+        "return (void *)wl_registry_bind((struct wl_registry *)registry, name, &wl_compositor_interface, use_version);"
+      ]
+    },
+    {
+      "name": "ail_wl_registry_bind_shm",
+      "return_type": "ptr",
+      "abi_return_type": "void *",
+      "params": [
+        {
+          "name": "registry",
+          "type": "ptr",
+          "abi_type": "void *"
+        },
+        {
+          "name": "name",
+          "type": "ushort",
+          "abi_type": "uint32_t"
+        },
+        {
+          "name": "version",
+          "type": "ushort",
+          "abi_type": "uint32_t"
+        }
+      ],
+      "body": [
+        "uint32_t use_version = version < 1u ? version : 1u;",
+        "return (void *)wl_registry_bind((struct wl_registry *)registry, name, &wl_shm_interface, use_version);"
+      ]
+    },
+    {
+      "name": "ail_wl_registry_bind_xdg_wm_base",
+      "return_type": "ptr",
+      "abi_return_type": "void *",
+      "params": [
+        {
+          "name": "registry",
+          "type": "ptr",
+          "abi_type": "void *"
+        },
+        {
+          "name": "name",
+          "type": "ushort",
+          "abi_type": "uint32_t"
+        },
+        {
+          "name": "version",
+          "type": "ushort",
+          "abi_type": "uint32_t"
+        }
+      ],
+      "body": [
+        "uint32_t use_version = version < 6u ? version : 6u;",
+        "return (void *)wl_registry_bind((struct wl_registry *)registry, name, &xdg_wm_base_interface, use_version);"
+      ]
+    },
+    {
+      "name": "ail_wl_registry_destroy",
+      "return_type": "void",
+      "abi_return_type": "void",
+      "params": [
+        {
+          "name": "registry",
+          "type": "ptr",
+          "abi_type": "void *"
+        }
+      ],
+      "expr": "wl_registry_destroy((struct wl_registry *)registry)"
+    },
+    {
+      "name": "ail_wl_compositor_create_surface",
+      "return_type": "ptr",
+      "abi_return_type": "void *",
+      "params": [
+        {
+          "name": "compositor",
+          "type": "ptr",
+          "abi_type": "void *"
+        }
+      ],
+      "expr": "wl_compositor_create_surface((struct wl_compositor *)compositor)"
+    },
+    {
+      "name": "ail_wl_compositor_destroy",
+      "return_type": "void",
+      "abi_return_type": "void",
+      "params": [
+        {
+          "name": "compositor",
+          "type": "ptr",
+          "abi_type": "void *"
+        }
+      ],
+      "expr": "wl_compositor_destroy((struct wl_compositor *)compositor)"
+    },
+    {
+      "name": "ail_wl_shm_create_pool",
+      "return_type": "ptr",
+      "abi_return_type": "void *",
+      "params": [
+        {
+          "name": "shm",
+          "type": "ptr",
+          "abi_type": "void *"
+        },
+        {
+          "name": "fd",
+          "type": "short",
+          "abi_type": "int32_t"
+        },
+        {
+          "name": "size",
+          "type": "short",
+          "abi_type": "int32_t"
+        }
+      ],
+      "expr": "wl_shm_create_pool((struct wl_shm *)shm, fd, size)"
+    },
+    {
+      "name": "ail_wl_shm_release",
+      "return_type": "void",
+      "abi_return_type": "void",
+      "params": [
+        {
+          "name": "shm",
+          "type": "ptr",
+          "abi_type": "void *"
+        }
+      ],
+      "expr": "wl_shm_release((struct wl_shm *)shm)"
+    },
+    {
+      "name": "ail_wl_shm_pool_create_buffer",
+      "return_type": "ptr",
+      "abi_return_type": "void *",
+      "params": [
+        {
+          "name": "pool",
+          "type": "ptr",
+          "abi_type": "void *"
+        },
+        {
+          "name": "offset",
+          "type": "short",
+          "abi_type": "int32_t"
+        },
+        {
+          "name": "width",
+          "type": "short",
+          "abi_type": "int32_t"
+        },
+        {
+          "name": "height",
+          "type": "short",
+          "abi_type": "int32_t"
+        },
+        {
+          "name": "stride",
+          "type": "short",
+          "abi_type": "int32_t"
+        },
+        {
+          "name": "format",
+          "type": "ushort",
+          "abi_type": "uint32_t"
+        }
+      ],
+      "expr": "wl_shm_pool_create_buffer((struct wl_shm_pool *)pool, offset, width, height, stride, format)"
+    },
+    {
+      "name": "ail_wl_shm_pool_destroy",
+      "return_type": "void",
+      "abi_return_type": "void",
+      "params": [
+        {
+          "name": "pool",
+          "type": "ptr",
+          "abi_type": "void *"
+        }
+      ],
+      "expr": "wl_shm_pool_destroy((struct wl_shm_pool *)pool)"
+    },
+    {
+      "name": "ail_wl_buffer_destroy",
+      "return_type": "void",
+      "abi_return_type": "void",
+      "params": [
+        {
+          "name": "buffer",
+          "type": "ptr",
+          "abi_type": "void *"
+        }
+      ],
+      "expr": "wl_buffer_destroy((struct wl_buffer *)buffer)"
+    },
+    {
+      "name": "ail_wl_surface_attach",
+      "return_type": "void",
+      "abi_return_type": "void",
+      "params": [
+        {
+          "name": "surface",
+          "type": "ptr",
+          "abi_type": "void *"
+        },
+        {
+          "name": "buffer",
+          "type": "ptr",
+          "abi_type": "void *"
+        },
+        {
+          "name": "x",
+          "type": "short",
+          "abi_type": "int32_t"
+        },
+        {
+          "name": "y",
+          "type": "short",
+          "abi_type": "int32_t"
+        }
+      ],
+      "expr": "wl_surface_attach((struct wl_surface *)surface, (struct wl_buffer *)buffer, x, y)"
+    },
+    {
+      "name": "ail_wl_surface_damage_buffer",
+      "return_type": "void",
+      "abi_return_type": "void",
+      "params": [
+        {
+          "name": "surface",
+          "type": "ptr",
+          "abi_type": "void *"
+        },
+        {
+          "name": "x",
+          "type": "short",
+          "abi_type": "int32_t"
+        },
+        {
+          "name": "y",
+          "type": "short",
+          "abi_type": "int32_t"
+        },
+        {
+          "name": "width",
+          "type": "short",
+          "abi_type": "int32_t"
+        },
+        {
+          "name": "height",
+          "type": "short",
+          "abi_type": "int32_t"
+        }
+      ],
+      "expr": "wl_surface_damage_buffer((struct wl_surface *)surface, x, y, width, height)"
+    },
+    {
+      "name": "ail_wl_surface_commit",
+      "return_type": "void",
+      "abi_return_type": "void",
+      "params": [
+        {
+          "name": "surface",
+          "type": "ptr",
+          "abi_type": "void *"
+        }
+      ],
+      "expr": "wl_surface_commit((struct wl_surface *)surface)"
+    },
+    {
+      "name": "ail_wl_surface_destroy",
+      "return_type": "void",
+      "abi_return_type": "void",
+      "params": [
+        {
+          "name": "surface",
+          "type": "ptr",
+          "abi_type": "void *"
+        }
+      ],
+      "expr": "wl_surface_destroy((struct wl_surface *)surface)"
+    },
+    {
+      "name": "ail_xdg_wm_base_add_listener",
+      "return_type": "short",
+      "abi_return_type": "int32_t",
+      "params": [
+        {
+          "name": "wm_base",
+          "type": "ptr",
+          "abi_type": "void *"
+        },
+        {
+          "name": "listener",
+          "type": "ptr",
+          "abi_type": "void *"
+        },
+        {
+          "name": "data",
+          "type": "ptr",
+          "abi_type": "void *"
+        }
+      ],
+      "expr": "xdg_wm_base_add_listener((struct xdg_wm_base *)wm_base, (const struct xdg_wm_base_listener *)listener, data)"
+    },
+    {
+      "name": "ail_xdg_wm_base_pong",
+      "return_type": "void",
+      "abi_return_type": "void",
+      "params": [
+        {
+          "name": "wm_base",
+          "type": "ptr",
+          "abi_type": "void *"
+        },
+        {
+          "name": "serial",
+          "type": "ushort",
+          "abi_type": "uint32_t"
+        }
+      ],
+      "expr": "xdg_wm_base_pong((struct xdg_wm_base *)wm_base, serial)"
+    },
+    {
+      "name": "ail_xdg_wm_base_get_xdg_surface",
+      "return_type": "ptr",
+      "abi_return_type": "void *",
+      "params": [
+        {
+          "name": "wm_base",
+          "type": "ptr",
+          "abi_type": "void *"
+        },
+        {
+          "name": "surface",
+          "type": "ptr",
+          "abi_type": "void *"
+        }
+      ],
+      "expr": "xdg_wm_base_get_xdg_surface((struct xdg_wm_base *)wm_base, (struct wl_surface *)surface)"
+    },
+    {
+      "name": "ail_xdg_wm_base_destroy",
+      "return_type": "void",
+      "abi_return_type": "void",
+      "params": [
+        {
+          "name": "wm_base",
+          "type": "ptr",
+          "abi_type": "void *"
+        }
+      ],
+      "expr": "xdg_wm_base_destroy((struct xdg_wm_base *)wm_base)"
+    },
+    {
+      "name": "ail_xdg_surface_add_listener",
+      "return_type": "short",
+      "abi_return_type": "int32_t",
+      "params": [
+        {
+          "name": "xdg_surface",
+          "type": "ptr",
+          "abi_type": "void *"
+        },
+        {
+          "name": "listener",
+          "type": "ptr",
+          "abi_type": "void *"
+        },
+        {
+          "name": "data",
+          "type": "ptr",
+          "abi_type": "void *"
+        }
+      ],
+      "expr": "xdg_surface_add_listener((struct xdg_surface *)xdg_surface, (const struct xdg_surface_listener *)listener, data)"
+    },
+    {
+      "name": "ail_xdg_surface_get_toplevel",
+      "return_type": "ptr",
+      "abi_return_type": "void *",
+      "params": [
+        {
+          "name": "xdg_surface",
+          "type": "ptr",
+          "abi_type": "void *"
+        }
+      ],
+      "expr": "xdg_surface_get_toplevel((struct xdg_surface *)xdg_surface)"
+    },
+    {
+      "name": "ail_xdg_surface_ack_configure",
+      "return_type": "void",
+      "abi_return_type": "void",
+      "params": [
+        {
+          "name": "xdg_surface",
+          "type": "ptr",
+          "abi_type": "void *"
+        },
+        {
+          "name": "serial",
+          "type": "ushort",
+          "abi_type": "uint32_t"
+        }
+      ],
+      "expr": "xdg_surface_ack_configure((struct xdg_surface *)xdg_surface, serial)"
+    },
+    {
+      "name": "ail_xdg_surface_destroy",
+      "return_type": "void",
+      "abi_return_type": "void",
+      "params": [
+        {
+          "name": "xdg_surface",
+          "type": "ptr",
+          "abi_type": "void *"
+        }
+      ],
+      "expr": "xdg_surface_destroy((struct xdg_surface *)xdg_surface)"
+    },
+    {
+      "name": "ail_xdg_toplevel_add_listener",
+      "return_type": "short",
+      "abi_return_type": "int32_t",
+      "params": [
+        {
+          "name": "toplevel",
+          "type": "ptr",
+          "abi_type": "void *"
+        },
+        {
+          "name": "listener",
+          "type": "ptr",
+          "abi_type": "void *"
+        },
+        {
+          "name": "data",
+          "type": "ptr",
+          "abi_type": "void *"
+        }
+      ],
+      "expr": "xdg_toplevel_add_listener((struct xdg_toplevel *)toplevel, (const struct xdg_toplevel_listener *)listener, data)"
+    },
+    {
+      "name": "ail_xdg_toplevel_set_title",
+      "return_type": "void",
+      "abi_return_type": "void",
+      "params": [
+        {
+          "name": "toplevel",
+          "type": "ptr",
+          "abi_type": "void *"
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "abi_type": "const char *"
+        }
+      ],
+      "expr": "xdg_toplevel_set_title((struct xdg_toplevel *)toplevel, title)"
+    },
+    {
+      "name": "ail_xdg_toplevel_destroy",
+      "return_type": "void",
+      "abi_return_type": "void",
+      "params": [
+        {
+          "name": "toplevel",
+          "type": "ptr",
+          "abi_type": "void *"
+        }
+      ],
+      "expr": "xdg_toplevel_destroy((struct xdg_toplevel *)toplevel)"
+    },
+    {
+      "name": "ail_c_strcmp",
+      "return_type": "short",
+      "abi_return_type": "int32_t",
+      "params": [
+        {
+          "name": "left",
+          "type": "string",
+          "abi_type": "const char *"
+        },
+        {
+          "name": "right",
+          "type": "string",
+          "abi_type": "const char *"
+        }
+      ],
+      "expr": "strcmp(left, right)"
+    },
+    {
+      "name": "ail_wl_keyboard_add_listener",
+      "return_type": "short",
+      "abi_return_type": "int32_t",
+      "params": [
+        {
+          "name": "keyboard",
+          "type": "ptr",
+          "abi_type": "void *"
+        },
+        {
+          "name": "listener",
+          "type": "ptr",
+          "abi_type": "void *"
+        },
+        {
+          "name": "data",
+          "type": "ptr",
+          "abi_type": "void *"
+        }
+      ],
+      "expr": "wl_keyboard_add_listener((struct wl_keyboard *)keyboard, (const struct wl_keyboard_listener *)listener, data)"
+    },
+    {
+      "name": "ail_wl_keyboard_release",
+      "return_type": "void",
+      "abi_return_type": "void",
+      "params": [
+        {
+          "name": "keyboard",
+          "type": "ptr",
+          "abi_type": "void *"
+        }
+      ],
+      "expr": "wl_keyboard_release((struct wl_keyboard *)keyboard)"
+    },
+    {
+      "name": "ail_wl_pointer_add_listener",
+      "return_type": "short",
+      "abi_return_type": "int32_t",
+      "params": [
+        {
+          "name": "pointer",
+          "type": "ptr",
+          "abi_type": "void *"
+        },
+        {
+          "name": "listener",
+          "type": "ptr",
+          "abi_type": "void *"
+        },
+        {
+          "name": "data",
+          "type": "ptr",
+          "abi_type": "void *"
+        }
+      ],
+      "expr": "wl_pointer_add_listener((struct wl_pointer *)pointer, (const struct wl_pointer_listener *)listener, data)"
+    },
+    {
+      "name": "ail_wl_pointer_release",
+      "return_type": "void",
+      "abi_return_type": "void",
+      "params": [
+        {
+          "name": "pointer",
+          "type": "ptr",
+          "abi_type": "void *"
+        }
+      ],
+      "expr": "wl_pointer_release((struct wl_pointer *)pointer)"
+    },
+    {
+      "name": "ail_wl_registry_bind_seat",
+      "return_type": "ptr",
+      "abi_return_type": "void *",
+      "params": [
+        {
+          "name": "registry",
+          "type": "ptr",
+          "abi_type": "void *"
+        },
+        {
+          "name": "name",
+          "type": "ushort",
+          "abi_type": "uint32_t"
+        },
+        {
+          "name": "version",
+          "type": "ushort",
+          "abi_type": "uint32_t"
+        }
+      ],
+      "body": [
+        "uint32_t use_version = version < 9u ? version : 9u;",
+        "return (void *)wl_registry_bind((struct wl_registry *)registry, name, &wl_seat_interface, use_version);"
+      ]
+    },
+    {
+      "name": "ail_wl_seat_add_listener",
+      "return_type": "short",
+      "abi_return_type": "int32_t",
+      "params": [
+        {
+          "name": "seat",
+          "type": "ptr",
+          "abi_type": "void *"
+        },
+        {
+          "name": "listener",
+          "type": "ptr",
+          "abi_type": "void *"
+        },
+        {
+          "name": "data",
+          "type": "ptr",
+          "abi_type": "void *"
+        }
+      ],
+      "expr": "wl_seat_add_listener((struct wl_seat *)seat, (const struct wl_seat_listener *)listener, data)"
+    },
+    {
+      "name": "ail_wl_seat_get_keyboard",
+      "return_type": "ptr",
+      "abi_return_type": "void *",
+      "params": [
+        {
+          "name": "seat",
+          "type": "ptr",
+          "abi_type": "void *"
+        }
+      ],
+      "expr": "wl_seat_get_keyboard((struct wl_seat *)seat)"
+    },
+    {
+      "name": "ail_wl_seat_get_pointer",
+      "return_type": "ptr",
+      "abi_return_type": "void *",
+      "params": [
+        {
+          "name": "seat",
+          "type": "ptr",
+          "abi_type": "void *"
+        }
+      ],
+      "expr": "wl_seat_get_pointer((struct wl_seat *)seat)"
+    },
+    {
+      "name": "ail_wl_seat_release",
+      "return_type": "void",
+      "abi_return_type": "void",
+      "params": [
+        {
+          "name": "seat",
+          "type": "ptr",
+          "abi_type": "void *"
+        }
+      ],
+      "expr": "wl_seat_release((struct wl_seat *)seat)"
+    }
+  ]
+}

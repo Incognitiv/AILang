@@ -1,0 +1,120 @@
+import stdlib.ui.layout
+
+
+def fail(message: string): int
+    print(message)
+    return 1
+end
+
+
+def main(): int
+    frame = new UiFrame()
+    ui_frame_begin(frame, 1250, 1500)
+
+    if ui_scaled(100, frame.scale_milli) != 125 then
+        ui_frame_free(frame)
+        return fail("scale failed")
+    end
+    if ui_text_scale(2, frame.text_scale_milli) != 3 then
+        ui_frame_free(frame)
+        return fail("text scale failed")
+    end
+
+    column = ui_column(10, 20, 300, 400, 8, frame.scale_milli)
+    first = ui_layout_take(column, 100, 50)
+    second = ui_layout_take(column, 0, 60)
+
+    if first.x != 10 or first.y != 20 or first.width != 100 or first.height != 50 then
+        ui_rect_free(second)
+        ui_rect_free(first)
+        ui_layout_free(column)
+        ui_frame_free(frame)
+        return fail("first rect failed")
+    end
+
+    if second.x != 10 or second.y != 80 or second.width != 300 or second.height != 60 then
+        ui_rect_free(second)
+        ui_rect_free(first)
+        ui_layout_free(column)
+        ui_frame_free(frame)
+        return fail("second rect failed")
+    end
+
+    hit = ui_rect(40, 50, 120, 40)
+    if ui_rect_contains(hit, 60, 60) != 1 then
+        ui_rect_free(hit)
+        ui_rect_free(second)
+        ui_rect_free(first)
+        ui_layout_free(column)
+        ui_frame_free(frame)
+        return fail("contains inside failed")
+    end
+    if ui_rect_contains(hit, 10, 60) != 0 then
+        ui_rect_free(hit)
+        ui_rect_free(second)
+        ui_rect_free(first)
+        ui_layout_free(column)
+        ui_frame_free(frame)
+        return fail("contains outside failed")
+    end
+
+    frame.mouse_x = 60
+    frame.mouse_y = 60
+    frame.mouse_down = 1
+    frame.mouse_pressed = 1
+    if ui_button_logic(frame, 7, hit) != 0 then
+        ui_rect_free(hit)
+        ui_rect_free(second)
+        ui_rect_free(first)
+        ui_layout_free(column)
+        ui_frame_free(frame)
+        return fail("press click failed")
+    end
+    if frame.active_id != 7 or frame.next_hot_id != 7 then
+        ui_rect_free(hit)
+        ui_rect_free(second)
+        ui_rect_free(first)
+        ui_layout_free(column)
+        ui_frame_free(frame)
+        return fail("press state failed")
+    end
+    if ui_frame_finish(frame) != 1 then
+        ui_rect_free(hit)
+        ui_rect_free(second)
+        ui_rect_free(first)
+        ui_layout_free(column)
+        ui_frame_free(frame)
+        return fail("hot dirty failed")
+    end
+
+    ui_frame_begin(frame, 1250, 1500)
+    frame.mouse_x = 60
+    frame.mouse_y = 60
+    frame.mouse_down = 0
+    frame.mouse_released = 1
+    if ui_button_logic(frame, 7, hit) != 1 then
+        ui_rect_free(hit)
+        ui_rect_free(second)
+        ui_rect_free(first)
+        ui_layout_free(column)
+        ui_frame_free(frame)
+        return fail("release click failed")
+    end
+    if frame.clicked_id != 7 then
+        ui_rect_free(hit)
+        ui_rect_free(second)
+        ui_rect_free(first)
+        ui_layout_free(column)
+        ui_frame_free(frame)
+        return fail("clicked id failed")
+    end
+    ui_frame_finish(frame)
+
+    ui_rect_free(hit)
+    ui_rect_free(second)
+    ui_rect_free(first)
+    ui_layout_free(column)
+    ui_frame_free(frame)
+    print("layout state ok")
+    return 0
+end

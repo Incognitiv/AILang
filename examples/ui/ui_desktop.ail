@@ -1,0 +1,63 @@
+import stdlib.ui.platform
+import stdlib.ui.layout
+import apps.default_desktop_content
+
+
+def main(): int
+    if ail_ui_init() == 0 then
+        print("ui init failed")
+        return 1
+    end
+
+    window = ail_ui_open_borderless_window("AILang UI - workspace", 2048, 1125)
+    if window == 0 then
+        print("window open failed")
+        return 1
+    end
+
+    frame_limit = 0
+    frame_limit_text = getenv("AILANG_UI_DEMO_FRAMES")
+    if strlen(frame_limit_text) > 0 then
+        frame_limit = parse_int(frame_limit_text)
+    end
+    ui = new UiFrame()
+    app = new DesktopState()
+    frame_count = 0
+    dirty = 1
+
+    while ail_ui_window_alive(window) == 1 and app.close_requested == 0 and (frame_limit == 0 or frame_count < frame_limit) then
+        event_kind = ail_ui_poll_event(window)
+        if ui_frame_handle_event(ui, event_kind) == 1 then
+            dirty = 1
+        end
+
+        if ail_ui_window_alive(window) == 1 then
+            if dirty == 1 then
+                width = ail_ui_window_width_px(window)
+                height = ail_ui_window_height_px(window)
+                scale = ail_ui_window_scale_milli(window)
+                text_scale = ail_ui_window_text_scale_milli(window)
+                ui_frame_begin(ui, scale, text_scale)
+                ail_ui_begin_frame(window, 0xf5f7fb)
+                if desktop_draw_content(window, width, height, ui, app) == 1 then
+                    dirty = 1
+                else
+                    dirty = 0
+                end
+                ail_ui_end_frame(window)
+                if ui_frame_finish(ui) == 1 then
+                    dirty = 1
+                end
+            else
+                ail_ui_wait_event_ms(100)
+            end
+        end
+        frame_count = frame_count + 1
+    end
+
+    ail_ui_close_window(window)
+    ail_ui_shutdown()
+    desktop_state_free(app)
+    ui_frame_free(ui)
+    return 0
+end

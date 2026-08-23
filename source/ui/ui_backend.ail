@@ -1,0 +1,230 @@
+@library("ui_backend")
+
+// Target-selected pure AILang UI backend facade.
+//
+// Import this file when the application should get the platform backend from
+// AILang source instead of linking a native C backend object.
+// The target-qualified imports keep exactly one ail_ui_* implementation in the
+// translation unit.
+
+import stdlib.ui.platform
+import windows win32_pure
+import linux wayland_pure
+
+const int UI_BACKEND_UNSUPPORTED = 0
+const int UI_BACKEND_WIN32 = 1
+const int UI_BACKEND_WAYLAND = 2
+const int UI_BACKEND_X11 = 3
+const int UI_BACKEND_DRM_KMS = 4
+
+const int UI_PROTOCOL_NONE = 0
+const int UI_PROTOCOL_WIN32 = 1
+const int UI_PROTOCOL_WAYLAND = 2
+const int UI_PROTOCOL_X11 = 3
+const int UI_PROTOCOL_DRM_KMS = 4
+
+const int UI_OWNERSHIP_NONE = 0
+const int UI_OWNERSHIP_APP = 1
+const int UI_OWNERSHIP_SHELL = 2
+const int UI_OWNERSHIP_COMPOSITOR = 3
+const int UI_OWNERSHIP_RECOVERY = 4
+
+const int UI_CAP_APP_WINDOW = 1
+const int UI_CAP_BORDERLESS_WINDOW = 2
+const int UI_CAP_CLIENT_DRAWING = 3
+const int UI_CAP_INPUT_EVENTS = 4
+const int UI_CAP_WAIT_EVENTS = 5
+const int UI_CAP_SHELL_LAYER = 6
+const int UI_CAP_COMPOSITOR_CONTROL = 7
+const int UI_CAP_GLOBAL_WINDOW_LIST = 8
+const int UI_CAP_X11_COMPAT_PROTOCOL = 9
+const int UI_CAP_DRM_KMS_RECOVERY = 10
+
+
+int ui_backend_kind():
+    comptime if target_os() == "windows" then
+        return UI_BACKEND_WIN32
+    else
+        comptime if target_os() == "linux" then
+            return UI_BACKEND_WAYLAND
+        else
+            return UI_BACKEND_UNSUPPORTED
+        end
+    end
+end
+
+
+string ui_backend_name():
+    comptime if target_os() == "windows" then
+        return "win32"
+    else
+        comptime if target_os() == "linux" then
+            return "wayland"
+        else
+            return "unsupported"
+        end
+    end
+end
+
+
+int ui_backend_protocol():
+    comptime if target_os() == "windows" then
+        return UI_PROTOCOL_WIN32
+    else
+        comptime if target_os() == "linux" then
+            return UI_PROTOCOL_WAYLAND
+        else
+            return UI_PROTOCOL_NONE
+        end
+    end
+end
+
+
+int ui_backend_kind_for_protocol(protocol: int):
+    match protocol then
+        case UI_PROTOCOL_WIN32:
+            return UI_BACKEND_WIN32
+        case UI_PROTOCOL_WAYLAND:
+            return UI_BACKEND_WAYLAND
+        case UI_PROTOCOL_X11:
+            return UI_BACKEND_X11
+        case UI_PROTOCOL_DRM_KMS:
+            return UI_BACKEND_DRM_KMS
+        default:
+            return UI_BACKEND_UNSUPPORTED
+    end
+end
+
+
+int ui_backend_ownership():
+    if ui_backend_supported() == 0 then
+        return UI_OWNERSHIP_NONE
+    end
+    return UI_OWNERSHIP_APP
+end
+
+
+int ui_ownership_is_valid(ownership: int):
+    match ownership then
+        case UI_OWNERSHIP_NONE:
+            return 1
+        case UI_OWNERSHIP_APP:
+            return 1
+        case UI_OWNERSHIP_SHELL:
+            return 1
+        case UI_OWNERSHIP_COMPOSITOR:
+            return 1
+        case UI_OWNERSHIP_RECOVERY:
+            return 1
+        default:
+            return 0
+    end
+end
+
+
+int ui_platform_compat_protocol():
+    comptime if target_os() == "linux" then
+        return UI_PROTOCOL_X11
+    else
+        return UI_PROTOCOL_NONE
+    end
+end
+
+
+int ui_platform_recovery_protocol():
+    comptime if target_os() == "linux" then
+        return UI_PROTOCOL_DRM_KMS
+    else
+        return UI_PROTOCOL_NONE
+    end
+end
+
+
+int ui_backend_supports(capability: int):
+    if ui_backend_supported() == 0 then
+        return 0
+    end
+    match capability then
+        case UI_CAP_APP_WINDOW:
+            return 1
+        case UI_CAP_BORDERLESS_WINDOW:
+            return 1
+        case UI_CAP_CLIENT_DRAWING:
+            return 1
+        case UI_CAP_INPUT_EVENTS:
+            return 1
+        case UI_CAP_WAIT_EVENTS:
+            return 1
+        case UI_CAP_SHELL_LAYER:
+            return 0
+        case UI_CAP_COMPOSITOR_CONTROL:
+            return 0
+        case UI_CAP_GLOBAL_WINDOW_LIST:
+            return 0
+        case UI_CAP_X11_COMPAT_PROTOCOL:
+            return ui_platform_has_compat_protocol(UI_PROTOCOL_X11)
+        case UI_CAP_DRM_KMS_RECOVERY:
+            return ui_platform_has_recovery_protocol(UI_PROTOCOL_DRM_KMS)
+        default:
+            return 0
+    end
+end
+
+
+int ui_platform_has_compat_protocol(protocol: int):
+    if protocol == ui_platform_compat_protocol() then
+        if protocol != UI_PROTOCOL_NONE then
+            return 1
+        end
+    end
+    return 0
+end
+
+
+int ui_platform_has_recovery_protocol(protocol: int):
+    if protocol == ui_platform_recovery_protocol() then
+        if protocol != UI_PROTOCOL_NONE then
+            return 1
+        end
+    end
+    return 0
+end
+
+
+int ui_backend_supported():
+    if ui_backend_kind() == UI_BACKEND_UNSUPPORTED then
+        return 0
+    end
+    return 1
+end
+
+
+int ui_backend_abi_constants_probe():
+    int total = 0
+    total = total + UI_BACKEND_UNSUPPORTED
+    total = total + UI_BACKEND_WIN32
+    total = total + UI_BACKEND_WAYLAND
+    total = total + UI_BACKEND_X11
+    total = total + UI_BACKEND_DRM_KMS
+    total = total + UI_PROTOCOL_NONE
+    total = total + UI_PROTOCOL_WIN32
+    total = total + UI_PROTOCOL_WAYLAND
+    total = total + UI_PROTOCOL_X11
+    total = total + UI_PROTOCOL_DRM_KMS
+    total = total + UI_OWNERSHIP_NONE
+    total = total + UI_OWNERSHIP_APP
+    total = total + UI_OWNERSHIP_SHELL
+    total = total + UI_OWNERSHIP_COMPOSITOR
+    total = total + UI_OWNERSHIP_RECOVERY
+    total = total + UI_CAP_APP_WINDOW
+    total = total + UI_CAP_BORDERLESS_WINDOW
+    total = total + UI_CAP_CLIENT_DRAWING
+    total = total + UI_CAP_INPUT_EVENTS
+    total = total + UI_CAP_WAIT_EVENTS
+    total = total + UI_CAP_SHELL_LAYER
+    total = total + UI_CAP_COMPOSITOR_CONTROL
+    total = total + UI_CAP_GLOBAL_WINDOW_LIST
+    total = total + UI_CAP_X11_COMPAT_PROTOCOL
+    total = total + UI_CAP_DRM_KMS_RECOVERY
+    return total
+end

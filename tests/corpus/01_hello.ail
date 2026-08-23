@@ -1,0 +1,11 @@
+// hello.ail - Simple AILang program
+// Paren-less print should work
+
+def greet(name: string):
+    return "Hello, " + name + "!"
+end
+
+def main():
+    print greet("World")
+    return 0
+end

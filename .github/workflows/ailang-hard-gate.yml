@@ -1,0 +1,44 @@
+name: AILang Hard Gate
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  hard-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install native toolchains
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang gcc
+
+      - name: Install Python package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,llvm]"
+
+      - name: Run bounded hard gate
+        run: python tools/hard_gate.py
+
+      - name: Upload hard gate reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ailang-hard-gate-reports
+          path: |
+            out/codex_audit/hard_gate_current.json
+            out/codex_audit/hard_gate_current.md
+            benchmarks/results/c23_workload_compare.json
+            benchmarks/results/c23_workload_compare.md

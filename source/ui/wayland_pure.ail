@@ -1,0 +1,758 @@
+// Pure AILang Wayland backend proof.
+// Wayland does not let clients choose global window position; placement is compositor-owned.
+// JSON cimport is the canonical checked binding spec; generated bindings are an optimization cache.
+#cimport linux "wayland_pure.cbind.json"
+const int AIL_UI_PLATFORM_LINUX = 2
+const int AIL_UI_EVENT_NONE = 0
+const int AIL_UI_EVENT_CLOSE = 1
+const int AIL_UI_EVENT_RESIZE = 2
+const int AIL_UI_EVENT_MOUSE_MOVE = 3
+const int AIL_UI_EVENT_MOUSE_DOWN = 4
+const int AIL_UI_EVENT_MOUSE_UP = 5
+const int AIL_UI_EVENT_KEY_DOWN = 6
+const int AIL_UI_EVENT_KEY_UP = 7
+const int AIL_UI_WAYLAND_BUTTON_PRESSED = 1
+const int AIL_UI_WAYLAND_KEY_PRESSED = 1
+const int AIL_UI_WAYLAND_MAP_SHARED = 1
+const int AIL_UI_WAYLAND_PROT_READ = 1
+const int AIL_UI_WAYLAND_PROT_WRITE = 2
+const int AIL_UI_WAYLAND_SEAT_CAP_POINTER = 1
+const int AIL_UI_WAYLAND_SEAT_CAP_KEYBOARD = 2
+const int AIL_UI_WAYLAND_SHM_FORMAT_XRGB8888 = 1
+static int g_wayland_display = 0
+static int g_wayland_registry = 0
+static int g_wayland_compositor = 0
+static int g_wayland_shm = 0
+static int g_wayland_wm_base = 0
+static int g_wayland_seat = 0
+static int g_wayland_pointer = 0
+static int g_wayland_keyboard = 0
+static int g_wayland_surface = 0
+static int g_wayland_xdg_surface = 0
+static int g_wayland_toplevel = 0
+static int g_wayland_buffer = 0
+static int g_wayland_pixels = 0
+static int g_wayland_buffer_size = 0
+static int g_wayland_width_px = 0
+static int g_wayland_height_px = 0
+static int g_wayland_alive = 0
+static int g_wayland_configured = 0
+static int g_wayland_pending_event = 0
+static int g_wayland_event_x = 0
+static int g_wayland_event_y = 0
+static int g_wayland_event_key = 0
+static int g_wayland_event_width_px = 0
+static int g_wayland_event_height_px = 0
+static int g_wayland_mouse_x = 0
+static int g_wayland_mouse_y = 0
+static int g_wayland_registry_listener = 0
+static int g_wayland_seat_listener = 0
+static int g_wayland_pointer_listener = 0
+static int g_wayland_keyboard_listener = 0
+static int g_wayland_wm_listener = 0
+static int g_wayland_surface_listener = 0
+static int g_wayland_toplevel_listener = 0
+def wayland_set_pending_event(kind: int, x: int, y: int, key: int, width_px: int, height_px: int): void
+    g_wayland_pending_event = kind
+    g_wayland_event_x = x
+    g_wayland_event_y = y
+    g_wayland_event_key = key
+    g_wayland_event_width_px = width_px
+    g_wayland_event_height_px = height_px
+end
+
+def wayland_color(color: int): int
+    out = color % 16777216
+    if out < 0 then
+        return out + 16777216
+    end
+    return out
+end
+def wayland_event_constant_sentinel(): int
+    total = AIL_UI_EVENT_MOUSE_MOVE + AIL_UI_EVENT_MOUSE_DOWN
+    total = total + AIL_UI_EVENT_MOUSE_UP + AIL_UI_EVENT_KEY_DOWN
+    return total + AIL_UI_EVENT_KEY_UP
+end
+
+def wayland_fixed_to_int(value: short): int
+    return value / 256
+end
+def wayland_has_capability(capabilities: ushort, capability: int): int
+    return (capabilities / capability) % 2
+end
+
+@export
+def wayland_registry_global(data: ptr, registry: ptr, name: ushort, interface: string, version: ushort): void
+    if ail_c_strcmp(interface, "wl_compositor") == 0 then
+        if g_wayland_compositor == 0 then
+            g_wayland_compositor = reinterpret(int, ail_wl_registry_bind_compositor(registry, name, version))
+        end
+    end
+    if ail_c_strcmp(interface, "wl_shm") == 0 then
+        if g_wayland_shm == 0 then
+            g_wayland_shm = reinterpret(int, ail_wl_registry_bind_shm(registry, name, version))
+        end
+    end
+    if ail_c_strcmp(interface, "xdg_wm_base") == 0 then
+        if g_wayland_wm_base == 0 then
+            g_wayland_wm_base = reinterpret(int, ail_wl_registry_bind_xdg_wm_base(registry, name, version))
+        end
+    end
+    if ail_c_strcmp(interface, "wl_seat") == 0 then
+        if g_wayland_seat == 0 then
+            g_wayland_seat = reinterpret(int, ail_wl_registry_bind_seat(registry, name, version))
+        end
+    end
+end
+
+@export
+def wayland_registry_global_remove(data: ptr, registry: ptr, name: ushort): void
+end
+@export
+def wayland_wm_base_ping(data: ptr, wm_base: ptr, serial: ushort): void
+    ail_xdg_wm_base_pong(wm_base, serial)
+end
+@export
+def wayland_surface_configure(data: ptr, xdg_surface: ptr, serial: ushort): void
+    ail_xdg_surface_ack_configure(xdg_surface, serial)
+    g_wayland_configured = 1
+    wayland_set_pending_event(AIL_UI_EVENT_RESIZE, 0, 0, 0, g_wayland_width_px, g_wayland_height_px)
+end
+
+@export
+def wayland_toplevel_configure(data: ptr, toplevel: ptr, width: short, height: short, states: ptr): void
+    if width > 0 then
+        g_wayland_width_px = width
+    end
+    if height > 0 then
+        g_wayland_height_px = height
+    end
+end
+
+@export
+def wayland_toplevel_close(data: ptr, toplevel: ptr): void
+    g_wayland_alive = 0
+    wayland_set_pending_event(AIL_UI_EVENT_CLOSE, 0, 0, 0, 0, 0)
+end
+
+@export
+def wayland_toplevel_configure_bounds(data: ptr, toplevel: ptr, width: short, height: short): void
+end
+
+@export
+def wayland_toplevel_wm_capabilities(data: ptr, toplevel: ptr, capabilities: ptr): void
+end
+
+def wayland_release_pointer(): void
+    if g_wayland_pointer != 0 then
+        ail_wl_pointer_release(reinterpret(ptr, g_wayland_pointer))
+    end
+    if g_wayland_pointer_listener != 0 then
+        dealloc(g_wayland_pointer_listener)
+    end
+    g_wayland_pointer = 0
+    g_wayland_pointer_listener = 0
+end
+
+def wayland_release_keyboard(): void
+    if g_wayland_keyboard != 0 then
+        ail_wl_keyboard_release(reinterpret(ptr, g_wayland_keyboard))
+    end
+    if g_wayland_keyboard_listener != 0 then
+        dealloc(g_wayland_keyboard_listener)
+    end
+    g_wayland_keyboard = 0
+    g_wayland_keyboard_listener = 0
+end
+
+@export
+def wayland_pointer_enter(data: ptr, pointer: ptr, serial: ushort, surface: ptr, surface_x: short, surface_y: short): void
+    g_wayland_mouse_x = wayland_fixed_to_int(surface_x)
+    g_wayland_mouse_y = wayland_fixed_to_int(surface_y)
+    wayland_set_pending_event(AIL_UI_EVENT_MOUSE_MOVE, g_wayland_mouse_x, g_wayland_mouse_y, 0, 0, 0)
+end
+
+@export
+def wayland_pointer_leave(data: ptr, pointer: ptr, serial: ushort, surface: ptr): void
+end
+
+@export
+def wayland_pointer_motion(data: ptr, pointer: ptr, event_time: ushort, surface_x: short, surface_y: short): void
+    g_wayland_mouse_x = wayland_fixed_to_int(surface_x)
+    g_wayland_mouse_y = wayland_fixed_to_int(surface_y)
+    wayland_set_pending_event(AIL_UI_EVENT_MOUSE_MOVE, g_wayland_mouse_x, g_wayland_mouse_y, 0, 0, 0)
+end
+
+@export
+def wayland_pointer_button(data: ptr, pointer: ptr, serial: ushort, event_time: ushort, button: ushort, state: ushort): void
+    kind = AIL_UI_EVENT_MOUSE_UP
+    if state == AIL_UI_WAYLAND_BUTTON_PRESSED then
+        kind = AIL_UI_EVENT_MOUSE_DOWN
+    end
+    wayland_set_pending_event(kind, g_wayland_mouse_x, g_wayland_mouse_y, button, 0, 0)
+end
+
+@export
+def wayland_pointer_axis(data: ptr, pointer: ptr, event_time: ushort, axis: ushort, value: short): void
+end
+
+@export
+def wayland_pointer_frame(data: ptr, pointer: ptr): void
+end
+
+@export
+def wayland_pointer_axis_source(data: ptr, pointer: ptr, axis_source: ushort): void
+end
+
+@export
+def wayland_pointer_axis_stop(data: ptr, pointer: ptr, event_time: ushort, axis: ushort): void
+end
+
+@export
+def wayland_pointer_axis_discrete(data: ptr, pointer: ptr, axis: ushort, discrete: short): void
+end
+
+@export
+def wayland_pointer_axis_value120(data: ptr, pointer: ptr, axis: ushort, value120: short): void
+end
+
+@export
+def wayland_pointer_axis_relative_direction(data: ptr, pointer: ptr, axis: ushort, direction: ushort): void
+end
+
+@export
+def wayland_keyboard_keymap(data: ptr, keyboard: ptr, format: ushort, fd: short, size: ushort): void
+    // Raw-key proof path: close the keymap fd; xkbcommon translation is separate.
+    close(fd)
+end
+
+@export
+def wayland_keyboard_enter(data: ptr, keyboard: ptr, serial: ushort, surface: ptr, keys: ptr): void
+end
+
+@export
+def wayland_keyboard_leave(data: ptr, keyboard: ptr, serial: ushort, surface: ptr): void
+end
+
+@export
+def wayland_keyboard_key(data: ptr, keyboard: ptr, serial: ushort, event_time: ushort, key: ushort, state: ushort): void
+    kind = AIL_UI_EVENT_KEY_UP
+    if state == AIL_UI_WAYLAND_KEY_PRESSED then
+        kind = AIL_UI_EVENT_KEY_DOWN
+    end
+    wayland_set_pending_event(kind, 0, 0, key, 0, 0)
+end
+
+@export
+def wayland_keyboard_modifiers(data: ptr, keyboard: ptr, serial: ushort, mods_depressed: ushort, mods_latched: ushort, mods_locked: ushort, group: ushort): void
+end
+
+@export
+def wayland_keyboard_repeat_info(data: ptr, keyboard: ptr, rate: short, delay: short): void
+end
+
+def wayland_install_pointer_listener(pointer: ptr): int
+    listener = alloc(SIZEOF_wl_pointer_listener)
+    memset(listener, 0, SIZEOF_wl_pointer_listener)
+    poke64(listener, OFFSETOF_wl_pointer_listener_enter / 8, fn_ptr("wayland_pointer_enter"))
+    poke64(listener, OFFSETOF_wl_pointer_listener_leave / 8, fn_ptr("wayland_pointer_leave"))
+    poke64(listener, OFFSETOF_wl_pointer_listener_motion / 8, fn_ptr("wayland_pointer_motion"))
+    poke64(listener, OFFSETOF_wl_pointer_listener_button / 8, fn_ptr("wayland_pointer_button"))
+    poke64(listener, OFFSETOF_wl_pointer_listener_axis / 8, fn_ptr("wayland_pointer_axis"))
+    poke64(listener, OFFSETOF_wl_pointer_listener_frame / 8, fn_ptr("wayland_pointer_frame"))
+    poke64(listener, OFFSETOF_wl_pointer_listener_axis_source / 8, fn_ptr("wayland_pointer_axis_source"))
+    poke64(listener, OFFSETOF_wl_pointer_listener_axis_stop / 8, fn_ptr("wayland_pointer_axis_stop"))
+    poke64(listener, OFFSETOF_wl_pointer_listener_axis_discrete / 8, fn_ptr("wayland_pointer_axis_discrete"))
+    poke64(listener, OFFSETOF_wl_pointer_listener_axis_value120 / 8, fn_ptr("wayland_pointer_axis_value120"))
+    poke64(listener, OFFSETOF_wl_pointer_listener_axis_relative_direction / 8, fn_ptr("wayland_pointer_axis_relative_direction"))
+    g_wayland_pointer_listener = listener
+    return ail_wl_pointer_add_listener(pointer, reinterpret(ptr, listener), 0)
+end
+
+def wayland_install_keyboard_listener(keyboard: ptr): int
+    listener = alloc(SIZEOF_wl_keyboard_listener)
+    memset(listener, 0, SIZEOF_wl_keyboard_listener)
+    poke64(listener, OFFSETOF_wl_keyboard_listener_keymap / 8, fn_ptr("wayland_keyboard_keymap"))
+    poke64(listener, OFFSETOF_wl_keyboard_listener_enter / 8, fn_ptr("wayland_keyboard_enter"))
+    poke64(listener, OFFSETOF_wl_keyboard_listener_leave / 8, fn_ptr("wayland_keyboard_leave"))
+    poke64(listener, OFFSETOF_wl_keyboard_listener_key / 8, fn_ptr("wayland_keyboard_key"))
+    poke64(listener, OFFSETOF_wl_keyboard_listener_modifiers / 8, fn_ptr("wayland_keyboard_modifiers"))
+    poke64(listener, OFFSETOF_wl_keyboard_listener_repeat_info / 8, fn_ptr("wayland_keyboard_repeat_info"))
+    g_wayland_keyboard_listener = listener
+    return ail_wl_keyboard_add_listener(keyboard, reinterpret(ptr, listener), 0)
+end
+
+@export
+def wayland_seat_capabilities(data: ptr, seat: ptr, capabilities: ushort): void
+    if wayland_has_capability(capabilities, AIL_UI_WAYLAND_SEAT_CAP_POINTER) == 1 then
+        if g_wayland_pointer == 0 then
+            pointer = ail_wl_seat_get_pointer(seat)
+            if reinterpret(int, pointer) != 0 then
+                g_wayland_pointer = reinterpret(int, pointer)
+                wayland_install_pointer_listener(pointer)
+            end
+        end
+    else
+        wayland_release_pointer()
+    end
+
+    if wayland_has_capability(capabilities, AIL_UI_WAYLAND_SEAT_CAP_KEYBOARD) == 1 then
+        if g_wayland_keyboard == 0 then
+            keyboard = ail_wl_seat_get_keyboard(seat)
+            if reinterpret(int, keyboard) != 0 then
+                g_wayland_keyboard = reinterpret(int, keyboard)
+                wayland_install_keyboard_listener(keyboard)
+            end
+        end
+    else
+        wayland_release_keyboard()
+    end
+end
+
+@export
+def wayland_seat_name(data: ptr, seat: ptr, name: string): void
+end
+
+def wayland_install_registry_listener(registry: ptr): int
+    listener = alloc(SIZEOF_wl_registry_listener)
+    memset(listener, 0, SIZEOF_wl_registry_listener)
+    poke64(listener, OFFSETOF_wl_registry_listener_global / 8, fn_ptr("wayland_registry_global"))
+    poke64(listener, OFFSETOF_wl_registry_listener_global_remove / 8, fn_ptr("wayland_registry_global_remove"))
+    g_wayland_registry_listener = listener
+    return ail_wl_registry_add_listener(registry, reinterpret(ptr, listener), 0)
+end
+
+def wayland_install_seat_listener(seat: ptr): int
+    listener = alloc(SIZEOF_wl_seat_listener)
+    memset(listener, 0, SIZEOF_wl_seat_listener)
+    poke64(listener, OFFSETOF_wl_seat_listener_capabilities / 8, fn_ptr("wayland_seat_capabilities"))
+    poke64(listener, OFFSETOF_wl_seat_listener_name / 8, fn_ptr("wayland_seat_name"))
+    g_wayland_seat_listener = listener
+    return ail_wl_seat_add_listener(seat, reinterpret(ptr, listener), 0)
+end
+
+def wayland_install_wm_listener(wm_base: ptr): int
+    listener = alloc(SIZEOF_xdg_wm_base_listener)
+    memset(listener, 0, SIZEOF_xdg_wm_base_listener)
+    poke64(listener, OFFSETOF_xdg_wm_base_listener_ping / 8, fn_ptr("wayland_wm_base_ping"))
+    g_wayland_wm_listener = listener
+    return ail_xdg_wm_base_add_listener(wm_base, reinterpret(ptr, listener), 0)
+end
+
+def wayland_install_surface_listener(xdg_surface: ptr): int
+    listener = alloc(SIZEOF_xdg_surface_listener)
+    memset(listener, 0, SIZEOF_xdg_surface_listener)
+    poke64(listener, OFFSETOF_xdg_surface_listener_configure / 8, fn_ptr("wayland_surface_configure"))
+    g_wayland_surface_listener = listener
+    return ail_xdg_surface_add_listener(xdg_surface, reinterpret(ptr, listener), 0)
+end
+
+def wayland_install_toplevel_listener(toplevel: ptr): int
+    listener = alloc(SIZEOF_xdg_toplevel_listener)
+    memset(listener, 0, SIZEOF_xdg_toplevel_listener)
+    poke64(listener, OFFSETOF_xdg_toplevel_listener_configure / 8, fn_ptr("wayland_toplevel_configure"))
+    poke64(listener, OFFSETOF_xdg_toplevel_listener_close / 8, fn_ptr("wayland_toplevel_close"))
+    poke64(listener, OFFSETOF_xdg_toplevel_listener_configure_bounds / 8, fn_ptr("wayland_toplevel_configure_bounds"))
+    poke64(listener, OFFSETOF_xdg_toplevel_listener_wm_capabilities / 8, fn_ptr("wayland_toplevel_wm_capabilities"))
+    g_wayland_toplevel_listener = listener
+    return ail_xdg_toplevel_add_listener(toplevel, reinterpret(ptr, listener), 0)
+end
+
+def wayland_release_buffer(): void
+    if g_wayland_buffer != 0 then
+        ail_wl_buffer_destroy(reinterpret(ptr, g_wayland_buffer))
+    end
+    if g_wayland_pixels != 0 then
+        munmap(reinterpret(ptr, g_wayland_pixels), g_wayland_buffer_size)
+    end
+    g_wayland_buffer = 0
+    g_wayland_pixels = 0
+    g_wayland_buffer_size = 0
+end
+
+def wayland_destroy_listeners(): void
+    wayland_release_pointer()
+    wayland_release_keyboard()
+    if g_wayland_toplevel_listener != 0 then
+        dealloc(g_wayland_toplevel_listener)
+    end
+    if g_wayland_surface_listener != 0 then
+        dealloc(g_wayland_surface_listener)
+    end
+    if g_wayland_wm_listener != 0 then
+        dealloc(g_wayland_wm_listener)
+    end
+    if g_wayland_registry_listener != 0 then
+        dealloc(g_wayland_registry_listener)
+    end
+    if g_wayland_seat_listener != 0 then
+        dealloc(g_wayland_seat_listener)
+    end
+    g_wayland_toplevel_listener = 0
+    g_wayland_surface_listener = 0
+    g_wayland_wm_listener = 0
+    g_wayland_registry_listener = 0
+    g_wayland_seat_listener = 0
+end
+
+def wayland_create_shm_buffer(width: int, height: int): int
+    stride = width * 4
+    size = stride * height
+    fd = ail_wayland_memfd_create("ailang_wayland_shm", 0)
+    if fd < 0 then
+        return 0
+    end
+    if ftruncate(fd, size) != 0 then
+        close(fd)
+        return 0
+    end
+    mapped = mmap(0, size, AIL_UI_WAYLAND_PROT_READ + AIL_UI_WAYLAND_PROT_WRITE, AIL_UI_WAYLAND_MAP_SHARED, fd, 0)
+    pixels = reinterpret(int, mapped)
+    if pixels == -1 then
+        close(fd)
+        return 0
+    end
+    pool = ail_wl_shm_create_pool(reinterpret(ptr, g_wayland_shm), fd, size)
+    if reinterpret(int, pool) == 0 then
+        munmap(mapped, size)
+        close(fd)
+        return 0
+    end
+
+    buffer = ail_wl_shm_pool_create_buffer(pool, 0, width, height, stride, AIL_UI_WAYLAND_SHM_FORMAT_XRGB8888)
+    ail_wl_shm_pool_destroy(pool)
+    close(fd)
+    if reinterpret(int, buffer) == 0 then
+        munmap(mapped, size)
+        return 0
+    end
+
+    g_wayland_buffer = reinterpret(int, buffer)
+    g_wayland_pixels = pixels
+    g_wayland_buffer_size = size
+    memset(g_wayland_pixels, 0, size)
+    return 1
+end
+
+def ail_ui_init(): int
+    if g_wayland_display != 0 then
+        return 1
+    end
+
+    display = ail_wl_display_connect_default()
+    if reinterpret(int, display) == 0 then
+        return 0
+    end
+    g_wayland_display = reinterpret(int, display)
+
+    registry = ail_wl_display_get_registry(display)
+    if reinterpret(int, registry) == 0 then
+        ail_ui_shutdown()
+        return 0
+    end
+    g_wayland_registry = reinterpret(int, registry)
+    wayland_install_registry_listener(registry)
+    ail_wl_display_roundtrip(display)
+
+    if g_wayland_compositor == 0 or g_wayland_shm == 0 or g_wayland_wm_base == 0 then
+        ail_ui_shutdown()
+        return 0
+    end
+    if g_wayland_seat != 0 then
+        wayland_install_seat_listener(reinterpret(ptr, g_wayland_seat))
+        ail_wl_display_roundtrip(display)
+    end
+    wayland_install_wm_listener(reinterpret(ptr, g_wayland_wm_base))
+    return 1
+end
+
+def ail_ui_shutdown(): void
+    if g_wayland_surface != 0 then
+        ail_ui_close_window(g_wayland_surface)
+    end
+    wayland_destroy_listeners()
+    if g_wayland_wm_base != 0 then
+        ail_xdg_wm_base_destroy(reinterpret(ptr, g_wayland_wm_base))
+    end
+    if g_wayland_shm != 0 then
+        ail_wl_shm_release(reinterpret(ptr, g_wayland_shm))
+    end
+    if g_wayland_compositor != 0 then
+        ail_wl_compositor_destroy(reinterpret(ptr, g_wayland_compositor))
+    end
+    if g_wayland_seat != 0 then
+        ail_wl_seat_release(reinterpret(ptr, g_wayland_seat))
+    end
+    if g_wayland_registry != 0 then
+        ail_wl_registry_destroy(reinterpret(ptr, g_wayland_registry))
+    end
+    if g_wayland_display != 0 then
+        ail_wl_display_disconnect(reinterpret(ptr, g_wayland_display))
+    end
+    g_wayland_display = 0
+    g_wayland_registry = 0
+    g_wayland_compositor = 0
+    g_wayland_shm = 0
+    g_wayland_wm_base = 0
+    g_wayland_seat = 0
+    g_wayland_alive = 0
+end
+
+def ail_ui_open_window(title: string, width: int, height: int): int
+    if ail_ui_init() != 1 then
+        return 0
+    end
+
+    g_wayland_width_px = width
+    g_wayland_height_px = height
+    g_wayland_configured = 0
+
+    surface = ail_wl_compositor_create_surface(reinterpret(ptr, g_wayland_compositor))
+    if reinterpret(int, surface) == 0 then
+        return 0
+    end
+    xdg_surface = ail_xdg_wm_base_get_xdg_surface(reinterpret(ptr, g_wayland_wm_base), surface)
+    if reinterpret(int, xdg_surface) == 0 then
+        ail_wl_surface_destroy(surface)
+        return 0
+    end
+    toplevel = ail_xdg_surface_get_toplevel(xdg_surface)
+    if reinterpret(int, toplevel) == 0 then
+        ail_xdg_surface_destroy(xdg_surface)
+        ail_wl_surface_destroy(surface)
+        return 0
+    end
+
+    g_wayland_surface = reinterpret(int, surface)
+    g_wayland_xdg_surface = reinterpret(int, xdg_surface)
+    g_wayland_toplevel = reinterpret(int, toplevel)
+    wayland_install_surface_listener(xdg_surface)
+    wayland_install_toplevel_listener(toplevel)
+    ail_xdg_toplevel_set_title(toplevel, title)
+    ail_wl_surface_commit(surface)
+
+    tries = 0
+    while g_wayland_configured == 0 and tries < 16 then
+        if ail_wl_display_dispatch(reinterpret(ptr, g_wayland_display)) < 0 then
+            ail_ui_close_window(g_wayland_surface)
+            return 0
+        end
+        tries = tries + 1
+    end
+    if g_wayland_configured == 0 then
+        ail_ui_close_window(g_wayland_surface)
+        return 0
+    end
+
+    if wayland_create_shm_buffer(g_wayland_width_px, g_wayland_height_px) != 1 then
+        ail_ui_close_window(g_wayland_surface)
+        return 0
+    end
+    ail_wl_surface_attach(surface, reinterpret(ptr, g_wayland_buffer), 0, 0)
+    ail_wl_surface_damage_buffer(surface, 0, 0, g_wayland_width_px, g_wayland_height_px)
+    ail_wl_surface_commit(surface)
+    ail_wl_display_flush(reinterpret(ptr, g_wayland_display))
+    g_wayland_alive = 1
+    return g_wayland_surface
+end
+
+def ail_ui_open_borderless_window(title: string, width: int, height: int): int
+    return ail_ui_open_window(title, width, height)
+end
+
+def ail_ui_close_window(window: int): void
+    wayland_release_buffer()
+    if g_wayland_toplevel != 0 then
+        ail_xdg_toplevel_destroy(reinterpret(ptr, g_wayland_toplevel))
+    end
+    if g_wayland_xdg_surface != 0 then
+        ail_xdg_surface_destroy(reinterpret(ptr, g_wayland_xdg_surface))
+    end
+    if g_wayland_surface != 0 then
+        ail_wl_surface_destroy(reinterpret(ptr, g_wayland_surface))
+    end
+    if g_wayland_display != 0 then
+        ail_wl_display_flush(reinterpret(ptr, g_wayland_display))
+    end
+    g_wayland_surface = 0
+    g_wayland_xdg_surface = 0
+    g_wayland_toplevel = 0
+    g_wayland_alive = 0
+    g_wayland_configured = 0
+end
+
+def ail_ui_minimize_window(window: int): void
+    // Wayland support needs xdg_toplevel.set_minimized in the binding surface.
+end
+
+def ail_ui_toggle_maximize_window(window: int): void
+    // Wayland maximize/restore is compositor-mediated; expose it after the
+    // xdg_toplevel maximize/unmaximize wrappers are in the cbind file.
+end
+
+def ail_ui_window_alive(window: int): int
+    return g_wayland_alive
+end
+
+def ail_ui_platform(): int
+    return AIL_UI_PLATFORM_LINUX
+end
+
+def ail_ui_window_width_px(window: int): int
+    return g_wayland_width_px
+end
+
+def ail_ui_window_height_px(window: int): int
+    return g_wayland_height_px
+end
+
+def ail_ui_window_scale_milli(window: int): int
+    return 1000
+end
+
+def ail_ui_window_text_scale_milli(window: int): int
+    return 1000
+end
+
+def ail_ui_window_maximized(window: int): int
+    return 0
+end
+
+def ail_ui_poll_event(window: int): int
+    g_wayland_pending_event = AIL_UI_EVENT_NONE
+    if g_wayland_display == 0 then
+        return AIL_UI_EVENT_NONE
+    end
+    if ail_wl_display_dispatch_pending(reinterpret(ptr, g_wayland_display)) < 0 then
+        g_wayland_alive = 0
+        return AIL_UI_EVENT_CLOSE
+    end
+    kind = g_wayland_pending_event
+    g_wayland_pending_event = AIL_UI_EVENT_NONE
+    return kind
+end
+
+def ail_ui_event_x(): int
+    return g_wayland_event_x
+end
+def ail_ui_event_y(): int
+    return g_wayland_event_y
+end
+def ail_ui_event_key(): int
+    return g_wayland_event_key
+end
+def ail_ui_event_width_px(): int
+    return g_wayland_event_width_px
+end
+def ail_ui_event_height_px(): int
+    return g_wayland_event_height_px
+end
+def ail_ui_begin_frame(window: int, color: int): void
+    ail_ui_draw_rect(window, 0, 0, g_wayland_width_px, g_wayland_height_px, color)
+end
+def ail_ui_draw_rect(window: int, x: int, y: int, width: int, height: int, color: int): void
+    if g_wayland_pixels == 0 then
+        return
+    end
+    x0 = x
+    y0 = y
+    x1 = x + width
+    y1 = y + height
+    if x0 < 0 then
+        x0 = 0
+    end
+    if y0 < 0 then
+        y0 = 0
+    end
+    if x1 > g_wayland_width_px then
+        x1 = g_wayland_width_px
+    end
+    if y1 > g_wayland_height_px then
+        y1 = g_wayland_height_px
+    end
+    if x1 <= x0 or y1 <= y0 then
+        return
+    end
+    pixel = wayland_color(color)
+    yy = y0
+    while yy < y1 then
+        xx = x0
+        base = yy * g_wayland_width_px
+        while xx < x1 then
+            poke32(g_wayland_pixels, base + xx, pixel)
+            xx = xx + 1
+        end
+        yy = yy + 1
+    end
+end
+def ail_ui_draw_text(window: int, x: int, y: int, scale: int, color: int, text: string): void
+    // Minimal proof path: text shaping stays above the native backend.
+end
+def ail_ui_draw_text_style(
+    window: int,
+    x: int,
+    y: int,
+    size_px: int,
+    weight: int,
+    color: int,
+    text: string
+): void
+    // Minimal proof path: text shaping stays above the native backend.
+end
+def ail_ui_set_font(font_name: string): void
+    // Wayland proof backend keeps font choice at the text draw call.
+end
+def ail_ui_draw_text_font(
+    window: int,
+    x: int,
+    y: int,
+    size_px: int,
+    weight: int,
+    color: int,
+    font_name: string,
+    text: string
+): void
+    // Font selection is part of the richer text backend; keep ABI coverage now.
+    ail_ui_draw_text_style(window, x, y, size_px, weight, color, text)
+end
+def ail_ui_set_clip(window: int, x: int, y: int, width: int, height: int): void
+end
+def ail_ui_clear_clip(window: int): void
+end
+def ail_ui_end_frame(window: int): void
+    if g_wayland_surface != 0 and g_wayland_buffer != 0 then
+        ail_wl_surface_attach(reinterpret(ptr, g_wayland_surface), reinterpret(ptr, g_wayland_buffer), 0, 0)
+        ail_wl_surface_damage_buffer(reinterpret(ptr, g_wayland_surface), 0, 0, g_wayland_width_px, g_wayland_height_px)
+        ail_wl_surface_commit(reinterpret(ptr, g_wayland_surface))
+        ail_wl_display_flush(reinterpret(ptr, g_wayland_display))
+    end
+end
+def ail_ui_sleep_ms(ms: int): void
+    if ms > 0 then
+        usleep(ms * 1000)
+    end
+end
+def ail_ui_wait_event_ms(ms: int): void
+    ail_ui_poll_event(g_wayland_surface)
+    ail_ui_sleep_ms(ms)
+end
+def wayland_pure_smoke(): int
+    if ail_ui_init() != 1 then
+        return 1
+    end
+    window = ail_ui_open_window("AILang pure Wayland", 640, 360)
+    if window == 0 then
+        ail_ui_shutdown()
+        return 2
+    end
+    ail_ui_begin_frame(window, 15791611)
+    ail_ui_draw_rect(window, 48, 48, 220, 72, 3385907)
+    ail_ui_end_frame(window)
+    ail_ui_wait_event_ms(20)
+    ail_ui_close_window(window)
+    ail_ui_shutdown()
+    return 0
+end
+def main(): int
+    return wayland_pure_smoke()
+end

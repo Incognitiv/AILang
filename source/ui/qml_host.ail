@@ -1,0 +1,26 @@
+@library("qml_host")
+
+// Embedded Qt/QML host.
+//
+// This is a C ABI surface implemented by source/ui/qml_host/qml_host.cpp.
+// AILang owns the program flow and context values; Qt owns QML parsing,
+// rendering, input, animation, font shaping, and platform integration.
+
+const int QML_HOST_OK = 0
+const int QML_HOST_CREATE_FAILED = 10
+const int QML_HOST_LOAD_FAILED = 11
+
+extern fn ail_qml_create(): int
+extern fn ail_qml_load_file(host: int, path: string): int
+extern fn ail_qml_set_context_string(host: int, name: string, value: string): int
+extern fn ail_qml_set_context_int(host: int, name: string, value: int): int
+extern fn ail_qml_exec(host: int): int
+extern fn ail_qml_destroy(host: int): void
+extern fn ail_qml_last_error(host: int): string
+extern fn ail_qml_run_file(path: string): int
+extern fn ail_qml_run_default(): int
+
+
+def qml_host_run_default(): int
+    return ail_qml_run_default()
+end

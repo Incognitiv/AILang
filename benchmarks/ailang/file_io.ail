@@ -1,0 +1,22 @@
+def file_io_bench(iterations):
+    payload = "abcdefghijklmnopqrstuvwxyz0123456789"
+    path = "benchmarks/out/file_io_bench.txt"
+    checksum = 0
+    i = 0
+    while i < iterations then
+        if write_file(path, payload) == 1 then
+            content = read_file(path)
+            checksum = checksum + len(content)
+        end
+        i = i + 1
+    end
+    return checksum
+end
+
+
+def main(): int
+    iterations = 2000
+    result = file_io_bench(iterations)
+    print(result)
+    return 0
+end

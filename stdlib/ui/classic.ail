@@ -1,0 +1,242 @@
+@library("ui_classic")
+
+import stdlib.ui.platform
+
+// Lightweight classic-desktop paint primitives. These are intentionally
+// immediate-mode and backend-neutral: the platform only needs rect/text draws.
+
+void ui_classic_text(window: int, x: int, y: int, size_px: int, weight: int, color: int, text: string):
+    ail_ui_draw_text_font(window, x, y, size_px, weight, color, "Tahoma", text)
+end
+
+
+int ui_classic_text_width(text: string, size_px: int):
+    return (strlen(text) * size_px) / 2
+end
+
+
+int ui_classic_channel(color: int, shift: int):
+    if shift == 16 then
+        return (color / 65536) - ((color / 16777216) * 256)
+    end
+    if shift == 8 then
+        return (color / 256) - ((color / 65536) * 256)
+    end
+    return color - ((color / 256) * 256)
+end
+
+
+int ui_classic_lerp(a: int, b: int, pos: int, total: int):
+    if total <= 0 then
+        return b
+    end
+    return a + (((b - a) * pos) / total)
+end
+
+
+int ui_classic_lerp_color(a: int, b: int, pos: int, total: int):
+    r = ui_classic_lerp(ui_classic_channel(a, 16), ui_classic_channel(b, 16), pos, total)
+    g = ui_classic_lerp(ui_classic_channel(a, 8), ui_classic_channel(b, 8), pos, total)
+    bl = ui_classic_lerp(ui_classic_channel(a, 0), ui_classic_channel(b, 0), pos, total)
+    return (r * 65536) + (g * 256) + bl
+end
+
+
+void ui_classic_gradient_down(
+    window: int,
+    x: int,
+    y: int,
+    width: int,
+    height: int,
+    top_color: int,
+    bottom_color: int
+):
+    yy = 0
+    while yy < height then
+        color = ui_classic_lerp_color(top_color, bottom_color, yy, height - 1)
+        ail_ui_draw_rect(window, x, y + yy, width, 1, color)
+        yy = yy + 1
+    end
+end
+
+
+void ui_classic_gradient_right(
+    window: int,
+    x: int,
+    y: int,
+    width: int,
+    height: int,
+    left_color: int,
+    right_color: int
+):
+    xx = 0
+    while xx < width then
+        color = ui_classic_lerp_color(left_color, right_color, xx, width - 1)
+        ail_ui_draw_rect(window, x + xx, y, 1, height, color)
+        xx = xx + 1
+    end
+end
+
+
+void ui_classic_border(window: int, x: int, y: int, width: int, height: int, color: int):
+    ail_ui_draw_rect(window, x, y, width, 1, color)
+    ail_ui_draw_rect(window, x, y + height - 1, width, 1, color)
+    ail_ui_draw_rect(window, x, y, 1, height, color)
+    ail_ui_draw_rect(window, x + width - 1, y, 1, height, color)
+end
+
+
+void ui_classic_raised_box(window: int, x: int, y: int, width: int, height: int, fill: int):
+    ail_ui_draw_rect(window, x, y, width, height, fill)
+    ail_ui_draw_rect(window, x, y, width, 1, 0xffffff)
+    ail_ui_draw_rect(window, x, y, 1, height, 0xffffff)
+    ail_ui_draw_rect(window, x, y + height - 1, width, 1, 0x6f7f90)
+    ail_ui_draw_rect(window, x + width - 1, y, 1, height, 0x6f7f90)
+    ail_ui_draw_rect(window, x + 1, y + 1, width - 2, 1, 0xd8d2bd)
+    ail_ui_draw_rect(window, x + 1, y + 1, 1, height - 2, 0xd8d2bd)
+end
+
+
+void ui_classic_inset_box(window: int, x: int, y: int, width: int, height: int, fill: int):
+    ail_ui_draw_rect(window, x, y, width, height, fill)
+    ail_ui_draw_rect(window, x, y, width, 1, 0x7f9db9)
+    ail_ui_draw_rect(window, x, y, 1, height, 0x7f9db9)
+    ail_ui_draw_rect(window, x, y + height - 1, width, 1, 0xffffff)
+    ail_ui_draw_rect(window, x + width - 1, y, 1, height, 0xffffff)
+end
+
+
+void ui_classic_button_state(
+    window: int,
+    x: int,
+    y: int,
+    width: int,
+    height: int,
+    label: string,
+    state: int
+):
+    if state == 3 then
+        ail_ui_draw_rect(window, x, y, width, height, 0xf3f0e7)
+        ui_classic_border(window, x, y, width, height, 0xd0ccc0)
+    else
+        if state == 2 then
+            ui_classic_gradient_down(window, x, y, width, height, 0xded9c8, 0xffffff)
+            ui_classic_border(window, x, y, width, height, 0x315f8f)
+        else
+            if state == 1 then
+                ui_classic_gradient_down(window, x, y, width, height, 0xffffff, 0xdff0ff)
+                ui_classic_border(window, x, y, width, height, 0x1f73c9)
+            else
+                ui_classic_gradient_down(window, x, y, width, height, 0xffffff, 0xe7e4d8)
+                ui_classic_border(window, x, y, width, height, 0x315f8f)
+            end
+        end
+    end
+
+    text_size = 13
+    text_width = ui_classic_text_width(label, text_size)
+    text_x = x + ((width - text_width) / 2)
+    if text_x < x + 4 then
+        text_x = x + 4
+    end
+    text_y = y + ((height - text_size) / 2)
+    if state == 2 then
+        text_x = text_x + 1
+        text_y = text_y + 1
+    end
+    if state == 3 then
+        ui_classic_text(window, text_x, text_y, text_size, 400, 0xb8b4a9, label)
+    else
+        ui_classic_text(window, text_x, text_y, text_size, 400, 0x222222, label)
+    end
+end
+
+
+void ui_classic_button(window: int, x: int, y: int, width: int, height: int, label: string, enabled: int):
+    state = 0
+    if enabled == 0 then
+        state = 3
+    end
+    ui_classic_button_state(window, x, y, width, height, label, state)
+end
+
+
+void ui_classic_tab(window: int, x: int, y: int, width: int, height: int, label: string, active: int):
+    if active == 1 then
+        ail_ui_draw_rect(window, x, y, width, height + 2, 0xfffbf2)
+        ui_classic_border(window, x, y, width, height + 2, 0xaca899)
+        ail_ui_draw_rect(window, x + 1, y + height, width - 2, 3, 0xfffbf2)
+        ail_ui_draw_rect(window, x, y, width, 3, 0xf4b23d)
+        ui_classic_text(window, x + 10, y + 9, 11, 400, 0x111111, label)
+    else
+        ail_ui_draw_rect(window, x, y + 4, width, height - 4, 0xf0eee4)
+        ui_classic_border(window, x, y + 4, width, height - 4, 0xb9b5aa)
+        ui_classic_text(window, x + 10, y + 11, 11, 400, 0x222222, label)
+    end
+end
+
+
+void ui_classic_title_button(window: int, x: int, y: int, width: int, height: int, label: string, close_button: int):
+    if close_button == 1 then
+        ui_classic_gradient_down(window, x, y, width, height, 0xfca080, 0xd62d11)
+    else
+        ui_classic_gradient_down(window, x, y, width, height, 0x8bbcff, 0x2464d6)
+    end
+    ui_classic_border(window, x, y, width, height, 0xffffff)
+    ui_classic_text(window, x + 7, y + 2, 20, 700, 0xffffff, label)
+end
+
+
+void ui_classic_titlebar(window: int, x: int, y: int, width: int, height: int, title: string):
+    ui_classic_gradient_down(window, x, y, width, height, 0x3aa0ff, 0x0050d6)
+    ui_classic_gradient_right(window, x, y + 2, width, height - 4, 0x0a63f0, 0x0037a7)
+    ail_ui_draw_rect(window, x, y, width, 1, 0x65b8ff)
+    ui_classic_text(window, x + 10, y + 8, 17, 700, 0xffffff, title)
+    ui_classic_title_button(window, x + width - 58, y + 6, 24, 24, "?", 0)
+    ui_classic_title_button(window, x + width - 30, y + 6, 24, 24, "X", 1)
+end
+
+
+void ui_classic_window_shell(window: int, x: int, y: int, width: int, height: int, title: string):
+    ail_ui_draw_rect(window, x + 4, y + 5, width, height, 0x003b8c)
+    ail_ui_draw_rect(window, x, y, width, height, 0x0b55d9)
+    ui_classic_border(window, x, y, width, height, 0x003c9f)
+    ail_ui_draw_rect(window, x + 1, y + 1, width - 2, 1, 0x4cb0ff)
+    ail_ui_draw_rect(window, x + 1, y + 1, 1, height - 2, 0x4cb0ff)
+    ui_classic_titlebar(window, x + 4, y + 4, width - 8, 36, title)
+    ail_ui_draw_rect(window, x + 4, y + 40, width - 8, height - 44, 0xeeeade)
+end
+
+
+void ui_classic_start_button(window: int, x: int, y: int, width: int, height: int):
+    ui_classic_gradient_right(window, x, y, width, height, 0x1f8f2c, 0x73d06a)
+    ail_ui_draw_rect(window, x, y, width, 1, 0xa8f89d)
+    ail_ui_draw_rect(window, x, y + height - 1, width, 1, 0x1b6a20)
+    ail_ui_draw_rect(window, x + width - 1, y, 1, height, 0x17621b)
+    ail_ui_draw_rect(window, x + width - 8, y, 8, height, 0x58b953)
+    ail_ui_draw_rect(window, x + 12, y + 10, 10, 10, 0xf25622)
+    ail_ui_draw_rect(window, x + 24, y + 10, 10, 10, 0x32a852)
+    ail_ui_draw_rect(window, x + 12, y + 22, 10, 10, 0x2f80ed)
+    ail_ui_draw_rect(window, x + 24, y + 22, 10, 10, 0xf3c52d)
+    ail_ui_draw_rect(window, x + 12, y + 20, 22, 2, 0xffffff)
+    ail_ui_draw_rect(window, x + 22, y + 10, 2, 22, 0xffffff)
+    ui_classic_text(window, x + 44, y + 8, 25, 700, 0xffffff, "start")
+end
+
+
+void ui_classic_taskbar(window: int, y: int, width: int):
+    ui_classic_gradient_down(window, 0, y, width, 40, 0x399cff, 0x0751c9)
+    ail_ui_draw_rect(window, 0, y, width, 1, 0x75b8ff)
+    ail_ui_draw_rect(window, 0, y + 2, width, 1, 0x1a70e4)
+    ui_classic_start_button(window, 0, y, 116, 40)
+    tray_x = width - 168
+    ui_classic_gradient_down(window, tray_x, y + 2, 168, 36, 0x20b7f4, 0x0b8bd5)
+    ail_ui_draw_rect(window, tray_x, y + 2, 1, 36, 0x86dcff)
+    ail_ui_draw_rect(window, tray_x + 1, y + 2, 1, 36, 0x1689d9)
+    ail_ui_draw_rect(window, tray_x + 28, y + 12, 10, 10, 0x748aa2)
+    ail_ui_draw_rect(window, tray_x + 41, y + 11, 9, 12, 0x20b344)
+    ail_ui_draw_rect(window, tray_x + 55, y + 12, 10, 10, 0xdf3f3f)
+    ail_ui_draw_rect(window, tray_x + 69, y + 11, 8, 12, 0xf7d43d)
+    ail_ui_draw_rect(window, tray_x + 117, y + 9, 1, 22, 0x4fc5ef)
+    ui_classic_text(window, width - 91, y + 10, 18, 400, 0xffffff, "10:50 PM")
+end

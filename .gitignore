@@ -1,0 +1,122 @@
+# Python caches and bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Tooling caches
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Local virtual environments
+.venv/
+.venv*/
+venv/
+venv_*/
+
+# Build / package artifacts
+build/
+dist/
+*.egg-info/
+
+# Generic binary artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+*.o
+*.obj
+*.pdb
+
+# Generated compiler artifacts
+*.ll
+*_opt.ll
+benchmarks/ailang/*.c
+tests/corpus/*.c
+
+# Runtime/temp outputs
+out/
+benchmarks/out/
+source/out/
+tools/out/
+
+# Verifier and benchmark generated outputs
+verifier/dist/
+benchmarks/benchmark_results.json
+benchmarks/benchmark_results.md
+benchmarks/benchmark_results_wsl.json
+benchmarks/results/
+benchmarks/sessions/
+
+# Local DB/log/temp files
+test.db
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.log
+*.tmp
+tmp_*
+benchmarks/tmp_*.txt
+
+# Profiling outputs
+*.profraw
+*.profdata
+
+# Local editor/assistant state
+.claude/
+
+# Restored archive and binary/source cruft; keep out of the publish tree.
+archived/
+
+# Shell, benchmark, and recovery scratch files created at repository root
+.msh-*/
+.msh-*
+/ ;*
+/  ;*
+/ one two;
+/a
+/a b
+/a.out
+/co-a
+/dircmd
+/eq-a
+/err
+/err2
+/err3
+/fib_mix.ail
+/in*
+/msh_tmp.txt
+/noclobber.out
+/NUL
+/one two
+/one two;
+/out-file
+/out2
+/out3
+/outer
+/p.out
+/pytest_full.log
+/UsersVAppDataLocalTempmsh-*.out
+/*msh_redir_probe.txt
+/verifier_source_strict*.log
+/verifier/diag_out.txt
+/verifier/score.txt
+/verifier/verifier_out.json
+/verifier/verifier_output.txt
+/wsl_tools_*
+/FULL_TREE_PASS.*
+/tmp_indirect.db
+
+# Local recovery/audit reports; useful locally, not safe for public history.
+/RESTORE_*.md
+/god_object_audit.md
+/source/CODE_ANALYSIS.md
+/tools/regression_baseline*.json
+
+# Public repository policy: keep README.md as the only tracked Markdown doc.
+# Exception: this UI platform contract is required by tests.
+*.md
+*.MD
+!/README.md
+!/docs/AILANG_UI_PLATFORM.md

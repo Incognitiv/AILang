@@ -1,0 +1,49 @@
+// AILang-native metadata for the release hard gate.
+// The Python runner owns execution; this file is the self-hosted contract that
+// keeps gate identity visible to AILang-side tooling.
+
+const int AILANG_HARD_GATE_STEP_COUNT = 6
+
+const string AILANG_GATE_SOURCE_STRICT = "source_strict"
+const string AILANG_GATE_VERIFIER_STRICT = "verifier_strict"
+const string AILANG_GATE_C23_HOSTED = "c23_hosted_compile"
+const string AILANG_GATE_C23_FREESTANDING = "c23_freestanding_compile"
+const string AILANG_GATE_FOCUSED_PYTEST = "focused_pytest"
+const string AILANG_GATE_C23_WORKLOAD_COMPARE = "c23_workload_compare"
+
+def hard_gate_step_count(): int
+    return AILANG_HARD_GATE_STEP_COUNT
+end
+
+def hard_gate_step_name(index: int): string
+    if index == 0 then
+        return AILANG_GATE_SOURCE_STRICT
+    end
+    if index == 1 then
+        return AILANG_GATE_VERIFIER_STRICT
+    end
+    if index == 2 then
+        return AILANG_GATE_C23_HOSTED
+    end
+    if index == 3 then
+        return AILANG_GATE_C23_FREESTANDING
+    end
+    if index == 4 then
+        return AILANG_GATE_FOCUSED_PYTEST
+    end
+    if index == 5 then
+        return AILANG_GATE_C23_WORKLOAD_COMPARE
+    end
+    return ""
+end
+
+def main(): int
+    print hard_gate_step_count()
+    print hard_gate_step_name(0)
+    print hard_gate_step_name(1)
+    print hard_gate_step_name(2)
+    print hard_gate_step_name(3)
+    print hard_gate_step_name(4)
+    print hard_gate_step_name(5)
+    return 0
+end

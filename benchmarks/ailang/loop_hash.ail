@@ -1,0 +1,20 @@
+def loop_hash_bench(iterations: u32): u32
+    u32 acc = 0
+    u32 i = 0
+    while i < iterations then
+        acc = acc + i
+        if acc > 1000000000 then
+            acc = acc - 1000000000
+        end
+        i = i + 1
+    end
+    return acc
+end
+
+
+def main(): int
+    u32 iterations = 12000000
+    u32 result = loop_hash_bench(iterations)
+    print(result)
+    return 0
+end

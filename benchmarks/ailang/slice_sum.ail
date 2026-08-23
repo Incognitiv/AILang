@@ -1,0 +1,27 @@
+type Arr8 = [int; 8]
+type IterCount = 0..250000
+
+
+def slice_sum_bench(iterations: IterCount):
+    Arr8 arr = [3, 1, 4, 1, 5, 9, 2, 6]
+    slice[int] view = arr
+    acc := 0..7750000 = 0
+    i = 0
+    while i < iterations then
+        j := 0..8 = 0
+        while j < 8 then
+            acc = acc + view[j]
+            j = j + 1
+        end
+        i = i + 1
+    end
+    return acc
+end
+
+
+def main(): int
+    iterations = 250000
+    result = slice_sum_bench(iterations)
+    print(result)
+    return 0
+end

@@ -1,0 +1,461 @@
+{
+  "name": "x11_pure",
+  "cflags": [
+    "-include",
+    "X11/Xlib.h",
+    "-include",
+    "X11/Xatom.h"
+  ],
+  "link_flags": [
+    "-lX11"
+  ],
+  "macros": [
+    "ButtonPress",
+    "ButtonPressMask",
+    "ButtonRelease",
+    "ButtonReleaseMask",
+    "ClientMessage",
+    "ConfigureNotify",
+    "DestroyNotify",
+    "Expose",
+    "ExposureMask",
+    "KeyPress",
+    "KeyPressMask",
+    "KeyRelease",
+    "KeyReleaseMask",
+    "MotionNotify",
+    "PointerMotionMask",
+    "StructureNotifyMask"
+  ],
+  "records": [
+    {
+      "name": "XEvent",
+      "c_name": "XEvent",
+      "kind": "extern",
+      "fields": [
+        {
+          "name": "type",
+          "type": "short"
+        }
+      ]
+    },
+    {
+      "name": "XConfigureEvent",
+      "c_name": "XConfigureEvent",
+      "kind": "extern",
+      "fields": [
+        {
+          "name": "type",
+          "type": "short"
+        },
+        {
+          "name": "width",
+          "type": "short"
+        },
+        {
+          "name": "height",
+          "type": "short"
+        }
+      ]
+    },
+    {
+      "name": "XMotionEvent",
+      "c_name": "XMotionEvent",
+      "kind": "extern",
+      "fields": [
+        {
+          "name": "x",
+          "type": "short"
+        },
+        {
+          "name": "y",
+          "type": "short"
+        }
+      ]
+    },
+    {
+      "name": "XButtonEvent",
+      "c_name": "XButtonEvent",
+      "kind": "extern",
+      "fields": [
+        {
+          "name": "x",
+          "type": "short"
+        },
+        {
+          "name": "y",
+          "type": "short"
+        },
+        {
+          "name": "button",
+          "type": "ushort"
+        }
+      ]
+    },
+    {
+      "name": "XKeyEvent",
+      "c_name": "XKeyEvent",
+      "kind": "extern",
+      "fields": [
+        {
+          "name": "keycode",
+          "type": "ushort"
+        }
+      ]
+    }
+  ],
+  "functions": [
+    {
+      "name": "XOpenDisplay",
+      "return_type": "ptr",
+      "params": [
+        {
+          "name": "display_name",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "XDefaultScreen",
+      "return_type": "short",
+      "params": [
+        {
+          "name": "display",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "XRootWindow",
+      "return_type": "uint",
+      "params": [
+        {
+          "name": "display",
+          "type": "ptr"
+        },
+        {
+          "name": "screen",
+          "type": "short"
+        }
+      ]
+    },
+    {
+      "name": "XWhitePixel",
+      "return_type": "uint",
+      "params": [
+        {
+          "name": "display",
+          "type": "ptr"
+        },
+        {
+          "name": "screen",
+          "type": "short"
+        }
+      ]
+    },
+    {
+      "name": "XBlackPixel",
+      "return_type": "uint",
+      "params": [
+        {
+          "name": "display",
+          "type": "ptr"
+        },
+        {
+          "name": "screen",
+          "type": "short"
+        }
+      ]
+    },
+    {
+      "name": "XCreateSimpleWindow",
+      "return_type": "uint",
+      "params": [
+        {
+          "name": "display",
+          "type": "ptr"
+        },
+        {
+          "name": "parent",
+          "type": "uint"
+        },
+        {
+          "name": "x",
+          "type": "short"
+        },
+        {
+          "name": "y",
+          "type": "short"
+        },
+        {
+          "name": "width",
+          "type": "ushort"
+        },
+        {
+          "name": "height",
+          "type": "ushort"
+        },
+        {
+          "name": "border_width",
+          "type": "ushort"
+        },
+        {
+          "name": "border",
+          "type": "uint"
+        },
+        {
+          "name": "background",
+          "type": "uint"
+        }
+      ]
+    },
+    {
+      "name": "XStoreName",
+      "return_type": "short",
+      "params": [
+        {
+          "name": "display",
+          "type": "ptr"
+        },
+        {
+          "name": "window",
+          "type": "uint"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "XSelectInput",
+      "return_type": "short",
+      "params": [
+        {
+          "name": "display",
+          "type": "ptr"
+        },
+        {
+          "name": "window",
+          "type": "uint"
+        },
+        {
+          "name": "event_mask",
+          "type": "int"
+        }
+      ]
+    },
+    {
+      "name": "XInternAtom",
+      "return_type": "uint",
+      "params": [
+        {
+          "name": "display",
+          "type": "ptr"
+        },
+        {
+          "name": "atom_name",
+          "type": "string"
+        },
+        {
+          "name": "only_if_exists",
+          "type": "short"
+        }
+      ]
+    },
+    {
+      "name": "XSetWMProtocols",
+      "return_type": "short",
+      "params": [
+        {
+          "name": "display",
+          "type": "ptr"
+        },
+        {
+          "name": "window",
+          "type": "uint"
+        },
+        {
+          "name": "protocols",
+          "type": "ptr"
+        },
+        {
+          "name": "count",
+          "type": "short"
+        }
+      ]
+    },
+    {
+      "name": "XMapWindow",
+      "return_type": "short",
+      "params": [
+        {
+          "name": "display",
+          "type": "ptr"
+        },
+        {
+          "name": "window",
+          "type": "uint"
+        }
+      ]
+    },
+    {
+      "name": "XDestroyWindow",
+      "return_type": "short",
+      "params": [
+        {
+          "name": "display",
+          "type": "ptr"
+        },
+        {
+          "name": "window",
+          "type": "uint"
+        }
+      ]
+    },
+    {
+      "name": "XPending",
+      "return_type": "short",
+      "params": [
+        {
+          "name": "display",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "XNextEvent",
+      "return_type": "short",
+      "params": [
+        {
+          "name": "display",
+          "type": "ptr"
+        },
+        {
+          "name": "event",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "XDefaultGC",
+      "return_type": "ptr",
+      "params": [
+        {
+          "name": "display",
+          "type": "ptr"
+        },
+        {
+          "name": "screen",
+          "type": "short"
+        }
+      ]
+    },
+    {
+      "name": "XSetForeground",
+      "return_type": "short",
+      "params": [
+        {
+          "name": "display",
+          "type": "ptr"
+        },
+        {
+          "name": "gc",
+          "type": "ptr"
+        },
+        {
+          "name": "foreground",
+          "type": "uint"
+        }
+      ]
+    },
+    {
+      "name": "XFillRectangle",
+      "return_type": "short",
+      "params": [
+        {
+          "name": "display",
+          "type": "ptr"
+        },
+        {
+          "name": "drawable",
+          "type": "uint"
+        },
+        {
+          "name": "gc",
+          "type": "ptr"
+        },
+        {
+          "name": "x",
+          "type": "short"
+        },
+        {
+          "name": "y",
+          "type": "short"
+        },
+        {
+          "name": "width",
+          "type": "ushort"
+        },
+        {
+          "name": "height",
+          "type": "ushort"
+        }
+      ]
+    },
+    {
+      "name": "XDrawString",
+      "return_type": "short",
+      "params": [
+        {
+          "name": "display",
+          "type": "ptr"
+        },
+        {
+          "name": "drawable",
+          "type": "uint"
+        },
+        {
+          "name": "gc",
+          "type": "ptr"
+        },
+        {
+          "name": "x",
+          "type": "short"
+        },
+        {
+          "name": "y",
+          "type": "short"
+        },
+        {
+          "name": "text",
+          "type": "string"
+        },
+        {
+          "name": "length",
+          "type": "short"
+        }
+      ]
+    },
+    {
+      "name": "XFlush",
+      "return_type": "short",
+      "params": [
+        {
+          "name": "display",
+          "type": "ptr"
+        }
+      ]
+    },
+    {
+      "name": "XCloseDisplay",
+      "return_type": "short",
+      "params": [
+        {
+          "name": "display",
+          "type": "ptr"
+        }
+      ]
+    }
+  ]
+}

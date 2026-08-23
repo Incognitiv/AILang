@@ -1,0 +1,209 @@
+@library("ui_effects")
+
+import stdlib.ui.platform
+import stdlib.ui.paint
+
+// Lightweight immediate-mode effects built on top of the platform paint ABI.
+// These helpers intentionally approximate effects with rect/text primitives so
+// they stay portable across Win32, X11, Wayland, and headless test backends.
+
+def ui_effect_clamp(value: int, min_value: int, max_value: int): int
+    if value < min_value then
+        return min_value
+    end
+    if value > max_value then
+        return max_value
+    end
+    return value
+end
+
+
+def ui_effect_blend(base: int, overlay: int, amount: int): int
+    alpha = ui_effect_clamp(amount, 0, 1000)
+    return ui_paint_lerp_color(base, overlay, alpha, 1000)
+end
+
+
+def ui_effect_corner_inset(pos: int, radius: int): int
+    if radius <= 1 then
+        return 0
+    end
+    p = pos
+    if p < 0 then
+        p = 0
+    end
+    if p >= radius then
+        p = radius - 1
+    end
+
+    // A cheap circular-corner approximation tuned for UI chrome, not geometry.
+    distance = radius - p
+    inset = (distance * distance) / (radius * 2)
+    if inset < 0 then
+        return 0
+    end
+    if inset > radius then
+        return radius
+    end
+    return inset
+end
+
+
+def ui_effect_rounded_rect(
+    window: int,
+    x: int,
+    y: int,
+    width: int,
+    height: int,
+    radius: int,
+    color: int
+): void
+    if width <= 0 or height <= 0 then
+        return
+    end
+    r = radius
+    if r < 1 then
+        ail_ui_draw_rect(window, x, y, width, height, color)
+        return
+    end
+    if r * 2 > width then
+        r = width / 2
+    end
+    if r * 2 > height then
+        r = height / 2
+    end
+    if r < 1 then
+        ail_ui_draw_rect(window, x, y, width, height, color)
+        return
+    end
+
+    if height - (r * 2) > 0 then
+        ail_ui_draw_rect(window, x, y + r, width, height - (r * 2), color)
+    end
+
+    yy = 0
+    while yy < r then
+        inset = ui_effect_corner_inset(yy, r)
+        line_w = width - (inset * 2)
+        if line_w > 0 then
+            ail_ui_draw_rect(window, x + inset, y + yy, line_w, 1, color)
+            ail_ui_draw_rect(window, x + inset, y + height - yy - 1, line_w, 1, color)
+        end
+        yy = yy + 1
+    end
+end
+
+
+def ui_effect_rounded_box(
+    window: int,
+    x: int,
+    y: int,
+    width: int,
+    height: int,
+    radius: int,
+    fill_color: int,
+    border_color: int,
+    border_width: int
+): void
+    if width <= 0 or height <= 0 then
+        return
+    end
+    bw = border_width
+    if bw < 0 then
+        bw = 0
+    end
+    if bw > 0 then
+        ui_effect_rounded_rect(window, x, y, width, height, radius, border_color)
+    end
+    inner_w = width - (bw * 2)
+    inner_h = height - (bw * 2)
+    if inner_w <= 0 or inner_h <= 0 then
+        return
+    end
+    inner_r = radius - bw
+    if inner_r < 0 then
+        inner_r = 0
+    end
+    ui_effect_rounded_rect(window, x + bw, y + bw, inner_w, inner_h, inner_r, fill_color)
+end
+
+
+def ui_effect_soft_shadow(
+    window: int,
+    x: int,
+    y: int,
+    width: int,
+    height: int,
+    radius: int,
+    offset_x: int,
+    offset_y: int,
+    spread: int,
+    shadow_color: int,
+    backdrop_color: int,
+    amount: int
+): void
+    if width <= 0 or height <= 0 then
+        return
+    end
+    max_spread = spread
+    if max_spread < 1 then
+        max_spread = 1
+    end
+    if max_spread > 12 then
+        max_spread = 12
+    end
+
+    layer = max_spread
+    while layer > 0 then
+        alpha = (amount * layer) / (max_spread * 2)
+        color = ui_effect_blend(backdrop_color, shadow_color, alpha)
+        ui_effect_rounded_rect(
+            window,
+            x + offset_x - layer,
+            y + offset_y - layer,
+            width + (layer * 2),
+            height + (layer * 2),
+            radius + layer,
+            color
+        )
+        layer = layer - 1
+    end
+end
+
+
+def ui_effect_fake_glass_panel(
+    window: int,
+    x: int,
+    y: int,
+    width: int,
+    height: int,
+    radius: int,
+    backdrop_color: int,
+    base_color: int,
+    accent_color: int,
+    amount: int
+): void
+    fill = ui_effect_blend(backdrop_color, base_color, amount)
+    border = ui_effect_blend(fill, accent_color, 420)
+    highlight = ui_effect_blend(fill, 0xffffff, 140)
+    ui_effect_rounded_box(window, x, y, width, height, radius, fill, border, 1)
+    if height > 4 then
+        ui_effect_rounded_rect(window, x + 1, y + 1, width - 2, height / 3, radius, highlight)
+    end
+end
+
+
+def ui_effect_text_shadow(
+    window: int,
+    x: int,
+    y: int,
+    size_px: int,
+    weight: int,
+    color: int,
+    shadow_color: int,
+    font_name: string,
+    text: string
+): void
+    ail_ui_draw_text_font(window, x + 1, y + 1, size_px, weight, shadow_color, font_name, text)
+    ail_ui_draw_text_font(window, x, y, size_px, weight, color, font_name, text)
+end

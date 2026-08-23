@@ -1,0 +1,121 @@
+@library("qml_bridge")
+
+// Optional rich UI bridge.
+//
+// The pure AILang backend remains the recovery/fallback path. This bridge is
+// intentionally process-based for now: AILang owns the entrypoint and argv
+// contract, while a QML runner owns rich rendering, font shaping, animation,
+// and compositor-specific behavior.
+
+const int QML_BRIDGE_OK = 0
+const int QML_BRIDGE_RUNNER_NOT_FOUND = 127
+
+
+string qml_bridge_default_scene():
+    return "examples/ui/qml/ailang_qml_smoke.qml"
+end
+
+
+string qml_bridge_scene_from_env():
+    if strlen(getenv("AILANG_QML_SCENE")) > 0 then
+        return getenv("AILANG_QML_SCENE")
+    end
+    return qml_bridge_default_scene()
+end
+
+
+string qml_bridge_runner_from_env():
+    return getenv("AILANG_QML_RUNNER")
+end
+
+
+string qml_bridge_app_from_env():
+    return getenv("AILANG_QML_APP")
+end
+
+
+int qml_bridge_run_app(app: string):
+    args = str_array_new(1)
+    args = str_array_push(args, app)
+    rc = process_run_argv(args)
+    dealloc_str_array(args)
+    return rc
+end
+
+
+int qml_bridge_run_with_runner(runner: string, scene: string):
+    args = str_array_new(2)
+    args = str_array_push(args, runner)
+    args = str_array_push(args, scene)
+    rc = process_run_argv(args)
+    dealloc_str_array(args)
+    return rc
+end
+
+
+int qml_bridge_try_runner(runner: string, scene: string):
+    if strlen(runner) <= 0 then
+        return QML_BRIDGE_RUNNER_NOT_FOUND
+    end
+    return qml_bridge_run_with_runner(runner, scene)
+end
+
+
+int qml_bridge_run_file(scene: string):
+    preferred = qml_bridge_runner_from_env()
+    if strlen(preferred) > 0 then
+        return qml_bridge_try_runner(preferred, scene)
+    end
+
+    rc = qml_bridge_try_runner("qml6", scene)
+    if rc != QML_BRIDGE_RUNNER_NOT_FOUND then
+        return rc
+    end
+
+    rc = qml_bridge_try_runner("qmlscene6", scene)
+    if rc != QML_BRIDGE_RUNNER_NOT_FOUND then
+        return rc
+    end
+
+    rc = qml_bridge_try_runner("qml", scene)
+    if rc != QML_BRIDGE_RUNNER_NOT_FOUND then
+        return rc
+    end
+
+    rc = qml_bridge_try_runner("qmlscene", scene)
+    if rc != QML_BRIDGE_RUNNER_NOT_FOUND then
+        return rc
+    end
+
+    comptime if target_os() == "windows" then
+        rc = qml_bridge_try_runner("qml6.exe", scene)
+        if rc != QML_BRIDGE_RUNNER_NOT_FOUND then
+            return rc
+        end
+
+        rc = qml_bridge_try_runner("qmlscene6.exe", scene)
+        if rc != QML_BRIDGE_RUNNER_NOT_FOUND then
+            return rc
+        end
+
+        rc = qml_bridge_try_runner("qml.exe", scene)
+        if rc != QML_BRIDGE_RUNNER_NOT_FOUND then
+            return rc
+        end
+
+        rc = qml_bridge_try_runner("qmlscene.exe", scene)
+        if rc != QML_BRIDGE_RUNNER_NOT_FOUND then
+            return rc
+        end
+    end
+
+    return QML_BRIDGE_RUNNER_NOT_FOUND
+end
+
+
+int qml_bridge_run_default():
+    if strlen(qml_bridge_app_from_env()) > 0 then
+        return qml_bridge_run_app(qml_bridge_app_from_env())
+    end
+    return qml_bridge_run_file(qml_bridge_scene_from_env())
+end

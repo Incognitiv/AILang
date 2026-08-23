@@ -1,0 +1,342 @@
+// Pure AILang X11 backend proof.
+// This is intentionally a small no-shim proof, not the full desktop backend.
+
+#cimport x11 "x11_pure.cbind.json"
+
+const int AIL_UI_PLATFORM_LINUX = 2
+
+const int AIL_UI_EVENT_NONE = 0
+const int AIL_UI_EVENT_CLOSE = 1
+const int AIL_UI_EVENT_RESIZE = 2
+const int AIL_UI_EVENT_MOUSE_MOVE = 3
+const int AIL_UI_EVENT_MOUSE_DOWN = 4
+const int AIL_UI_EVENT_MOUSE_UP = 5
+const int AIL_UI_EVENT_KEY_DOWN = 6
+const int AIL_UI_EVENT_KEY_UP = 7
+
+static int g_x11_display = 0
+static int g_x11_window = 0
+static int g_x11_gc = 0
+static int g_x11_screen = 0
+static int g_x11_alive = 0
+static int g_x11_width_px = 0
+static int g_x11_height_px = 0
+static int g_x11_wm_delete = 0
+static int g_x11_pending_event = 0
+static int g_x11_event_x = 0
+static int g_x11_event_y = 0
+static int g_x11_event_key = 0
+static int g_x11_event_width_px = 0
+static int g_x11_event_height_px = 0
+
+def x11_set_pending_event(kind: int, x: int, y: int, key: int, width_px: int, height_px: int): void
+    g_x11_pending_event = kind
+    g_x11_event_x = x
+    g_x11_event_y = y
+    g_x11_event_key = key
+    g_x11_event_width_px = width_px
+    g_x11_event_height_px = height_px
+end
+
+def x11_color(color: int): int
+    out = color % 16777216
+    if out < 0 then
+        return out + 16777216
+    end
+    return out
+end
+
+def ail_ui_init(): int
+    g_x11_display = reinterpret(int, XOpenDisplay(0))
+    if g_x11_display == 0 then
+        return 0
+    end
+    g_x11_screen = XDefaultScreen(reinterpret(ptr, g_x11_display))
+    g_x11_gc = reinterpret(int, XDefaultGC(reinterpret(ptr, g_x11_display), g_x11_screen))
+    return 1
+end
+
+def ail_ui_shutdown(): void
+    if g_x11_display != 0 then
+        XCloseDisplay(reinterpret(ptr, g_x11_display))
+    end
+    g_x11_display = 0
+    g_x11_window = 0
+    g_x11_gc = 0
+    g_x11_alive = 0
+end
+
+def ail_ui_open_window(title: string, width: int, height: int): int
+    if g_x11_display == 0 then
+        if ail_ui_init() != 1 then
+            return 0
+        end
+    end
+
+    display = reinterpret(ptr, g_x11_display)
+    root = XRootWindow(display, g_x11_screen)
+    black = XBlackPixel(display, g_x11_screen)
+    white = XWhitePixel(display, g_x11_screen)
+    window = XCreateSimpleWindow(display, root, 0, 0, width, height, 0, black, white)
+    if window == 0 then
+        return 0
+    end
+
+    XStoreName(display, window, title)
+    mask = ExposureMask + StructureNotifyMask + PointerMotionMask
+    mask = mask + ButtonPressMask + ButtonReleaseMask + KeyPressMask + KeyReleaseMask
+    XSelectInput(display, window, mask)
+
+    g_x11_wm_delete = XInternAtom(display, "WM_DELETE_WINDOW", 0)
+    protocols = alloc(8)
+    poke64(protocols, 0, g_x11_wm_delete)
+    XSetWMProtocols(display, window, reinterpret(ptr, protocols), 1)
+    dealloc(protocols)
+
+    XMapWindow(display, window)
+    XFlush(display)
+
+    g_x11_window = window
+    g_x11_width_px = width
+    g_x11_height_px = height
+    g_x11_alive = 1
+    return window
+end
+
+def ail_ui_open_borderless_window(title: string, width: int, height: int): int
+    return ail_ui_open_window(title, width, height)
+end
+
+def ail_ui_close_window(window: int): void
+    if g_x11_display != 0 and window != 0 then
+        XDestroyWindow(reinterpret(ptr, g_x11_display), window)
+        XFlush(reinterpret(ptr, g_x11_display))
+    end
+    g_x11_alive = 0
+end
+
+def ail_ui_minimize_window(window: int): void
+    // X11 minimize needs an ICCCM/EWMH request; the proof backend keeps this
+    // as a no-op until those atoms are part of the binding spec.
+end
+
+def ail_ui_toggle_maximize_window(window: int): void
+    // X11 maximize/restore needs EWMH state changes; keep the ABI complete for
+    // now without pretending the window manager action exists.
+end
+
+def ail_ui_window_alive(window: int): int
+    return g_x11_alive
+end
+
+def ail_ui_platform(): int
+    return AIL_UI_PLATFORM_LINUX
+end
+
+def ail_ui_window_width_px(window: int): int
+    return g_x11_width_px
+end
+
+def ail_ui_window_height_px(window: int): int
+    return g_x11_height_px
+end
+
+def ail_ui_window_scale_milli(window: int): int
+    return 1000
+end
+
+def ail_ui_window_text_scale_milli(window: int): int
+    return 1000
+end
+
+def ail_ui_window_maximized(window: int): int
+    return 0
+end
+
+def ail_ui_poll_event(window: int): int
+    g_x11_pending_event = AIL_UI_EVENT_NONE
+    if g_x11_display == 0 then
+        return AIL_UI_EVENT_NONE
+    end
+    if XPending(reinterpret(ptr, g_x11_display)) <= 0 then
+        return AIL_UI_EVENT_NONE
+    end
+
+    event = alloc(SIZEOF_XEvent)
+    XNextEvent(reinterpret(ptr, g_x11_display), reinterpret(ptr, event))
+    kind = peek32(event, OFFSETOF_XEvent_type / 4)
+
+    if kind == ConfigureNotify then
+        g_x11_width_px = peek32(event, OFFSETOF_XConfigureEvent_width / 4)
+        g_x11_height_px = peek32(event, OFFSETOF_XConfigureEvent_height / 4)
+        x11_set_pending_event(AIL_UI_EVENT_RESIZE, 0, 0, 0, g_x11_width_px, g_x11_height_px)
+    end
+    if kind == MotionNotify then
+        x11_set_pending_event(
+            AIL_UI_EVENT_MOUSE_MOVE,
+            peek32(event, OFFSETOF_XMotionEvent_x / 4),
+            peek32(event, OFFSETOF_XMotionEvent_y / 4),
+            0,
+            0,
+            0
+        )
+    end
+    if kind == ButtonPress then
+        x11_set_pending_event(
+            AIL_UI_EVENT_MOUSE_DOWN,
+            peek32(event, OFFSETOF_XButtonEvent_x / 4),
+            peek32(event, OFFSETOF_XButtonEvent_y / 4),
+            peek32(event, OFFSETOF_XButtonEvent_button / 4),
+            0,
+            0
+        )
+    end
+    if kind == ButtonRelease then
+        x11_set_pending_event(
+            AIL_UI_EVENT_MOUSE_UP,
+            peek32(event, OFFSETOF_XButtonEvent_x / 4),
+            peek32(event, OFFSETOF_XButtonEvent_y / 4),
+            peek32(event, OFFSETOF_XButtonEvent_button / 4),
+            0,
+            0
+        )
+    end
+    if kind == KeyPress then
+        x11_set_pending_event(AIL_UI_EVENT_KEY_DOWN, 0, 0, peek32(event, OFFSETOF_XKeyEvent_keycode / 4), 0, 0)
+    end
+    if kind == KeyRelease then
+        x11_set_pending_event(AIL_UI_EVENT_KEY_UP, 0, 0, peek32(event, OFFSETOF_XKeyEvent_keycode / 4), 0, 0)
+    end
+    if kind == ClientMessage or kind == DestroyNotify then
+        g_x11_alive = 0
+        x11_set_pending_event(AIL_UI_EVENT_CLOSE, 0, 0, 0, 0, 0)
+    end
+
+    dealloc(event)
+    result = g_x11_pending_event
+    g_x11_pending_event = AIL_UI_EVENT_NONE
+    return result
+end
+
+def ail_ui_event_x(): int
+    return g_x11_event_x
+end
+
+def ail_ui_event_y(): int
+    return g_x11_event_y
+end
+
+def ail_ui_event_key(): int
+    return g_x11_event_key
+end
+
+def ail_ui_event_width_px(): int
+    return g_x11_event_width_px
+end
+
+def ail_ui_event_height_px(): int
+    return g_x11_event_height_px
+end
+
+def ail_ui_begin_frame(window: int, color: int): void
+    ail_ui_draw_rect(window, 0, 0, g_x11_width_px, g_x11_height_px, color)
+end
+
+def ail_ui_draw_rect(window: int, x: int, y: int, width: int, height: int, color: int): void
+    if g_x11_display == 0 or window == 0 then
+        return
+    end
+    XSetForeground(reinterpret(ptr, g_x11_display), reinterpret(ptr, g_x11_gc), x11_color(color))
+    XFillRectangle(reinterpret(ptr, g_x11_display), window, reinterpret(ptr, g_x11_gc), x, y, width, height)
+end
+
+def ail_ui_draw_text(window: int, x: int, y: int, scale: int, color: int, text: string): void
+    if g_x11_display == 0 or window == 0 then
+        return
+    end
+    XSetForeground(reinterpret(ptr, g_x11_display), reinterpret(ptr, g_x11_gc), x11_color(color))
+    XDrawString(reinterpret(ptr, g_x11_display), window, reinterpret(ptr, g_x11_gc), x, y + 14, text, strlen(text))
+end
+
+def ail_ui_draw_text_style(
+    window: int,
+    x: int,
+    y: int,
+    size_px: int,
+    weight: int,
+    color: int,
+    text: string
+): void
+    if g_x11_display == 0 or window == 0 then
+        return
+    end
+    if size_px <= 0 then
+        size_px = 14
+    end
+    XSetForeground(reinterpret(ptr, g_x11_display), reinterpret(ptr, g_x11_gc), x11_color(color))
+    XDrawString(reinterpret(ptr, g_x11_display), window, reinterpret(ptr, g_x11_gc), x, y + size_px, text, strlen(text))
+end
+
+
+def ail_ui_set_font(font_name: string): void
+    // The minimal X11 backend keeps using the current GC font.
+end
+
+
+def ail_ui_draw_text_font(
+    window: int,
+    x: int,
+    y: int,
+    size_px: int,
+    weight: int,
+    color: int,
+    font_name: string,
+    text: string
+): void
+    // The minimal X11 path uses the current GC font; preserve the ABI and size.
+    ail_ui_draw_text_style(window, x, y, size_px, weight, color, text)
+end
+
+def ail_ui_set_clip(window: int, x: int, y: int, width: int, height: int): void
+end
+
+def ail_ui_clear_clip(window: int): void
+end
+
+def ail_ui_end_frame(window: int): void
+    if g_x11_display != 0 then
+        XFlush(reinterpret(ptr, g_x11_display))
+    end
+end
+
+def ail_ui_sleep_ms(ms: int): void
+    if ms > 0 then
+        sleep(ms / 1000)
+    end
+end
+
+def ail_ui_wait_event_ms(ms: int): void
+    ail_ui_sleep_ms(ms)
+end
+
+def x11_pure_smoke(): int
+    if ail_ui_init() != 1 then
+        return 1
+    end
+    window = ail_ui_open_window("AILang pure X11", 640, 360)
+    if window == 0 then
+        ail_ui_shutdown()
+        return 2
+    end
+    ail_ui_begin_frame(window, 15791611)
+    ail_ui_draw_rect(window, 48, 48, 220, 72, 3385907)
+    ail_ui_draw_text(window, 64, 72, 1, 16777215, "AILang pure X11")
+    ail_ui_end_frame(window)
+    ail_ui_close_window(window)
+    ail_ui_shutdown()
+    return 0
+end
+
+def main(): int
+    return x11_pure_smoke()
+end
