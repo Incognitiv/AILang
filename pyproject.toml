@@ -46,6 +46,12 @@ profile = "black"
 line-length = 88
 target-version = ["py311"]
 
+# Golden Gate must not inherit Ruff's evolving default rule set.  Formatting,
+# import ordering, typing, security and deeper structural checks are enforced
+# independently by Black, isort, mypy, pyflakes, Bandit and AILang's verifier.
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 norecursedirs = [
