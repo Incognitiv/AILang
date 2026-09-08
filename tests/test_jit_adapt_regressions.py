@@ -89,3 +89,21 @@ end
     assert proc.returncode == 0, combined
     assert "fatal exception" not in combined.lower()
     assert "3:what" in proc.stdout
+
+
+def test_jit_cli_propagates_program_exit_code(tmp_path: Path) -> None:
+    proc = _run_jit(
+        tmp_path,
+        "nonzero_exit.ail",
+        """\
+int main():
+    print "intentional failure"
+    return 4
+end
+""",
+    )
+
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode == 4, combined
+    assert "Program exited with code: 4" in combined
+    assert "intentional failure" in proc.stdout

@@ -729,7 +729,7 @@ def main():
                         print(f"JIT repeat failed: {result['note']}")
                     sys.exit(1)
             else:
-                fast_jit_file(
+                result = fast_jit_file(
                     source_file,
                     optimize=True,
                     jit_opt=jit_opt_level,
@@ -738,7 +738,11 @@ def main():
                     sample_hz=sample_hz,
                     dump_ir_path=jit_dump_ir_path,
                 )
-            # fast_jit_file already prints the inner program's exit code.
+                # Match AOT/native process semantics: the CLI process must
+                # propagate main()'s exit status to its caller. Printing the
+                # inner code while always exiting 0 made failing JIT programs
+                # look successful to shells, CI, and integration harnesses.
+                sys.exit(result)
             sys.exit(0)
         except (OSError, RuntimeError, ValueError) as e:
 

@@ -122,7 +122,13 @@ def _walk_nodes(value: Any):
             yield from _walk_nodes(item)
 
 
-def _collect_env(fn: A.Function, class_name: str | None) -> dict[str, str]:
+def _collect_env(
+    fn: A.Function,
+    class_name: str | None,
+    fn_returns: dict[str, str],
+    class_fields: dict[str, dict[str, str]],
+    class_methods: dict[tuple[str, str], str],
+) -> dict[str, str]:
     env = {p[0]: _canon(p[1]) for p in fn.params}
     if class_name:
         env["this"] = class_name
@@ -161,6 +167,15 @@ def _collect_env(fn: A.Function, class_name: str | None) -> dict[str, str]:
                 inferred = _canon(value.target_type)
             elif isinstance(value, A.NewExpr):
                 inferred = value.type_name
+            else:
+                inferred = _expr_type(
+                    value,
+                    env,
+                    fn_returns,
+                    class_fields,
+                    class_methods,
+                    class_name,
+                )
             if inferred:
                 env[node.var_name] = inferred
                 changed = True
@@ -366,7 +381,9 @@ def infer_unannotated_return_types(program: list[A.ASTNode]) -> None:
                     f"Cannot infer return type for function '{fn.name}': it mixes value returns with bare return"
                 )
             else:
-                env = _collect_env(fn, cls)
+                env = _collect_env(
+                    fn, cls, fn_returns, class_fields, class_methods
+                )
                 inferred = ""
                 unresolved = False
                 for ret in valued:

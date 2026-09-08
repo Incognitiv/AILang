@@ -188,6 +188,37 @@ end
     assert functions["joined"].return_type == "i16"
 
 
+def test_unannotated_def_inference_tracks_typed_call_assignments_and_fields() -> None:
+    src = """
+class Packet:
+    public int error = 0
+end
+
+def make_packet(): Packet
+    return new Packet()
+end
+
+def validate(): int
+    return 0
+end
+
+def main():
+    packet = make_packet()
+    if packet.error != 0 then
+        return packet.error
+    end
+    rc = validate()
+    if rc != 0 then
+        return rc
+    end
+    return 0
+end
+"""
+    nodes = Parser(tokenize(src)).parse_program()
+    functions = {n.name: n for n in nodes if isinstance(n, A.Function)}
+    assert functions["main"].return_type == "i64"
+
+
 def test_unannotated_def_inference_resolves_forward_calls_and_methods() -> None:
     src = """
 def outer():
