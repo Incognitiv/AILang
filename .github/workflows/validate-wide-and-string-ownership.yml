@@ -12,26 +12,53 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
         with:
           ref: agent/unbounded-field-semantics
           fetch-depth: 0
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
       - name: Install test toolchains
         run: |
+          set -euxo pipefail
           sudo apt-get update -qq
           sudo apt-get install -y -qq clang gcc llvm libsqlite3-dev
           python -m pip install -e '.[dev,llvm]'
-      - name: Apply ownership candidate
+
+      - name: Apply proven compiler repairs
         run: |
           set -euxo pipefail
           python - <<'PY'
           from pathlib import Path
 
+          # C parser canonical bool spelling: bool is normalized to i1.
+          p = Path('source/transpiler/core_type_lowering.py')
+          s = p.read_text(encoding='utf-8')
+          old = '            "bool": "bool",\n            "string": "const char *",\n'
+          new = '            "bool": "bool",\n            "i1": "bool",  # parser canonical spelling for AILang bool\n            "string": "const char *",\n'
+          if old not in s:
+              raise SystemExit('bool type-map anchor missing')
+          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+
+          # Heavy pure-AIL BigInt translation units can legitimately exceed
+          # the old 60 s native-C subprocess ceiling on slower hosts.
+          p = Path('source/cli/compilation.py')
+          s = p.read_text(encoding='utf-8')
+          old = 'CBACKEND_COMPILE_TIMEOUT_SECONDS = 60\n'
+          if old not in s:
+              raise SystemExit('C backend timeout anchor missing')
+          p.write_text(
+              s.replace(old, 'CBACKEND_COMPILE_TIMEOUT_SECONDS = 180\n', 1),
+              encoding='utf-8',
+          )
+
+          # Keep length-only string analysis and C emission on the same
+          # function-local type facts.
           p = Path('source/transpiler/strlen_assign_cache.py')
           s = p.read_text(encoding='utf-8')
           anchor = 'def strlen_cache_var_name(var_name: str) -> str:\n    return f"__ailang_strlen_{var_name}"\n\n\n'
@@ -39,15 +66,30 @@ jobs:
           if anchor not in s:
               raise SystemExit('strlen type-map insertion anchor missing')
           s = s.replace(anchor, insert, 1)
-          s = s.replace('    value_arg = str_known_integer_arg(emitter, value)\n', '    type_map = _emission_type_map(emitter)\n    value_arg = str_known_integer_arg(emitter, value, type_map)\n', 1)
-          s = s.replace('    base_arg = baseconv_known_integer_arg(emitter, value)\n', '    base_arg = baseconv_known_integer_arg(emitter, value, type_map)\n', 1)
-          s = s.replace('    if interpolation_known_length(emitter, value, getattr(emitter, "_var_types", {})):\n', '    if interpolation_known_length(emitter, value, type_map):\n', 1)
+          s = s.replace(
+              '    value_arg = str_known_integer_arg(emitter, value)\n',
+              '    type_map = _emission_type_map(emitter)\n    value_arg = str_known_integer_arg(emitter, value, type_map)\n',
+              1,
+          )
+          s = s.replace(
+              '    base_arg = baseconv_known_integer_arg(emitter, value)\n',
+              '    base_arg = baseconv_known_integer_arg(emitter, value, type_map)\n',
+              1,
+          )
+          s = s.replace(
+              '    if interpolation_known_length(emitter, value, getattr(emitter, "_var_types", {})):\n',
+              '    if interpolation_known_length(emitter, value, type_map):\n',
+              1,
+          )
           old = '''    return is_length_only_string_producer(\n        emitter, value, getattr(emitter, "_var_types", {})\n    )\n'''
           new = '''    return is_length_only_string_producer(\n        emitter, value, _emission_type_map(emitter)\n    )\n'''
           if old not in s:
               raise SystemExit('length-only emission anchor missing')
           p.write_text(s.replace(old, new, 1), encoding='utf-8')
 
+          # Hidden string lengths must use allocation-free numeric
+          # scalarization before the generic dynamic-length planner. Also
+          # recognize the lowered C spellings stored in local type tables.
           p = Path('source/transpiler/expr_gen.py')
           s = p.read_text(encoding='utf-8')
           old = '''        dynamic_len = emit_dynamic_strlen_c(self, node)\n        if dynamic_len is not None:\n            return dynamic_len\n        virtual_len = self._emit_virtual_strlen(node)\n        if virtual_len is not None:\n            return virtual_len\n'''
@@ -67,21 +109,95 @@ jobs:
           if old not in s:
               raise SystemExit('integer type-name set anchor missing')
           p.write_text(s.replace(old, new, 1), encoding='utf-8')
+
+          # The branch now has real arbitrary-precision runtime support on
+          # both native backends; old rejection tests describe a stale contract.
+          t = Path('tests/test_c_wide_ints.py')
+          text = t.read_text(encoding='utf-8')
+          start = text.index('def test_c_backend_rejects_unbounded_instead_of_silent_i64_truncation():')
+          end = text.index('\ndef test_c_backend_wide_decimal_and_base_formatting_do_not_truncate():', start)
+          replacement = '\n'.join([
+              'def test_c_backend_unbounded_preserves_arbitrary_precision():',
+              '    source = r"""',
+              'def main(): int',
+              '    unbounded x = 1267650600228229401496703205376',
+              '    unbounded y = 7',
+              '    unbounded z = x + y',
+              '    print z',
+              '    return 0',
+              'end',
+              '"""',
+              '    _build, run = _compile_and_run(source)',
+              '    assert run.returncode == 0, run.stdout + "\\n" + run.stderr',
+              '    assert run.stdout.strip() == "1267650600228229401496703205383"',
+              '',
+          ])
+          t.write_text(text[:start] + replacement + text[end:], encoding='utf-8')
+
+          t = Path('tests/test_llvm_wide_ints.py')
+          text = t.read_text(encoding='utf-8')
+          start = text.index('def test_llvm_backend_rejects_unbounded_instead_of_pointer_placeholder() -> None:')
+          end = text.index('\ndef _compile_and_run_llvm(', start)
+          replacement = '\n'.join([
+              'def test_llvm_backend_unbounded_preserves_arbitrary_precision() -> None:',
+              '    source = """',
+              'def main(): int',
+              '    unbounded x = 1267650600228229401496703205376',
+              '    unbounded y = 7',
+              '    unbounded z = x + y',
+              '    print z',
+              '    return 0',
+              'end',
+              '"""',
+              '    run = _compile_and_run_llvm(source)',
+              '    assert run.returncode == 0, run.stdout + "\\n" + run.stderr',
+              '    assert run.stdout.strip() == "1267650600228229401496703205383"',
+              '',
+          ])
+          t.write_text(text[:start] + replacement + text[end:], encoding='utf-8')
           PY
-          python -m py_compile source/transpiler/strlen_assign_cache.py source/transpiler/expr_gen.py
-      - name: Target class-loop ownership regression
+          python -m py_compile \
+            source/transpiler/core_type_lowering.py \
+            source/cli/compilation.py \
+            source/transpiler/strlen_assign_cache.py \
+            source/transpiler/expr_gen.py \
+            tests/test_c_wide_ints.py \
+            tests/test_llvm_wide_ints.py
+          git diff --check
+
+      - name: C fixed wide and unbounded integers
         run: |
           set -euxo pipefail
-          set +e
-          pytest -q tests/test_c_string_ownership.py::test_c_backend_cleans_redeclared_class_local_in_loop
-          rc=$?
-          set -e
-          f="$(ls -t out/generated/c_backend/loop_redecl_class_*.c | head -1)"
-          grep -n 'Packet_init(&__ailang_stack_p' "$f" || true
-          grep -n -E 'ailang_int_to_str\(i\)|ailang_i64_decimal_len\(i\)' "$f" | tail -n 40 || true
-          if grep -q 'ailang_strlen(ailang_int_to_str(i))' "$f"; then
-            echo 'hidden length still allocates str(i)' >&2
-            exit 1
-          fi
-          grep -q 'ailang_i64_decimal_len(i)' "$f"
-          exit "$rc"
+          pytest -q tests/test_c_wide_ints.py
+
+      - name: LLVM fixed wide and unbounded integers
+        run: |
+          set -euxo pipefail
+          pytest -q tests/test_llvm_wide_ints.py
+
+      - name: C string ownership
+        run: |
+          set -euxo pipefail
+          pytest -q tests/test_c_string_ownership.py
+
+      - name: String-length optimization regressions
+        run: |
+          set -euxo pipefail
+          pytest -q tests/test_format_strlen_budget.py
+
+      - name: Representation integrity regression
+        run: |
+          set -euxo pipefail
+          pytest -q tests/test_fixed_wide_representation_integrity.py
+
+      - name: Commit repairs and self-remove validation workflow
+        run: |
+          set -euxo pipefail
+          rm .github/workflows/validate-wide-and-string-ownership.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git status --short
+          git commit -m 'Repair integer and string ownership semantics'
+          git push origin HEAD:agent/unbounded-field-semantics
