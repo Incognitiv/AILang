@@ -1,53 +1,51 @@
-name: Capture range-facts import traceback
+name: Verify staged 750-line refactor repairs
 
 on:
   push:
     branches: ["agent/unbounded-field-semantics"]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  capture-import-traceback:
-    if: github.event.head_commit.message == 'Capture range facts import traceback'
+  verify-refactor-repairs:
+    if: github.event.head_commit.message == 'Repair emit statements split binding'
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
           ref: agent/unbounded-field-semantics
-          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install AILang
+      - name: Install AILang and verification dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -e ".[dev,llvm]"
 
-      - name: Capture backend import traceback
+      - name: Instantiate backends
         shell: bash
         run: |
-          set +e
-          PYTHONPATH=source python - <<'PY' > .golden-upload/range-facts-import-probe.txt 2>&1
+          set -euo pipefail
+          PYTHONPATH=source python - <<'PY'
           from transpiler.core import CTranspiler
           from codegen.fast_jit import fast_jit_file
           CTranspiler()
           assert callable(fast_jit_file)
           print('backend import graph: PASS')
           PY
-          rc=$?
-          echo "import_probe_rc=${rc}" >> .golden-upload/range-facts-import-probe.txt
-          exit 0
 
-      - name: Commit traceback
-        shell: bash
+      - name: Verify C string ownership
+        run: python -m pytest -q tests/test_c_string_ownership.py
+
+      - name: Verify C string ownership optimizations
+        run: python -m pytest -q tests/test_c_string_ownership_optimizations.py
+
+      - name: Verify complexity and repository hygiene
         run: |
-          set -euo pipefail
-          git config user.name "AILang Golden Gate"
-          git config user.email "actions@users.noreply.github.com"
-          git add .golden-upload/range-facts-import-probe.txt
-          git commit -m "Capture range facts import failure"
-          git push origin HEAD:agent/unbounded-field-semantics
+          python -m pytest -q tests/test_complexity_guard.py
+          python tools/repository_hygiene_audit.py
+          python -m pytest -q tests/test_repository_hygiene_audit.py
