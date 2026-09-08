@@ -207,7 +207,7 @@ def _cleanup_current_loop_stack_class_locals(self) -> None:
     cleanup_stack = getattr(self.codegen, "_loop_stack_class_cleanup", [])
     if not cleanup_stack:
         return
-    from .emit_statements_control_data import _emit_stack_class_cleanup
+    from .emit_statements_cleanup import _emit_stack_class_cleanup
 
     for var_name in reversed(cleanup_stack[-1]):
         _emit_stack_class_cleanup(self, var_name)
@@ -217,7 +217,7 @@ def _cleanup_all_stack_class_locals(self, skip_names: set[str] | None = None) ->
     plans = getattr(self.codegen, "_stack_class_cleanup_plans", {})
     if not plans:
         return
-    from .emit_statements_control_data import _emit_stack_class_cleanup
+    from .emit_statements_cleanup import _emit_stack_class_cleanup
 
     skip_names = skip_names or set()
     for var_name in reversed(list(plans)):
