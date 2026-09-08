@@ -30,7 +30,7 @@ jobs:
           sudo apt-get install -y -qq clang gcc llvm libsqlite3-dev
           python -m pip install -e '.[dev,llvm]'
 
-      - name: Repair focused compiler contracts
+      - name: Apply candidate repairs
         run: |
           set -euxo pipefail
           python - <<'PY'
@@ -47,10 +47,9 @@ jobs:
           p = Path('source/cli/compilation.py')
           s = p.read_text(encoding='utf-8')
           old = 'CBACKEND_COMPILE_TIMEOUT_SECONDS = 60\n'
-          new = 'CBACKEND_COMPILE_TIMEOUT_SECONDS = 180\n'
           if old not in s:
               raise SystemExit('C backend timeout anchor missing')
-          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+          p.write_text(s.replace(old, 'CBACKEND_COMPILE_TIMEOUT_SECONDS = 180\n', 1), encoding='utf-8')
 
           p = Path('source/transpiler/strlen_assign_cache.py')
           s = p.read_text(encoding='utf-8')
@@ -59,109 +58,55 @@ jobs:
           if anchor not in s:
               raise SystemExit('strlen type-map insertion anchor missing')
           s = s.replace(anchor, insert, 1)
-          s = s.replace(
-              '    value_arg = str_known_integer_arg(emitter, value)\n',
-              '    type_map = _emission_type_map(emitter)\n    value_arg = str_known_integer_arg(emitter, value, type_map)\n',
-              1,
-          )
-          s = s.replace(
-              '    base_arg = baseconv_known_integer_arg(emitter, value)\n',
-              '    base_arg = baseconv_known_integer_arg(emitter, value, type_map)\n',
-              1,
-          )
-          s = s.replace(
-              '    if interpolation_known_length(emitter, value, getattr(emitter, "_var_types", {})):\n',
-              '    if interpolation_known_length(emitter, value, type_map):\n',
-              1,
-          )
+          s = s.replace('    value_arg = str_known_integer_arg(emitter, value)\n', '    type_map = _emission_type_map(emitter)\n    value_arg = str_known_integer_arg(emitter, value, type_map)\n', 1)
+          s = s.replace('    base_arg = baseconv_known_integer_arg(emitter, value)\n', '    base_arg = baseconv_known_integer_arg(emitter, value, type_map)\n', 1)
+          s = s.replace('    if interpolation_known_length(emitter, value, getattr(emitter, "_var_types", {})):\n', '    if interpolation_known_length(emitter, value, type_map):\n', 1)
           old = '''    return is_length_only_string_producer(\n        emitter, value, getattr(emitter, "_var_types", {})\n    )\n'''
           new = '''    return is_length_only_string_producer(\n        emitter, value, _emission_type_map(emitter)\n    )\n'''
           if old not in s:
               raise SystemExit('length-only emission anchor missing')
-          s = s.replace(old, new, 1)
-          p.write_text(s, encoding='utf-8')
+          p.write_text(s.replace(old, new, 1), encoding='utf-8')
 
           p = Path('source/transpiler/drop_plan.py')
           s = p.read_text(encoding='utf-8')
           old = '''    if coerced == DropKind.OWNED_STRING:\n        checker = is_owned_string_alloc or _default_owned_string_alloc\n        return bool(checker(expr))\n'''
-          new = '''    if coerced == DropKind.OWNED_STRING:\n        # In a string-typed ownership context, binary + is the language string\n        # concatenation operator and therefore materializes fresh storage. Do\n        # not make transfer ownership depend on a secondary type-info lookup:\n        # constructor lowering already knows the target parameter/field is a\n        # string, and stale function-scope type facts must not turn an owning\n        # value into a borrowed one.\n        if isinstance(expr, A.BinaryOp) and expr.op.lower() in {"+", "plus"}:\n            return True\n        checker = is_owned_string_alloc or _default_owned_string_alloc\n        return bool(checker(expr))\n'''
+          new = '''    if coerced == DropKind.OWNED_STRING:\n        if isinstance(expr, A.BinaryOp) and expr.op.lower() in {"+", "plus"}:\n            return True\n        checker = is_owned_string_alloc or _default_owned_string_alloc\n        return bool(checker(expr))\n'''
           if old not in s:
               raise SystemExit('owned string drop-plan anchor missing')
           p.write_text(s.replace(old, new, 1), encoding='utf-8')
-
-          t = Path('tests/test_c_wide_ints.py')
-          text = t.read_text(encoding='utf-8')
-          start = text.index('def test_c_backend_rejects_unbounded_instead_of_silent_i64_truncation():')
-          end = text.index('\ndef test_c_backend_wide_decimal_and_base_formatting_do_not_truncate():', start)
-          replacement = '\n'.join([
-              'def test_c_backend_unbounded_preserves_arbitrary_precision():',
-              '    source = r"""',
-              'def main(): int',
-              '    unbounded x = 1267650600228229401496703205376',
-              '    unbounded y = 7',
-              '    unbounded z = x + y',
-              '    print z',
-              '    return 0',
-              'end',
-              '"""',
-              '    _build, run = _compile_and_run(source)',
-              '    assert run.returncode == 0, run.stdout + "\\n" + run.stderr',
-              '    assert run.stdout.strip() == "1267650600228229401496703205383"',
-              '',
-          ])
-          t.write_text(text[:start] + replacement + text[end:], encoding='utf-8')
-
-          t = Path('tests/test_llvm_wide_ints.py')
-          text = t.read_text(encoding='utf-8')
-          start = text.index('def test_llvm_backend_rejects_unbounded_instead_of_pointer_placeholder() -> None:')
-          end = text.index('\ndef _compile_and_run_llvm(', start)
-          replacement = '\n'.join([
-              'def test_llvm_backend_unbounded_preserves_arbitrary_precision() -> None:',
-              '    source = """',
-              'def main(): int',
-              '    unbounded x = 1267650600228229401496703205376',
-              '    unbounded y = 7',
-              '    unbounded z = x + y',
-              '    print z',
-              '    return 0',
-              'end',
-              '"""',
-              '    run = _compile_and_run_llvm(source)',
-              '    assert run.returncode == 0, run.stdout + "\\n" + run.stderr',
-              '    assert run.stdout.strip() == "1267650600228229401496703205383"',
-              '',
-          ])
-          t.write_text(text[:start] + replacement + text[end:], encoding='utf-8')
           PY
-          python -m py_compile source/transpiler/core_type_lowering.py source/cli/compilation.py source/transpiler/strlen_assign_cache.py source/transpiler/drop_plan.py tests/test_c_wide_ints.py tests/test_llvm_wide_ints.py
+
+      - name: Target remaining ownership regression and dump C on failure
+        run: |
+          set -euxo pipefail
+          if pytest -q tests/test_c_string_ownership.py::test_c_backend_cleans_redeclared_class_local_in_loop; then
+            exit 0
+          fi
+          f="$(ls -t out/generated/c_backend/loop_redecl_class_*.c | head -1)"
+          echo "=== GENERATED: $f ==="
+          echo '=== Packet init/new/destructor ==='
+          grep -n -E 'Packet_(init|new|destructor)|__owned_|__ailang_stack_p|ailang_strcat|while \(' "$f" | tail -n 160 || true
+          echo '=== main body ==='
+          main_line="$(grep -n '^int main' "$f" | head -1 | cut -d: -f1)"
+          if [ -n "$main_line" ]; then
+            start=$((main_line > 10 ? main_line - 10 : 1))
+            end=$((main_line + 100))
+            sed -n "${start},${end}p" "$f"
+          fi
+          exit 1
 
       - name: C fixed wide and unbounded integers
         run: |
-          set -euxo pipefail
           pytest -q tests/test_c_wide_ints.py
 
       - name: LLVM fixed wide and unbounded integers
         run: |
-          set -euxo pipefail
           pytest -q tests/test_llvm_wide_ints.py
 
       - name: C string ownership
         run: |
-          set -euxo pipefail
           pytest -q tests/test_c_string_ownership.py
 
       - name: Representation integrity regression
         run: |
-          set -euxo pipefail
           pytest -q tests/test_fixed_wide_representation_integrity.py
-
-      - name: Self-remove validation workflow
-        run: |
-          set -euxo pipefail
-          rm .github/workflows/validate-wide-and-string-ownership.yml
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
-          git diff --cached --check
-          git commit -m 'Repair integer, ownership, and scalarization semantics'
-          git push origin HEAD:agent/unbounded-field-semantics
