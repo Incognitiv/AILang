@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   normalize-and-diagnose:
-    if: github.event.head_commit.message == 'Repair 750 refactor strict contracts'
+    if: github.event.head_commit.message == 'Run repaired 750 verifier normalization'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
@@ -62,7 +62,7 @@ jobs:
           text = field_file.read_text()
           old = 'from .stmt_visit_data import _emit_dyn_array_push_in_place'
           new = 'from .stmt_visit_assignment_helpers import _emit_dyn_array_push_in_place'
-          assert text.count(old) == 1, 'unexpected dyn-array import state'
+          assert text.count(old) == 1
           field_file.write_text(text.replace(old, new))
 
           mixins = {
@@ -78,9 +78,8 @@ jobs:
           pattern = re.compile(r'(\bdef\s+[A-Za-z_]\w*\(\s*)self(?=[,\)])')
           for filename, expected in mixins.items():
               path = Path(filename)
-              source = path.read_text()
-              source, count = pattern.subn(r'\1self: Any', source)
-              assert count == expected, f'{filename}: expected {expected} self annotations, got {count}'
+              source, count = pattern.subn(r'\1self: Any', path.read_text())
+              assert count == expected, f'{filename}: {count} != {expected}'
               ast.parse(source)
               path.write_text(source)
 
@@ -96,23 +95,24 @@ jobs:
           text = pyproject.read_text()
           black_block = '[tool.black]\nline-length = 88\n'
           assert black_block in text
-          text = text.replace(
-              black_block,
-              black_block + 'target-version = ["py311"]\n',
-              1,
-          )
+          text = text.replace(black_block, black_block + 'target-version = ["py311"]\n', 1)
           pyproject.write_text(text)
-          PY
-          PYTHONPATH=source python - <<'PY'
-          import transpiler.core
-          import codegen.fast_jit
-          print('core import smoke: PASS')
           PY
 
       - name: Install deterministic verification stack
         run: |
           python -m pip install --upgrade pip
           python -m pip install -e ".[dev,llvm]"
+
+      - name: Verify repaired import graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=source python - <<'PY'
+          import transpiler.core
+          import codegen.fast_jit
+          print('core import smoke: PASS')
+          PY
 
       - name: Apply safe mechanical normalization
         shell: bash
