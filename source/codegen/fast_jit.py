@@ -77,6 +77,12 @@ def create_execution_engine() -> Any:
 
 def _flush_c_stdout() -> None:
     """Best-effort flush of C-backed stdout on all platforms."""
+    try:
+        ctypes.CDLL(None).fflush(None)
+        return
+    except (OSError, AttributeError, TypeError):
+        pass
+
     candidates: list[str]
     if os.name == "nt":
         candidates = [
@@ -133,6 +139,7 @@ def _run_jit_once(
             None,
         )
 
+    _flush_c_stdout()
     with tempfile.TemporaryFile(mode="w+b") as capture:
         saved_stdout = os.dup(1)
         os.dup2(capture.fileno(), 1)

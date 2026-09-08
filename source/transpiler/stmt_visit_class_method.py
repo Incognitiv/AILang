@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from parser import ast as A
 from parser.ast import parsed_type_to_str
+from parser.return_type_inference import body_terminates_with_value_or_throw
 from typing import Dict, List, Set, cast
 
 from transpiler.class_field_ownership import (
@@ -344,8 +345,8 @@ def _generate_class_method(self, class_name: str, method: A.Function) -> None:
     for stmt in method.body:
         self.visit(stmt)
 
-    # Implicit return
-    if not method.body or not isinstance(method.body[-1], A.Return):
+    # Implicit return only when a live control-flow path can fall through.
+    if not body_terminates_with_value_or_throw(method.body):
         if method_name == "destructor":
             self._emit_owned_field_cleanup(class_name, "self")
         self._emit_class_cleanup(None)

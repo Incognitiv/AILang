@@ -377,6 +377,24 @@ def compile_via_c(
                     timeout=CBACKEND_COMPILE_TIMEOUT_SECONDS,
                     check=False,
                 )
+            if result.returncode != 0:
+                option_error = (result.stderr + "\n" + result.stdout).lower()
+                if "gnu23" in option_error and (
+                    "unrecognized command-line option" in option_error
+                    or "unknown argument" in option_error
+                    or "invalid value" in option_error
+                ):
+                    retry_cmd = [
+                        "-std=gnu2x" if arg == "-std=gnu23" else arg for arg in cmd
+                    ]
+                    with Phase(f"c_backend.{display_name}_compile_gnu2x"):
+                        result = subprocess.run(
+                            retry_cmd,
+                            capture_output=True,
+                            text=True,
+                            timeout=CBACKEND_COMPILE_TIMEOUT_SECONDS,
+                            check=False,
+                        )
             if result.returncode == 0:
                 print(f"        Created {output_exe} ({effective_compiler})")
                 compiled = True
