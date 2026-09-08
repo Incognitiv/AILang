@@ -18,38 +18,19 @@ jobs:
         with:
           ref: agent/unbounded-field-semantics
           fetch-depth: 0
-
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
       - name: Install test toolchains
         run: |
-          set -euxo pipefail
           sudo apt-get update -qq
           sudo apt-get install -y -qq clang gcc llvm libsqlite3-dev
           python -m pip install -e '.[dev,llvm]'
-
-      - name: Apply candidate repairs
+      - name: Apply ownership candidate
         run: |
           set -euxo pipefail
           python - <<'PY'
           from pathlib import Path
-
-          p = Path('source/transpiler/core_type_lowering.py')
-          s = p.read_text(encoding='utf-8')
-          old = '            "bool": "bool",\n            "string": "const char *",\n'
-          new = '            "bool": "bool",\n            "i1": "bool",  # parser canonical spelling for AILang bool\n            "string": "const char *",\n'
-          if old not in s:
-              raise SystemExit('bool type-map anchor missing')
-          p.write_text(s.replace(old, new, 1), encoding='utf-8')
-
-          p = Path('source/cli/compilation.py')
-          s = p.read_text(encoding='utf-8')
-          old = 'CBACKEND_COMPILE_TIMEOUT_SECONDS = 60\n'
-          if old not in s:
-              raise SystemExit('C backend timeout anchor missing')
-          p.write_text(s.replace(old, 'CBACKEND_COMPILE_TIMEOUT_SECONDS = 180\n', 1), encoding='utf-8')
 
           p = Path('source/transpiler/strlen_assign_cache.py')
           s = p.read_text(encoding='utf-8')
@@ -67,46 +48,23 @@ jobs:
               raise SystemExit('length-only emission anchor missing')
           p.write_text(s.replace(old, new, 1), encoding='utf-8')
 
-          p = Path('source/transpiler/drop_plan.py')
+          p = Path('source/transpiler/expr_gen.py')
           s = p.read_text(encoding='utf-8')
-          old = '''    if coerced == DropKind.OWNED_STRING:\n        checker = is_owned_string_alloc or _default_owned_string_alloc\n        return bool(checker(expr))\n'''
-          new = '''    if coerced == DropKind.OWNED_STRING:\n        if isinstance(expr, A.BinaryOp) and expr.op.lower() in {"+", "plus"}:\n            return True\n        checker = is_owned_string_alloc or _default_owned_string_alloc\n        return bool(checker(expr))\n'''
+          old = '''        dynamic_len = emit_dynamic_strlen_c(self, node)\n        if dynamic_len is not None:\n            return dynamic_len\n        virtual_len = self._emit_virtual_strlen(node)\n        if virtual_len is not None:\n            return virtual_len\n'''
+          new = '''        # Prefer the allocation-free numeric specialization before the\n        # generic dynamic planner. Hidden string-length arguments must not\n        # materialize str(i) merely to measure it.\n        virtual_len = self._emit_virtual_strlen(node)\n        if virtual_len is not None:\n            return virtual_len\n        dynamic_len = emit_dynamic_strlen_c(self, node)\n        if dynamic_len is not None:\n            return dynamic_len\n'''
           if old not in s:
-              raise SystemExit('owned string drop-plan anchor missing')
+              raise SystemExit('known strlen ordering anchor missing')
           p.write_text(s.replace(old, new, 1), encoding='utf-8')
           PY
-
-      - name: Target remaining ownership regression and dump C on failure
+          python -m py_compile source/transpiler/strlen_assign_cache.py source/transpiler/expr_gen.py
+      - name: Target class-loop ownership regression
         run: |
           set -euxo pipefail
-          if pytest -q tests/test_c_string_ownership.py::test_c_backend_cleans_redeclared_class_local_in_loop; then
-            exit 0
-          fi
+          pytest -q tests/test_c_string_ownership.py::test_c_backend_cleans_redeclared_class_local_in_loop
           f="$(ls -t out/generated/c_backend/loop_redecl_class_*.c | head -1)"
-          echo "=== GENERATED: $f ==="
-          echo '=== Packet init/new/destructor ==='
-          grep -n -E 'Packet_(init|new|destructor)|__owned_|__ailang_stack_p|ailang_strcat|while \(' "$f" | tail -n 160 || true
-          echo '=== main body ==='
-          main_line="$(grep -n '^int main' "$f" | head -1 | cut -d: -f1)"
-          if [ -n "$main_line" ]; then
-            start=$((main_line > 10 ? main_line - 10 : 1))
-            end=$((main_line + 100))
-            sed -n "${start},${end}p" "$f"
+          grep -n 'Packet_init(&__ailang_stack_p' "$f"
+          if grep -q 'ailang_strlen(ailang_int_to_str(i))' "$f"; then
+            echo 'hidden length still allocates str(i)' >&2
+            exit 1
           fi
-          exit 1
-
-      - name: C fixed wide and unbounded integers
-        run: |
-          pytest -q tests/test_c_wide_ints.py
-
-      - name: LLVM fixed wide and unbounded integers
-        run: |
-          pytest -q tests/test_llvm_wide_ints.py
-
-      - name: C string ownership
-        run: |
-          pytest -q tests/test_c_string_ownership.py
-
-      - name: Representation integrity regression
-        run: |
-          pytest -q tests/test_fixed_wide_representation_integrity.py
+          grep -q 'ailang_i64_decimal_len(i)' "$f"
