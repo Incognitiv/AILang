@@ -1,0 +1,62 @@
+name: Validate wide integers and string ownership
+
+on:
+  push:
+    branches:
+      - agent/unbounded-field-semantics
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/unbounded-field-semantics
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install test toolchains
+        run: |
+          set -euxo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq clang gcc llvm libsqlite3-dev
+          python -m pip install -e '.[dev,llvm]'
+
+      - name: C fixed and wide integers
+        run: |
+          set -euxo pipefail
+          pytest -q tests/test_c_wide_ints.py
+
+      - name: LLVM fixed and wide integers
+        run: |
+          set -euxo pipefail
+          pytest -q tests/test_llvm_wide_ints.py
+
+      - name: C string ownership
+        run: |
+          set -euxo pipefail
+          pytest -q tests/test_c_string_ownership.py
+
+      - name: Representation integrity regression
+        run: |
+          set -euxo pipefail
+          pytest -q tests/test_fixed_wide_representation_integrity.py
+
+      - name: Self-remove validation workflow
+        run: |
+          set -euxo pipefail
+          rm .github/workflows/validate-wide-and-string-ownership.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'Remove completed focused validation workflow'
+          git push origin HEAD:agent/unbounded-field-semantics
