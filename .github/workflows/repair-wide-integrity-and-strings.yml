@@ -34,6 +34,19 @@ jobs:
       - name: Apply repair
         run: |
           set -euxo pipefail
+          # static_analysis_perf.py receives its dedicated ownership producer
+          # table later in the repair; it is not one of the shared builtin
+          # metadata registries. Remove it from that generic insertion loop.
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('.github/scripts/repair_wide_integrity_and_strings.py')
+          s = p.read_text()
+          old = '''    "source/transpiler/drop_plan.py",\n    "source/diagnostics/static_analysis_perf.py",\n]:'''
+          new = '''    "source/transpiler/drop_plan.py",\n]:'''
+          if old not in s:
+              raise SystemExit('generic metadata list anchor missing')
+          p.write_text(s.replace(old, new, 1))
+          PY
           python .github/scripts/repair_wide_integrity_and_strings.py
 
       - name: Targeted regression tests
