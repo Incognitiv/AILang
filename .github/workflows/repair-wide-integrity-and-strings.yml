@@ -43,12 +43,11 @@ jobs:
           if old not in s:
               raise SystemExit('generic metadata list anchor missing')
           s = s.replace(old, new, 1)
-          # PascalCase unknowns intentionally represent forward class refs.
-          # The integrity test targets an unknown scalar-like spelling instead.
           s = s.replace('DefinitelyNotAType', 'definitely_not_a_type')
           p.write_text(s)
           PY
           python .github/scripts/repair_wide_integrity_and_strings.py
+          python .github/scripts/repair_i128_fixed_boundaries.py
           python -m py_compile \
             source/codegen/type_lowering.py \
             source/codegen/builtin_string.py \
@@ -56,9 +55,14 @@ jobs:
             source/transpiler/expr_threading_core.py \
             source/transpiler/expr_call_dispatch.py \
             source/transpiler/expr_gen_call_builtin_map.py \
+            source/transpiler/expr_gen_call_impl.py \
+            source/transpiler/expr_gen_basic_impl.py \
+            source/transpiler/stmt_visit_calls.py \
+            source/transpiler/stmt_visit_data.py \
             source/transpiler/helper_scanner.py \
             source/transpiler/runtime_emitter.py \
             source/transpiler/runtime_emit_string.py \
+            source/transpiler/runtime_emit_fixed_int_casts.py \
             source/diagnostics/static_analysis_perf.py
 
       - name: Focused representation tests
@@ -73,19 +77,17 @@ jobs:
           i128 add128(i128 a, i128 b):
               return a + b
           end
-
           i256 add256(i256 a, i256 b):
               return a + b
           end
-
           i512 add512(i512 a, i512 b):
               return a + b
           end
-
           def main(): int
               i128 a = 1267650600228229401496703205376
               i128 b = 7
               i128 c = add128(a, b)
+              u128 u = 1267650600228229401496703205385
               i256 x = 1606938044258990275541962092341162602522202993782792835301376
               i256 y = 11
               i256 z = add256(x, y)
@@ -93,6 +95,11 @@ jobs:
               i512 q = 17
               i512 r = add512(p, q)
               print(str(c))
+              print(str(u))
+              print(hex(c))
+              print(bin(c))
+              print(oct(c))
+              print("c={c}")
               print(str(z))
               print(str(r))
               return 0
@@ -114,8 +121,29 @@ jobs:
           CFILE=$(find out/generated/c_backend -name 'wide_integrity_*.c' -print -quit)
           test -n "$CFILE"
           grep -q '__int128' "$CFILE"
+          grep -q 'ailang_str_i128' "$CFILE"
+          grep -q 'ailang_hex_i128' "$CFILE"
           grep -Eq '_BitInt\(256\)|ailang_i256' "$CFILE"
           grep -Eq '_BitInt\(512\)|ailang_i512' "$CFILE"
+
+      - name: Check i128 dynamic-array boundary
+        run: |
+          set -euxo pipefail
+          cat > /tmp/i128_array_boundary.ail <<'AIL'
+          def main(): int
+              arr = array_new(1)
+              i128 x = 1267650600228229401496703205376
+              arr = array_push(arr, x)
+              return 0
+          end
+          AIL
+          python ailang.py /tmp/i128_array_boundary.ail --backend=c -O1 -o /tmp/i128_array_boundary
+          set +e
+          /tmp/i128_array_boundary > /tmp/i128_array.out 2>&1
+          rc=$?
+          set -e
+          test "$rc" -ne 0
+          grep -q 'does not fit signed 64-bit boundary' /tmp/i128_array.out
 
       - name: Compile and run one-allocation JSON escape
         run: |
@@ -128,7 +156,6 @@ jobs:
               return 0
           end
           AIL
-
           python ailang.py /tmp/json_escape.ail --backend=llvm --native-toolchain=clang --no-prepass -O2 -o /tmp/json_escape_llvm
           /tmp/json_escape_llvm > /tmp/json_escape_llvm.out
           python ailang.py /tmp/json_escape.ail --backend=c -O2 -o /tmp/json_escape_c
@@ -154,6 +181,7 @@ jobs:
           set -euxo pipefail
           rm .github/workflows/repair-wide-integrity-and-strings.yml
           rm .github/scripts/repair_wide_integrity_and_strings.py
+          rm .github/scripts/repair_i128_fixed_boundaries.py
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
