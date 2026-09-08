@@ -1,0 +1,43 @@
+name: Fix split StringArray reassignment cleanup
+on:
+  push:
+    branches: [agent/unbounded-field-semantics]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/unbounded-field-semantics
+      - name: Fix and verify
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('source/transpiler/stmt_visit_data.py')
+          s = p.read_text()
+          old = '''    if var_name in (getattr(self, "_str_array_locals_for_cleanup", None) or []):\n        self.emit(f"{{ typeof({var}) __pre_assign = {val};")\n        self.emit(f"  ailang_str_array_free_v2(&{var});")\n        self.emit(f"  {var} = __pre_assign; }}")\n        return True\n'''
+          new = '''    if var_name in (getattr(self, "_str_array_locals_for_cleanup", None) or []):\n        # split() returns StringArray whose elements are owned; use the\n        # StringArray destructor. str_array_new() uses ailang_str_array and\n        # is handled separately by _lc_str_array_locals_for_cleanup below.\n        self.emit(f"{{ typeof({var}) __pre_assign = {val};")\n        self.emit(f"  ailang_str_array_free(&{var});")\n        self.emit(f"  {var} = __pre_assign; }}")\n        return True\n'''
+          assert old in s
+          p.write_text(s.replace(old, new, 1))
+          PY
+          python3 -m py_compile source/transpiler/stmt_visit_data.py
+          cat >/tmp/split_reassign.ail <<'AIL'
+          def main(): int
+              words = split("a b", " ")
+              words = split("c d", " ")
+              return 0
+          end
+          AIL
+          python3 ailang.py /tmp/split_reassign.ail --backend=c -O1 -o /tmp/split_reassign
+          /tmp/split_reassign
+          rm .github/workflows/fix-split-reassign-cleanup.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'Use StringArray cleanup for split reassignment'
+          git push origin HEAD:agent/unbounded-field-semantics
