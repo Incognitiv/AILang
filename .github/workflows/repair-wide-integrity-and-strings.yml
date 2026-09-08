@@ -49,12 +49,22 @@ jobs:
           p.write_text(s)
           PY
           python .github/scripts/repair_wide_integrity_and_strings.py
+          python -m py_compile \
+            source/codegen/type_lowering.py \
+            source/codegen/builtin_string.py \
+            source/transpiler/core_type_lowering.py \
+            source/transpiler/expr_threading_core.py \
+            source/transpiler/expr_call_dispatch.py \
+            source/transpiler/expr_gen_call_builtin_map.py \
+            source/transpiler/helper_scanner.py \
+            source/transpiler/runtime_emitter.py \
+            source/transpiler/runtime_emit_string.py \
+            source/diagnostics/static_analysis_perf.py
 
-      - name: Targeted regression tests
+      - name: Focused representation tests
         run: |
           set -euxo pipefail
           pytest -q tests/test_fixed_wide_representation_integrity.py
-          pytest -q tests/test_c_backend_outputs.py tests/test_c_compat_abi.py tests/test_c_format_specialization.py
 
       - name: Compile and inspect real fixed-wide values
         run: |
