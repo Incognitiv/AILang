@@ -486,11 +486,14 @@ def visit_Assign(self, node: A.Assign) -> None:
     # assignments. Re-inferring a BinaryOp used to collapse `wide x; x = x <<
     # 200` back to plain `int`, causing the C backend to route the operation
     # through the 64-bit safety helpers.
-    existing_type = self._var_types.get(node.var_name)
-    if existing_type is None or (
-        not is_unbounded_spec(self, existing_type)
-        and info_for_ailang(existing_type) is None
-        and _fixed_int_info_for_ailang_spec(self, existing_type) is None
+    local_type = getattr(self, "_current_local_c_types", {}).get(node.var_name)
+    existing_type = local_type if local_type is not None else self._var_types.get(node.var_name)
+    if local_type is None and (
+        existing_type is None or (
+            not is_unbounded_spec(self, existing_type)
+            and info_for_ailang(existing_type) is None
+            and _fixed_int_info_for_ailang_spec(self, existing_type) is None
+        )
     ):
         self._var_types[node.var_name] = self._infer_ailang_type(node.value)
     if existing_type is not None and is_unbounded_spec(self, existing_type):
@@ -538,7 +541,7 @@ def visit_Assign(self, node: A.Assign) -> None:
             else:
                 array_len_hints[key] = propagated_array_len
         val = self.expr(node.value)
-        target_spec = self._var_types.get(node.var_name)
+        target_spec = local_type if local_type is not None else self._var_types.get(node.var_name)
         if target_spec is not None and _emit_checked_fixed_int_assignment(
             self, var, target_spec, node.value, val
         ):
@@ -610,6 +613,10 @@ def _infer_ailang_type(self, node: A.ASTNode) -> str:
             # callee's parameter type and avoids redundant casts.
             if ret in ("array", "str_array", "dict", "string"):
                 return ret
+    if isinstance(node, A.BinaryOp) and node.op == "+" and (
+        self._might_be_string(node.left) or self._might_be_string(node.right)
+    ):
+        return "string"
     if isinstance(node, A.StringLit):
         return "string"
     if isinstance(node, A.InterpolatedString):

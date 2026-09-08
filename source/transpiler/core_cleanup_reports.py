@@ -37,6 +37,15 @@ class _CTranspilerCleanupReportMixin:
         return self.type_info.might_be_string_static(node, func_scope)
 
     def _might_be_string(self: Any, node: A.ASTNode) -> bool:
+        if isinstance(node, A.Variable):
+            local_type = getattr(self, "_current_local_c_types", {}).get(node.name)
+            if isinstance(local_type, str):
+                text = local_type.strip().lower()
+                if text == "string" or "char *" in text:
+                    return True
+        if isinstance(node, A.BinaryOp) and node.op == "+":
+            if self._might_be_string(node.left) or self._might_be_string(node.right):
+                return True
         return self.type_info.might_be_string(node, self.current_function)
 
     def _can_elide_binary_safety(
