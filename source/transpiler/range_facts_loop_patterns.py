@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
+from typing import Any, TypeGuard
+
 from parser import ast as A
-from typing import Any
 
 from ast_access import body_at
 
@@ -91,6 +92,45 @@ def while_true_break_guard_bounds(
         return {}, False
 
     return {left.name: (low, high)}, True
+
+
+def is_branch_heavy_loop_body(
+    nodes: Iterable[A.ASTNode],
+    *,
+    ignore_first_break_guard: bool = False,
+    walk_ast: Callable[[A.ASTNode], Iterable[A.ASTNode]],
+) -> bool:
+    """Return True when loop body is branch-heavy for conservative analysis."""
+    branchy = {
+        "If",
+        "Match",
+        "TryExcept",
+        "While",
+        "DoWhile",
+        "For",
+        "Foreach",
+        "Repeat",
+        "Loop",
+    }
+    node_list = list(nodes)
+    for idx, node in enumerate(node_list):
+        if ignore_first_break_guard and idx == 0 and _is_break_guard_if(node):
+            continue
+        if _is_break_guard_if(node):
+            continue
+        for child in walk_ast(node):
+            if type(child).__name__ in branchy:
+                return True
+    return False
+
+
+def _is_break_guard_if(node: A.ASTNode) -> TypeGuard[A.If]:
+    return (
+        isinstance(node, A.If)
+        and not node.else_body
+        and len(node.then_body) == 1
+        and isinstance(node.then_body[0], A.Break)
+    )
 
 
 def derive_specialized_while_ranges(
