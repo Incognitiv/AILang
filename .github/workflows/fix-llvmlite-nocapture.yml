@@ -18,25 +18,20 @@ jobs:
           python3 -m pip install --disable-pip-version-check -q llvmlite
           python3 - <<'PY'
           from pathlib import Path
-          edits = {
-              'source/codegen/codegen_module_mixin.py': [
-                  ('                    func.args[i].add_attribute("nocapture")\n',
-                   '                    try:\n                        func.args[i].add_attribute("nocapture")\n                    except ValueError:\n                        # llvmlite 0.49 removed nocapture from the high-level\n                        # ArgumentAttributes allow-list. It is an optimizer hint,\n                        # not a semantic requirement, so compile without it.\n                        pass\n'),
-                  ('                    func.args[i].add_attribute("nocapture")\n',
-                   '                    try:\n                        func.args[i].add_attribute("nocapture")\n                    except ValueError:\n                        pass\n'),
-              ],
-              'source/codegen/codegen_function_mixin.py': [
-                  ('                        arg.add_attribute("nocapture")\n',
-                   '                        try:\n                            arg.add_attribute("nocapture")\n                        except ValueError:\n                            pass\n'),
-              ],
-          }
-          for name, replacements in edits.items():
-              p = Path(name)
-              s = p.read_text()
-              for old, new in replacements:
-                  assert old in s, f'missing expected nocapture site in {name}'
-                  s = s.replace(old, new, 1)
-              p.write_text(s)
+
+          p = Path('source/codegen/codegen_module_mixin.py')
+          s = p.read_text()
+          old = '''                if type_str in ("string", "str"):\n                    func.args[i].add_attribute("noalias")\n                    func.args[i].add_attribute("nocapture")\n                    func.args[i].add_attribute("nonnull")\n                # Other pointers are just nocapture (don't escape)\n                else:\n                    func.args[i].add_attribute("nocapture")\n'''
+          new = '''                if type_str in ("string", "str"):\n                    func.args[i].add_attribute("noalias")\n                    # llvmlite 0.49 no longer accepts nocapture through the\n                    # high-level ArgumentAttributes API. It is an optimization\n                    # hint only, so retain the semantic attributes and omit it.\n                    func.args[i].add_attribute("nonnull")\n                else:\n                    pass\n'''
+          assert old in s, 'module nocapture block changed unexpectedly'
+          p.write_text(s.replace(old, new, 1))
+
+          p = Path('source/codegen/codegen_function_mixin.py')
+          s = p.read_text()
+          old = '''                for arg in self.func.args:\n                    if isinstance(arg.type, ir.PointerType):\n                        arg.add_attribute("noalias")\n                        arg.add_attribute("nocapture")\n'''
+          new = '''                for arg in self.func.args:\n                    if isinstance(arg.type, ir.PointerType):\n                        arg.add_attribute("noalias")\n'''
+          assert old in s, 'function nocapture block changed unexpectedly'
+          p.write_text(s.replace(old, new, 1))
           PY
           python3 -m py_compile source/codegen/codegen_module_mixin.py source/codegen/codegen_function_mixin.py
           cat >/tmp/nocapture.ail <<'AIL'
