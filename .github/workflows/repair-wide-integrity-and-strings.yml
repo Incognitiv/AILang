@@ -78,8 +78,8 @@ jobs:
               return a + b
           end
 
-          i512 xor512(i512 a, i512 b):
-              return a xor b
+          i512 add512(i512 a, i512 b):
+              return a + b
           end
 
           def main(): int
@@ -89,8 +89,12 @@ jobs:
               i256 x = 1606938044258990275541962092341162602522202993782792835301376
               i256 y = 11
               i256 z = add256(x, y)
+              i512 p = 13
+              i512 q = 17
+              i512 r = add512(p, q)
               print(str(c))
               print(str(z))
+              print(str(r))
               return 0
           end
           AIL
@@ -101,6 +105,7 @@ jobs:
           test -n "$LL"
           grep -Eq 'define .*i128.*add128|add i128' "$LL"
           grep -Eq 'define .*i256.*add256|add i256' "$LL"
+          grep -Eq 'define .*i512.*add512|add i512' "$LL"
           ! grep -Eq 'trunc i(128|256|512) .* to i64' "$LL"
 
           python ailang.py /tmp/wide_integrity.ail --backend=c -O2 -o /tmp/wide_c
@@ -110,6 +115,7 @@ jobs:
           test -n "$CFILE"
           grep -q '__int128' "$CFILE"
           grep -Eq '_BitInt\(256\)|ailang_i256' "$CFILE"
+          grep -Eq '_BitInt\(512\)|ailang_i512' "$CFILE"
 
       - name: Compile and run one-allocation JSON escape
         run: |
