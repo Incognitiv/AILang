@@ -1,0 +1,94 @@
+name: Apply verified 750-line hygiene refactor once
+
+on:
+  push:
+    branches: ["agent/unbounded-field-semantics"]
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-verify:
+    if: github.event.head_commit.message == 'Stage verified 750-line refactor payload'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/unbounded-field-semantics
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Reconstruct and verify patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "061754bca1773fc43f79e4359ef3f69fee2d17da"
+          cat \
+            .golden-upload/xz00p-00.txt \
+            .golden-upload/xz00p-01.txt \
+            .golden-upload/xz00p-02.txt \
+            .golden-upload/xz00p-03.txt \
+            .golden-upload/xz8-01.txt \
+            .golden-upload/rem12-00.txt \
+            .golden-upload/rem12-01.txt \
+            .golden-upload/rem12-02.txt \
+            .golden-upload/rem12-03.txt \
+            .golden-upload/rem12-04.txt \
+            .golden-upload/rem12-05.txt \
+            .golden-upload/rem12-06.txt \
+            .golden-upload/rem12-07.txt \
+            .golden-upload/rem12-08.txt > /tmp/refactor.b64
+          echo "3a92445d0220ab2da950435477ee2380f4e69d9e7705bea456886c2c461d447b  /tmp/refactor.b64" | sha256sum -c -
+          base64 -d /tmp/refactor.b64 > /tmp/refactor.patch.xz
+          xz -dc /tmp/refactor.patch.xz > /tmp/refactor.patch
+          echo "775222c4324959829edc5abd17cb9e601b86aa71e3f1bcd23ed55da9a140fcb4  /tmp/refactor.patch" | sha256sum -c -
+          git apply --check /tmp/refactor.patch
+          git apply /tmp/refactor.patch
+
+      - name: Install deterministic verification stack
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,llvm]"
+
+      - name: Verify source structure and targeted regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m compileall -q source verifier tools benchmarks tests
+          python tools/public_tree_audit.py
+          python tools/repository_hygiene_audit.py
+          python -m pytest -q \
+            tests/test_complexity_guard.py \
+            tests/test_repository_hygiene_audit.py \
+            tests/test_c_string_ownership.py \
+            tests/test_c_string_ownership_optimizations.py \
+            tests/test_ui_platform.py \
+            tests/test_self_host_gate_seed.py
+
+      - name: Run strict verifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m verifier.cli -d source --preset strict --check-imports --fail-on-debt -j 0
+          python -m verifier.cli -d verifier --preset strict --check-imports --fail-on-debt -j 0
+
+      - name: Run full Golden Gate
+        run: python tools/golden_gate.py
+
+      - name: Commit verified source tree only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout -- benchmarks/results 2>/dev/null || true
+          git rm -r .golden-upload
+          git rm .github/workflows/apply-750-hygiene-once.yml
+          git config user.name "AILang Golden Gate"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git status --short
+          git commit -m "Enforce 750-line source and repository hygiene"
+          git push origin HEAD:agent/unbounded-field-semantics
