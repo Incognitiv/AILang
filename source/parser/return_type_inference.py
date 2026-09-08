@@ -99,9 +99,8 @@ def _join(a: str, b: str) -> str | None:
         return max((a, b), key=lambda t: floats[t])
     # Mixed integer/float inference is allowed only when every value in the
     # integer type is exactly representable by that float type.
-    if a in floats and _INT_RE.match(b):
-        m = _INT_RE.match(b)
-        assert m
+    m = _INT_RE.match(b)
+    if a in floats and m is not None:
         bits = int(m.group(2)) - (1 if m.group(1) == "i" else 0)
         return a if bits <= floats[a] else None
     if b in floats and _INT_RE.match(a):
@@ -385,9 +384,11 @@ def infer_unannotated_return_types(program: list[A.ASTNode]) -> None:
                 inferred = ""
                 unresolved = False
                 for ret in valued:
-                    assert ret.value is not None
+                    ret_value = ret.value
+                    if ret_value is None:
+                        continue
                     rt = _expr_type(
-                        ret.value, env, fn_returns, class_fields, class_methods, cls
+                        ret_value, env, fn_returns, class_fields, class_methods, cls
                     )
                     if not rt:
                         unresolved = True

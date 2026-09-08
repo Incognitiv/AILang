@@ -69,6 +69,8 @@ def fixed_to_bigint(
         )
 
     zero = ir.Constant(value.type, 0)
+    negative: ir.Value
+    magnitude: ir.Value
     if unsigned:
         negative = ir.Constant(ir.IntType(1), 0)
         magnitude = value
@@ -142,7 +144,7 @@ def bigint_to_fixed(
     builder.position_at_end(ok)
 
     words = (target.width + 63) // 64
-    result = ir.Constant(target, 0)
+    result: ir.Value = ir.Constant(target, 0)
     for idx in range(words):
         word = builder.call(
             codegen._get_bigint_word_at(),

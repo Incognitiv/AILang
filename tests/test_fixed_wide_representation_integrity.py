@@ -63,10 +63,13 @@ def test_unknown_c_type_fails_closed():
 
 def test_c_i128_formatting_and_i64_boundary_use_complete_fixed_metadata():
     from pathlib import Path
+
     root = Path(__file__).resolve().parents[1]
-    call_impl = (root / "source/transpiler/expr_gen_call_impl.py").read_text(encoding="utf-8")
+    fixed_casts = (root / "source/transpiler/fixed_int_cast_codegen.py").read_text(
+        encoding="utf-8"
+    )
     runtime_fixed = (root / "source/transpiler/runtime_emit_fixed_int_casts.py").read_text(encoding="utf-8")
     runtime_string = (root / "source/transpiler/runtime_emit_string.py").read_text(encoding="utf-8")
-    assert "info_for_c_fixed(self._infer_type(arg_node))" in call_impl
+    assert "info_for_c_fixed(transpiler._infer_type(value_node))" in fixed_casts
     assert "ailang_narrow_i64_i128" in runtime_fixed
     assert "ailang_str_i128" in runtime_string
