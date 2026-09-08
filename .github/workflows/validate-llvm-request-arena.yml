@@ -1,0 +1,169 @@
+name: Validate LLVM request arena lifetime repair
+
+on:
+  push:
+    branches:
+      - agent/unbounded-field-semantics
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/unbounded-field-semantics
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install test toolchain
+        run: |
+          set -euxo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq clang llvm
+          python -m pip install -e '.[dev,llvm]'
+
+      - name: Apply LLVM request-arena repair
+        run: |
+          set -euxo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          # Request arena context must survive ordinary function calls.
+          # C already uses a process/thread-global slot; LLVM used a fresh
+          # alloca initialized to null in every function, silently losing
+          # arena_use() on every call boundary.
+          p = Path('source/codegen/codegen_function_mixin.py')
+          s = p.read_text(encoding='utf-8')
+          old = '''        if getattr(self, "_module_uses_string_arena", True):\n            i8_ptr = ir.IntType(8).as_pointer()\n            self._request_arena_slot = self.builder.alloca(\n                i8_ptr, name="request_arena_slot"\n            )\n            self.builder.store(ir.Constant(i8_ptr, None), self._request_arena_slot)\n'''
+          new = '''        if getattr(self, "_module_uses_string_arena", True):\n            i8_ptr = ir.IntType(8).as_pointer()\n            # arena_use() is request/thread context, not function-local state.\n            # Keep one TLS slot in the module so callees observe the arena\n            # selected by their caller, matching the C backend contract.\n            slot = self.module.globals.get("__ailang_request_arena")\n            if slot is None:\n                slot = ir.GlobalVariable(\n                    self.module, i8_ptr, "__ailang_request_arena"\n                )\n                slot.linkage = "internal"\n                slot.initializer = ir.Constant(i8_ptr, None)\n                slot.thread_local = "general"\n            self._request_arena_slot = slot\n'''
+          if old not in s:
+              raise SystemExit('request arena alloca anchor missing')
+          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+
+          # LLVM concat must participate in request-arena routing. Raw malloc
+          # here defeated arena_use even after the slot itself was fixed.
+          p = Path('source/codegen/codegen_support_mixin.py')
+          s = p.read_text(encoding='utf-8')
+          old = '''        # Always use malloc for concat (arena would accumulate loop intermediates)\n        new_str = self.current_builder.call(\n            self.get_malloc(), [total_len], name="concat_str"\n        )\n'''
+          new = '''        # Route through the same string allocator as str/substr/chr. With an\n        # active request arena the caller can reclaim the whole request with\n        # arena_reset(); without one this falls back to the existing heap/main\n        # arena policy.\n        new_str = self.string_alloc(total_len, "concat_str")\n'''
+          if old not in s:
+              raise SystemExit('concat malloc anchor missing')
+          s = s.replace(old, new, 1)
+
+          # Existing temp-string consumption used raw free(). That is valid for
+          # heap temps but invalid for request/main-arena pointers. Emit a tiny
+          # conditional cleanup helper: main-arena allocations are reclaimed in
+          # bulk; request-arena allocations are reclaimed by reset; heap temps
+          # still get freed immediately.
+          old = '''        # Free intermediate temporaries from prior concatenations\n        left_name = getattr(left_str, "name", "")\n        right_name = getattr(right_str, "name", "")\n        if left_name in self.temp_strings:\n            self.current_builder.call(self._get_free(), [left_str])\n            self.temp_strings.discard(left_name)\n        if right_name in self.temp_strings:\n            self.current_builder.call(self._get_free(), [right_str])\n            self.temp_strings.discard(right_name)\n'''
+          new = '''        # Free heap intermediates, but never individually free pointers owned\n        # by the main/request arena. Request-arena temps are reclaimed by\n        # arena_reset() and main-arena temps by arena_destroy().\n        def release_temp_if_heap(value: Any) -> None:\n            name = getattr(value, "name", "")\n            if name not in self.temp_strings:\n                return\n            self.temp_strings.discard(name)\n            if self._string_arena is not None:\n                return\n            request_slot = getattr(self, "_request_arena_slot", None)\n            if request_slot is None:\n                self.current_builder.call(self._get_free(), [value])\n                return\n            i8_ptr = ir.IntType(8).as_pointer()\n            active = self.current_builder.load(\n                request_slot, name="concat_active_request_arena"\n            )\n            is_heap = self.current_builder.icmp_unsigned(\n                "==", active, ir.Constant(i8_ptr, None), name="concat_temp_is_heap"\n            )\n            free_block = self.current_function.append_basic_block("concat_temp_free")\n            done_block = self.current_function.append_basic_block("concat_temp_done")\n            self.current_builder.cbranch(is_heap, free_block, done_block)\n            self.current_builder.position_at_end(free_block)\n            self.current_builder.call(self._get_free(), [value])\n            self.current_builder.branch(done_block)\n            self.current_builder.position_at_end(done_block)\n\n        release_temp_if_heap(left_str)\n        release_temp_if_heap(right_str)\n'''
+          if old not in s:
+              raise SystemExit('concat temp cleanup anchor missing')
+          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+
+          # concat(...) builtin also bypassed the arena with raw malloc.
+          p = Path('source/codegen/builtin_string.py')
+          s = p.read_text(encoding='utf-8')
+          old = '''        result = self.current_builder.call(\n            self.get_malloc(), [alloc_size], name="concat_buf"\n        )\n'''
+          new = '''        result = self.string_alloc(alloc_size, "concat_buf")\n'''
+          if old not in s:
+              raise SystemExit('builtin concat malloc anchor missing')
+          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+
+          # Replace same-function-only arena tests with contract tests that also
+          # prove a callee observes the caller's arena_use().
+          p = Path('tests/test_arena_routing_llvm.py')
+          s = p.read_text(encoding='utf-8')
+          s += r'''
+
+
+def test_request_arena_slot_is_module_tls_not_function_alloca() -> None:
+    src = """
+def make_value(): string
+    return "value=" + str(123456)
+end
+
+def main(): int
+    a = arena_create(4096)
+    arena_use(a)
+    s = make_value()
+    print(s)
+    return arena_used(a)
+end
+"""
+    ir_text = _to_ir(src)
+    assert '__ailang_request_arena' in ir_text
+    assert 'thread_local' in ir_text
+    assert 'request_arena_slot = alloca' not in ir_text
+    # Both arena_use in main and string_alloc in make_value reference the same
+    # module slot; there must be multiple references across the module.
+    assert ir_text.count('__ailang_request_arena') >= 3
+    assert 'str_alloc_req_arena' in ir_text
+
+
+def test_string_concat_routes_through_request_arena_allocator() -> None:
+    src = """
+def make_value(a: string, b: string): string
+    return a + b
+end
+
+def main(): int
+    arena = arena_create(4096)
+    arena_use(arena)
+    s = make_value("left", "right")
+    n = arena_used(arena)
+    arena_reset(arena)
+    arena_destroy(arena)
+    return n
+end
+"""
+    ir_text = _to_ir(src)
+    # generate_string_concat must use string_alloc's request-arena branch,
+    # rather than an unconditional malloc-only concat allocation.
+    assert 'str_alloc_req_arena' in ir_text
+    assert '__ailang_request_arena' in ir_text
+'''
+          p.write_text(s, encoding='utf-8')
+          PY
+
+          python -m py_compile \
+            source/codegen/codegen_function_mixin.py \
+            source/codegen/codegen_support_mixin.py \
+            source/codegen/builtin_string.py \
+            tests/test_arena_routing_llvm.py
+          git diff --check
+
+      - name: Focused LLVM arena tests
+        run: |
+          set -euxo pipefail
+          pytest -q \
+            tests/test_arena_routing_llvm.py \
+            tests/test_arena_runtime_safety.py
+
+      - name: Relevant regression suites
+        run: |
+          set -euxo pipefail
+          pytest -q \
+            tests/test_format_strlen_budget.py \
+            tests/test_fixed_wide_representation_integrity.py \
+            tests/test_llvm_wide_ints.py
+
+      - name: Commit repair and self-remove workflow
+        run: |
+          set -euxo pipefail
+          rm .github/workflows/validate-llvm-request-arena.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git status --short
+          git commit -m 'Make LLVM request arena cross-function safe'
+          git push origin HEAD:agent/unbounded-field-semantics
