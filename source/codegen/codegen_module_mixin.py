@@ -493,11 +493,12 @@ class _CodeGenModuleMixin:
                 # String parameters are read-only and don't alias
                 if type_str in ("string", "str"):
                     func.args[i].add_attribute("noalias")
-                    func.args[i].add_attribute("nocapture")
+                    # llvmlite 0.49 no longer accepts nocapture through the
+                    # high-level ArgumentAttributes API. It is an optimization
+                    # hint only, so retain the semantic attributes and omit it.
                     func.args[i].add_attribute("nonnull")
-                # Other pointers are just nocapture (don't escape)
                 else:
-                    func.args[i].add_attribute("nocapture")
+                    pass
         # Store under original name for lookup
         self.functions[node.name] = func
         # Store default argument info for call-time resolution

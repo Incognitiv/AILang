@@ -117,7 +117,6 @@ class _CodeGenFunctionMixin:
                 for arg in self.func.args:
                     if isinstance(arg.type, ir.PointerType):
                         arg.add_attribute("noalias")
-                        arg.add_attribute("nocapture")
             elif decorator == "fastmath":
                 # llvmlite has no function-level unsafe-fp-math flag.
                 self._fastmath_mode = True
