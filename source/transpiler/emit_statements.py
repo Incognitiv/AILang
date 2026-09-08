@@ -10,7 +10,7 @@ from llvmlite import ir
 from .control_loop_utils import (
     close_streams_if_outer_loop as _m__close_streams_if_outer_loop,
 )
-from .emit_statements_basic import _emit_range_check as _m__emit_range_check
+from .emit_statements_assignment import _emit_range_check as _m__emit_range_check
 from .emit_statements_basic import _evaluate_comptime as _m__evaluate_comptime
 from .emit_statements_basic import visit_Assert as _m_visit_Assert
 from .emit_statements_basic import visit_Assign as _m_visit_Assign
