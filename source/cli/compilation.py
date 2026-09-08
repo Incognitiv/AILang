@@ -284,7 +284,20 @@ def compile_via_c(
     # auto-linked by mingw/clang.
     if "pthread.h" in _c_src and not sys.platform.startswith("win"):
         auto_link_flags.append("-lpthread")
-    link_flags = _merge_link_flags(explicit_link_flags, ["-lm"], auto_link_flags)
+    platform_compile_flags: list[str] = []
+    platform_link_flags: list[str] = []
+    if os_from_platform() == "freebsd":
+        # FreeBSD Ports installs third-party headers/libraries under
+        # /usr/local. The base-system clang intentionally does not search
+        # this prefix automatically, so ports-provided dependencies such as
+        # sqlite3 require explicit search paths.
+        if Path("/usr/local/include").is_dir():
+            platform_compile_flags.append("-I/usr/local/include")
+        if Path("/usr/local/lib").is_dir():
+            platform_link_flags.append("-L/usr/local/lib")
+    link_flags = _merge_link_flags(
+        explicit_link_flags, ["-lm"], platform_link_flags, auto_link_flags
+    )
     include_dirs = collect_cinclude_include_dirs(source_file)
     # Try GCC first (often produces faster code for this workload).
     # Each entry is (display_name, full_path_or_None)  -  full paths
@@ -334,6 +347,7 @@ def compile_via_c(
             *optimization_flags,
             "-march=native",
             *pgo_flags,
+            *platform_compile_flags,
             *(f"-I{include_dir}" for include_dir in include_dirs),
             str(c_file),
             "-o",
