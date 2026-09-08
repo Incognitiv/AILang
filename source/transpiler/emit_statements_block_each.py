@@ -5,8 +5,8 @@ from parser.ast import Block
 from ast_access import param_at
 from llvmlite import ir
 
+from .emit_statements_basic import _cleanup_current_loop_stack_class_locals
 from .emit_statements_common import StmtGenError
-from .emit_statements_control_data import _cleanup_current_loop_stack_class_locals
 
 
 def _block_each(self, array_obj: ir.Value, block: Block) -> None:
