@@ -1,0 +1,137 @@
+name: Apply first audit repairs
+
+on:
+  push:
+    branches: ["agent/audit-2026-09-08"]
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: ${{ !contains(github.event.head_commit.message, '[audit-fix]') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install toolchains
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends clang gcc llvm lld libclang-rt-18-dev
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,llvm]" psutil
+      - name: Apply narrowly scoped repairs
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              p = Path(path)
+              text = p.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected exactly one match, got {count}")
+              p.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          # C compiler portability: GCC <=13 accepts the C23 draft spelling
+          # gnu2x but rejects the final gnu23 spelling. Retry only for that
+          # specific option-name rejection; real C compilation errors remain
+          # visible and are not masked by the fallback.
+          replace_once(
+              "source/cli/compilation.py",
+              '''            if result.returncode == 0:\n                print(f"        Created {output_exe} ({effective_compiler})")\n                compiled = True\n                break\n            detail = _summarize_compiler_failure(result.stderr, result.stdout)\n''',
+              '''            if result.returncode != 0:\n                option_error = (result.stderr + "\\n" + result.stdout).lower()\n                if "gnu23" in option_error and (\n                    "unrecognized command-line option" in option_error\n                    or "unknown argument" in option_error\n                    or "invalid value" in option_error\n                ):\n                    retry_cmd = [\n                        "-std=gnu2x" if arg == "-std=gnu23" else arg for arg in cmd\n                    ]\n                    with Phase(f"c_backend.{display_name}_compile_gnu2x"):\n                        result = subprocess.run(\n                            retry_cmd,\n                            capture_output=True,\n                            text=True,\n                            timeout=CBACKEND_COMPILE_TIMEOUT_SECONDS,\n                            check=False,\n                        )\n            if result.returncode == 0:\n                print(f"        Created {output_exe} ({effective_compiler})")\n                compiled = True\n                break\n            detail = _summarize_compiler_failure(result.stderr, result.stdout)\n''',
+          )
+
+          # Return-flow analysis is already canonical at parser level. Export a
+          # small public wrapper so backend emitters can make the same decision
+          # instead of incorrectly assuming that only a final Return terminates.
+          replace_once(
+              "source/parser/return_type_inference.py",
+              '''def _body_terminates_with_value_or_throw(body: list[A.ASTNode]) -> bool:\n    for stmt in body:\n        if _stmt_terminates_with_value_or_throw(stmt):\n            return True\n    return False\ndef infer_unannotated_return_types(program: list[A.ASTNode]) -> None:\n''',
+              '''def _body_terminates_with_value_or_throw(body: list[A.ASTNode]) -> bool:\n    for stmt in body:\n        if _stmt_terminates_with_value_or_throw(stmt):\n            return True\n    return False\n\n\ndef body_terminates_with_value_or_throw(body: list[A.ASTNode]) -> bool:\n    """Return whether every live path in *body* returns a value or throws."""\n    return _body_terminates_with_value_or_throw(body)\n\n\ndef infer_unannotated_return_types(program: list[A.ASTNode]) -> None:\n''',
+          )
+          replace_once(
+              "source/transpiler/stmt_visit_class.py",
+              '''from parser.ast import parsed_type_to_str\n''',
+              '''from parser.ast import parsed_type_to_str\nfrom parser.return_type_inference import body_terminates_with_value_or_throw\n''',
+          )
+          replace_once(
+              "source/transpiler/stmt_visit_class.py",
+              '''    # Implicit return for functions that don't end with a return statement\n    if not node.body or not isinstance(node.body[-1], A.Return):\n''',
+              '''    # Emit an implicit return only when control can actually fall through.\n    # Exhaustive if/match/try bodies may end in a control statement while every\n    # live path already returns or throws.\n    if not body_terminates_with_value_or_throw(node.body):\n''',
+          )
+          replace_once(
+              "source/transpiler/stmt_visit_class_method.py",
+              '''from parser.ast import parsed_type_to_str\n''',
+              '''from parser.ast import parsed_type_to_str\nfrom parser.return_type_inference import body_terminates_with_value_or_throw\n''',
+          )
+          replace_once(
+              "source/transpiler/stmt_visit_class_method.py",
+              '''    # Implicit return\n    if not method.body or not isinstance(method.body[-1], A.Return):\n''',
+              '''    # Implicit return only when a live control-flow path can fall through.\n    if not body_terminates_with_value_or_throw(method.body):\n''',
+          )
+
+          # LLVM variadic calls previously zipped supplied arguments with only
+          # the fixed formal parameters, silently dropping every variadic arg.
+          # Preserve extra args and apply the C default argument promotions.
+          replace_once(
+              "source/transpiler/expr_calls.py",
+              '''            arg_values.append(arg_value)\n\n        result = self.codegen.call_or_invoke(func, arg_values, name=f"call_{node.name}")\n''',
+              '''            arg_values.append(arg_value)\n\n        if is_variadic and len(provided_args) > expected_count:\n            for arg_node in provided_args[expected_count:]:\n                arg_value = self.generate_expr(arg_node)\n                if isinstance(arg_value.type, ir.IntType) and arg_value.type.width < 32:\n                    i32 = ir.IntType(32)\n                    if self.codegen.is_unsigned_value(arg_value):\n                        arg_value = self.builder.zext(arg_value, i32)\n                    else:\n                        arg_value = self.builder.sext(arg_value, i32)\n                elif isinstance(arg_value.type, ir.FloatType):\n                    arg_value = self.builder.fpext(arg_value, ir.DoubleType())\n                arg_values.append(arg_value)\n\n        result = self.codegen.call_or_invoke(func, arg_values, name=f"call_{node.name}")\n''',
+          )
+
+          # Flush the actual process CRT first. Loading another libc handle by
+          # name can miss the FILE* state used by symbols resolved into LLJIT.
+          replace_once(
+              "source/codegen/fast_jit.py",
+              '''def _flush_c_stdout() -> None:\n    """Best-effort flush of C-backed stdout on all platforms."""\n    candidates: list[str]\n''',
+              '''def _flush_c_stdout() -> None:\n    """Best-effort flush of C-backed stdout on all platforms."""\n    try:\n        ctypes.CDLL(None).fflush(None)\n        return\n    except (OSError, AttributeError, TypeError):\n        pass\n\n    candidates: list[str]\n''',
+          )
+          replace_once(
+              "source/codegen/fast_jit.py",
+              '''    with tempfile.TemporaryFile(mode="w+b") as capture:\n        saved_stdout = os.dup(1)\n''',
+              '''    _flush_c_stdout()\n    with tempfile.TemporaryFile(mode="w+b") as capture:\n        saved_stdout = os.dup(1)\n''',
+          )
+          PY
+      - name: Compile Python sources
+        run: python -m compileall -q source
+      - name: Reproduce exhaustive-return regressions
+        run: |
+          python -m pytest -q \
+            tests/test_c_backend_outputs.py \
+            tests/test_match_lowering_backends.py \
+            tests/test_record_backend_parity.py \
+            tests/test_freestanding_c_compile.py
+      - name: Reproduce LLVM variadic ABI regression
+        run: |
+          python -m pytest -q 'tests/test_c_compat_abi.py::test_extern_var_and_variadic_extern_link_through_object[llvm]'
+      - name: Verify GCC 13 C23 spelling fallback
+        run: |
+          gcc --version | head -1
+          python ailang.py benchmarks/ailang/loop_hash.ail --backend=c --native-toolchain=gcc -O3 -o /tmp/ailang-gcc-fallback
+          /tmp/ailang-gcc-fallback
+      - name: Reproduce warm JIT output capture
+        run: |
+          for n in 1 2 3; do
+            python ailang.py benchmarks/ailang/format_print.ail \
+              --jit-repeat=5 --jit-warmup=2 --jit-json --jit-capture-output --jit-opt=3 \
+              | tee "/tmp/jit-format-$n.log"
+            grep '"status": "ok"' "/tmp/jit-format-$n.log"
+            grep '"checksum": 4950' "/tmp/jit-format-$n.log"
+          done
+      - name: Commit passing repairs
+        run: |
+          git config user.name "AILang audit"
+          git config user.email "actions@users.noreply.github.com"
+          git add source/cli/compilation.py source/parser/return_type_inference.py \
+            source/transpiler/stmt_visit_class.py source/transpiler/stmt_visit_class_method.py \
+            source/transpiler/expr_calls.py source/codegen/fast_jit.py
+          git diff --cached --check
+          git commit -m "[audit-fix] Repair C flow, GCC C23 fallback, LLVM varargs, and JIT capture"
+          git push origin HEAD:agent/audit-2026-09-08
