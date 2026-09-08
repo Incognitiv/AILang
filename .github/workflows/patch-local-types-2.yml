@@ -1,0 +1,60 @@
+name: Finish C backend local type propagation
+on:
+  push:
+    branches: [agent/unbounded-field-semantics]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/unbounded-field-semantics
+      - name: Patch
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('source/transpiler/expr_gen_type_impl.py')
+          s = p.read_text()
+          old = '''    if isinstance(node, A.Variable):\n        var_name = node.name\n        # Check if variable has a tracked type (from parameter or declaration)\n'''
+          new = '''    if isinstance(node, A.Variable):\n        var_name = node.name\n        local_type = getattr(self, "_current_local_c_types", {}).get(var_name)\n        if isinstance(local_type, str):\n            text = local_type.strip()\n            lower = text.lower()\n            if lower == "string":\n                return "const char *"\n            if lower in {"array", "ailang_dyn_array"}:\n                return "ailang_dyn_array"\n            if lower in {"str_array", "ailang_str_array"}:\n                return "ailang_str_array"\n            if text.endswith("*") or text.startswith("ailang_") or text in {\n                "int64_t", "int32_t", "uint64_t", "uint32_t",\n                "double", "float", "bool", "StringArray", "IntArray"\n            }:\n                return text\n            if text in self.classes:\n                return f"{text} *"\n            return self._ailang_type_to_c(text)\n        # Check if variable has a tracked type (from parameter or declaration)\n'''
+          assert old in s
+          p.write_text(s.replace(old, new, 1))
+
+          p = Path('source/transpiler/core_cleanup_reports.py')
+          s = p.read_text()
+          old = '''        if isinstance(node, A.Variable):\n            local_type = getattr(self, "_current_local_c_types", {}).get(node.name)\n            if isinstance(local_type, str):\n                c_type = local_type.strip()\n                if c_type in self.classes:\n                    return c_type\n                if c_type.endswith("*"):\n                    base = c_type[:-1].strip()\n                    if base in self.classes:\n                        return base\n        return self.type_info.class_ptr_type(node, self._current_class)\n'''
+          new = '''        if isinstance(node, A.Variable):\n            local_type = getattr(self, "_current_local_c_types", {}).get(node.name)\n            if isinstance(local_type, str):\n                c_type = local_type.strip()\n                if c_type in self.classes:\n                    return c_type\n                if c_type.endswith("*"):\n                    base = c_type[:-1].strip()\n                    if base in self.classes:\n                        return base\n        if isinstance(node, A.ThisExpr):\n            return self._current_class\n        if isinstance(node, A.FieldAccess):\n            parent = self._class_ptr_type(node.object_expr)\n            if parent is not None:\n                field_type = self._field_ailang_type(parent, node.field_name)\n                if field_type in self.classes:\n                    return field_type\n        return self.type_info.class_ptr_type(node, self._current_class)\n'''
+          assert old in s
+          s = s.replace(old, new, 1)
+          old = '''        if isinstance(node, A.BinaryOp) and node.op == "+":\n            if self._might_be_string(node.left) or self._might_be_string(node.right):\n                return True\n        return self.type_info.might_be_string(node, self.current_function)\n'''
+          new = '''        if isinstance(node, A.FieldAccess):\n            parent = self._class_ptr_type(node.object_expr)\n            if parent is not None:\n                field_type = self._field_ailang_type(parent, node.field_name)\n                if isinstance(field_type, str) and field_type.strip().lower() == "string":\n                    return True\n        if isinstance(node, A.BinaryOp) and node.op == "+":\n            if self._might_be_string(node.left) or self._might_be_string(node.right):\n                return True\n        return self.type_info.might_be_string(node, self.current_function)\n'''
+          assert old in s
+          p.write_text(s.replace(old, new, 1))
+
+          p = Path('source/transpiler/stmt_visit_class.py')
+          s = p.read_text()
+          old = '''    all_vars: Dict[str, str] = {}\n    self._collect_vars_in_body(node.body, all_vars)\n    self._current_local_c_types = dict(all_vars)\n    self._current_param_type_overrides = apply_proven_i32_narrowing(\n        self, node, all_vars\n    )\n'''
+          new = '''    all_vars: Dict[str, str] = {}\n    self._collect_vars_in_body(node.body, all_vars)\n    self._current_param_type_overrides = apply_proven_i32_narrowing(\n        self, node, all_vars\n    )\n    self._current_local_c_types = dict(all_vars)\n    for p in node.params or []:\n        if isinstance(p, tuple) and len(p) >= 2:\n            pname, ptype = str(p[0]), p[1]\n            self._current_local_c_types[pname] = self._current_param_type_overrides.get(\n                pname, parsed_type_to_str(ptype) if ptype else "i64"\n            )\n'''
+          assert old in s
+          p.write_text(s.replace(old, new, 1))
+
+          p = Path('source/transpiler/stmt_visit_class_method.py')
+          s = p.read_text()
+          old = '''    all_vars: Dict[str, str] = {}\n    self._collect_vars_in_body(method.body, all_vars)\n    self._current_local_c_types = dict(all_vars)\n'''
+          new = '''    all_vars: Dict[str, str] = {}\n    self._collect_vars_in_body(method.body, all_vars)\n    self._current_local_c_types = dict(all_vars)\n    for p in method.params or []:\n        if isinstance(p, tuple) and len(p) >= 2:\n            self._current_local_c_types[str(p[0])] = parsed_type_to_str(p[1])\n'''
+          assert old in s
+          p.write_text(s.replace(old, new, 1))
+          PY
+          python3 -m py_compile source/transpiler/expr_gen_type_impl.py source/transpiler/core_cleanup_reports.py source/transpiler/stmt_visit_class.py source/transpiler/stmt_visit_class_method.py
+          rm .github/workflows/patch-local-types-2.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'Make C expression typing function local'
+          git push origin HEAD:agent/unbounded-field-semantics
