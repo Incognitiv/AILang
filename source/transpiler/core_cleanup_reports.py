@@ -43,6 +43,12 @@ class _CTranspilerCleanupReportMixin:
                 text = local_type.strip().lower()
                 if text == "string" or "char *" in text:
                     return True
+        if isinstance(node, A.FieldAccess):
+            parent = self._class_ptr_type(node.object_expr)
+            if parent is not None:
+                field_type = self._field_ailang_type(parent, node.field_name)
+                if isinstance(field_type, str) and field_type.strip().lower() == "string":
+                    return True
         if isinstance(node, A.BinaryOp) and node.op == "+":
             if self._might_be_string(node.left) or self._might_be_string(node.right):
                 return True
@@ -174,6 +180,14 @@ class _CTranspilerCleanupReportMixin:
                     base = c_type[:-1].strip()
                     if base in self.classes:
                         return base
+        if isinstance(node, A.ThisExpr):
+            return self._current_class
+        if isinstance(node, A.FieldAccess):
+            parent = self._class_ptr_type(node.object_expr)
+            if parent is not None:
+                field_type = self._field_ailang_type(parent, node.field_name)
+                if field_type in self.classes:
+                    return field_type
         return self.type_info.class_ptr_type(node, self._current_class)
 
     def _is_owned_string_alloc(self: Any, expr: A.ASTNode) -> bool:

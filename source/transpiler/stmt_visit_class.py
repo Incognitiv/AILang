@@ -219,10 +219,16 @@ def visit_Function(self, node: A.Function) -> None:
     # Collect all variables
     all_vars: Dict[str, str] = {}
     self._collect_vars_in_body(node.body, all_vars)
-    self._current_local_c_types = dict(all_vars)
     self._current_param_type_overrides = apply_proven_i32_narrowing(
         self, node, all_vars
     )
+    self._current_local_c_types = dict(all_vars)
+    for p in node.params or []:
+        if isinstance(p, tuple) and len(p) >= 2:
+            pname, ptype = str(p[0]), p[1]
+            self._current_local_c_types[pname] = self._current_param_type_overrides.get(
+                pname, parsed_type_to_str(ptype) if ptype else "i64"
+            )
     self._length_only_string_locals = collect_length_only_string_locals(
         self, node.body, all_vars
     )

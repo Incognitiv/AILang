@@ -91,6 +91,24 @@ def _infer_type(self, node: A.ASTNode) -> str:
             return var_name
     if isinstance(node, A.Variable):
         var_name = node.name
+        local_type = getattr(self, "_current_local_c_types", {}).get(var_name)
+        if isinstance(local_type, str):
+            text = local_type.strip()
+            lower = text.lower()
+            if lower == "string":
+                return "const char *"
+            if lower in {"array", "ailang_dyn_array"}:
+                return "ailang_dyn_array"
+            if lower in {"str_array", "ailang_str_array"}:
+                return "ailang_str_array"
+            if text.endswith("*") or text.startswith("ailang_") or text in {
+                "int64_t", "int32_t", "uint64_t", "uint32_t",
+                "double", "float", "bool", "StringArray", "IntArray"
+            }:
+                return text
+            if text in self.classes:
+                return f"{text} *"
+            return self._ailang_type_to_c(text)
         # Check if variable has a tracked type (from parameter or declaration)
         if hasattr(self, "_var_types") and var_name in self._var_types:
             atype = self._var_types[var_name]

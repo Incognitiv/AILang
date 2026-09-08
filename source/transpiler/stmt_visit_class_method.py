@@ -271,6 +271,9 @@ def _generate_class_method(self, class_name: str, method: A.Function) -> None:
     all_vars: Dict[str, str] = {}
     self._collect_vars_in_body(method.body, all_vars)
     self._current_local_c_types = dict(all_vars)
+    for p in method.params or []:
+        if isinstance(p, tuple) and len(p) >= 2:
+            self._current_local_c_types[str(p[0])] = parsed_type_to_str(p[1])
 
     # Build parameter list with self pointer first
     params = f"{class_name} *self"
