@@ -110,6 +110,29 @@ jobs:
               raise SystemExit('integer type-name set anchor missing')
           p.write_text(s.replace(old, new, 1), encoding='utf-8')
 
+          # Fixed-width routing must not bypass the existing overflow proof
+          # engine. Honor RangeFacts/codegen ranges using the actual target
+          # width and signedness before selecting a typed safe helper.
+          p = Path('source/transpiler/expr_gen_binary_impl.py')
+          s = p.read_text(encoding='utf-8')
+          old = '''from transpiler.codegen_int_ranges import (\n    expr_int_range,\n    range_fits_int64,\n    range_is_positive,\n)\n'''
+          new = '''from transpiler.codegen_int_ranges import (\n    expr_int_range,\n    range_fits_int64,\n    range_fits_signed_width,\n    range_is_positive,\n)\n'''
+          if old not in s:
+              raise SystemExit('fixed proof import anchor missing')
+          s = s.replace(old, new, 1)
+
+          anchor = '''def _fixed_binary_expr(self, node: A.BinaryOp, left: str, right: str):\n'''
+          helper = '''def _fixed_arithmetic_is_proven(self, node: A.BinaryOp, info) -> bool:\n    """True when fixed-width + / - / * cannot overflow its real type."""\n    if node.op not in {"+", "-", "*"}:\n        return False\n    facts = getattr(self, "range_facts", None)\n    if facts is not None and facts.can_prove_no_overflow_for_int(\n        node,\n        self.current_function,\n        bit_width=info.bits,\n        is_unsigned=info.unsigned,\n    ):\n        return True\n    rng = expr_int_range(self, node)\n    if rng is None:\n        return False\n    if info.unsigned:\n        return 0 <= rng[0] and rng[1] <= (1 << info.bits) - 1\n    return range_fits_signed_width(rng, info.bits)\n\n\ndef _fixed_binary_expr(self, node: A.BinaryOp, left: str, right: str):\n'''
+          if anchor not in s:
+              raise SystemExit('fixed proof helper anchor missing')
+          s = s.replace(anchor, helper, 1)
+
+          old = '''    if op in ("+", "plus"):\n        return f"({l} + {r})" if self._unchecked_mode else f"ailang_safe_add_{suffix}({l}, {r})"\n    if op in ("-", "minus"):\n        return f"({l} - {r})" if self._unchecked_mode else f"ailang_safe_sub_{suffix}({l}, {r})"\n    if op in ("*", "star"):\n        return f"({l} * {r})" if self._unchecked_mode else f"ailang_safe_mul_{suffix}({l}, {r})"\n'''
+          new = '''    fixed_proven = _fixed_arithmetic_is_proven(self, node, info)\n    if op in ("+", "plus"):\n        return f"({l} + {r})" if self._unchecked_mode or fixed_proven else f"ailang_safe_add_{suffix}({l}, {r})"\n    if op in ("-", "minus"):\n        return f"({l} - {r})" if self._unchecked_mode or fixed_proven else f"ailang_safe_sub_{suffix}({l}, {r})"\n    if op in ("*", "star"):\n        return f"({l} * {r})" if self._unchecked_mode or fixed_proven else f"ailang_safe_mul_{suffix}({l}, {r})"\n'''
+          if old not in s:
+              raise SystemExit('fixed arithmetic helper-selection anchor missing')
+          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+
           # The branch now has real arbitrary-precision runtime support on
           # both native backends; old rejection tests describe a stale contract.
           t = Path('tests/test_c_wide_ints.py')
@@ -161,9 +184,15 @@ jobs:
             source/cli/compilation.py \
             source/transpiler/strlen_assign_cache.py \
             source/transpiler/expr_gen.py \
+            source/transpiler/expr_gen_binary_impl.py \
             tests/test_c_wide_ints.py \
             tests/test_llvm_wide_ints.py
           git diff --check
+
+      - name: String-length optimization regressions
+        run: |
+          set -euxo pipefail
+          pytest -q tests/test_format_strlen_budget.py
 
       - name: C fixed wide and unbounded integers
         run: |
@@ -179,11 +208,6 @@ jobs:
         run: |
           set -euxo pipefail
           pytest -q tests/test_c_string_ownership.py
-
-      - name: String-length optimization regressions
-        run: |
-          set -euxo pipefail
-          pytest -q tests/test_format_strlen_budget.py
 
       - name: Representation integrity regression
         run: |
