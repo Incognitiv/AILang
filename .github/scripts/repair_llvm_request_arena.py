@@ -20,9 +20,9 @@ replace_once(
 ''',
     '''        if getattr(self, "_module_uses_string_arena", True):
             i8_ptr = ir.IntType(8).as_pointer()
-            # arena_use() is request/thread context, not function-local state.
-            # Keep one TLS slot in the module so callees observe the arena
-            # selected by their caller, matching the C backend contract.
+            # arena_use() is request context, not function-local state. Keep one
+            # module slot so ordinary callees observe the arena selected by the
+            # caller. This matches the C backend's single-threaded fast path.
             slot = self.module.globals.get("__ailang_request_arena")
             if slot is None:
                 slot = ir.GlobalVariable(
@@ -30,7 +30,6 @@ replace_once(
                 )
                 slot.linkage = "internal"
                 slot.initializer = ir.Constant(i8_ptr, None)
-                slot.thread_local = "general"
             self._request_arena_slot = slot
 ''',
     "request arena alloca",
@@ -112,11 +111,50 @@ replace_once(
 
 p = Path("tests/test_arena_routing_llvm.py")
 s = p.read_text(encoding="utf-8")
-if "test_request_arena_slot_is_module_tls_not_function_alloca" not in s:
+old = '''    slot_refs = [ln for ln in ir_text.splitlines() if "request_arena_slot" in ln]
+    assert slot_refs
+    assert any("store i8* null" in ln for ln in slot_refs)
+    assert any("store i8*" in ln and "null" not in ln for ln in slot_refs)
+    assert "str_alloc_req_arena" in ir_text
+    assert "str_alloc_fallback" in ir_text
+'''
+new = '''    slot_refs = [ln for ln in ir_text.splitlines() if "__ailang_request_arena" in ln]
+    assert slot_refs
+    assert any("global i8* null" in ln for ln in slot_refs)
+    assert any("store i8*" in ln and "null" not in ln for ln in slot_refs)
+    assert "str_alloc_req_arena" in ir_text
+    assert "str_alloc_fallback" in ir_text
+'''
+if old not in s:
+    raise SystemExit("first arena routing test anchor missing")
+s = s.replace(old, new, 1)
+
+old = '''    null_stores = [
+        ln
+        for ln in ir_text.splitlines()
+        if "store i8* null" in ln and "request_arena_slot" in ln
+    ]
+    # One init store + one clear-on-destroy store.
+    assert len(null_stores) >= 2
+'''
+new = '''    assert '@"__ailang_request_arena" = internal global i8* null' in ir_text
+    null_stores = [
+        ln
+        for ln in ir_text.splitlines()
+        if "store i8* null" in ln and "__ailang_request_arena" in ln
+    ]
+    # arena_destroy clears the shared active-request slot.
+    assert len(null_stores) >= 1
+'''
+if old not in s:
+    raise SystemExit("destroy arena routing test anchor missing")
+s = s.replace(old, new, 1)
+
+if "test_request_arena_slot_is_module_global_not_function_alloca" not in s:
     s += r'''
 
 
-def test_request_arena_slot_is_module_tls_not_function_alloca() -> None:
+def test_request_arena_slot_is_module_global_not_function_alloca() -> None:
     src = """
 def make_value(): string
     return "value=" + str(123456)
@@ -131,8 +169,7 @@ def main(): int
 end
 """
     ir_text = _to_ir(src)
-    assert '__ailang_request_arena' in ir_text
-    assert 'thread_local' in ir_text
+    assert '@"__ailang_request_arena" = internal global i8* null' in ir_text
     assert 'request_arena_slot = alloca' not in ir_text
     assert ir_text.count('__ailang_request_arena') >= 3
     assert 'str_alloc_req_arena' in ir_text
