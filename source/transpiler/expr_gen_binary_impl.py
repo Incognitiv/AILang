@@ -11,6 +11,7 @@ from transpiler.arithmetic_literal_proofs import (
 from transpiler.codegen_int_ranges import (
     expr_int_range,
     range_fits_int64,
+    range_fits_signed_width,
     range_is_positive,
 )
 from transpiler.wide_int_types import info_for_c, promoted_info
@@ -39,6 +40,26 @@ def _fixed_binary_info(self, node: A.BinaryOp):
     if ri is not None and _literal_fits_fixed(node.left, ri):
         return ri
     return promoted_fixed_info(li, ri)
+
+
+def _fixed_arithmetic_is_proven(self, node: A.BinaryOp, info) -> bool:
+    """True when fixed-width + / - / * cannot overflow its real type."""
+    if node.op not in {"+", "-", "*"}:
+        return False
+    facts = getattr(self, "range_facts", None)
+    if facts is not None and facts.can_prove_no_overflow_for_int(
+        node,
+        self.current_function,
+        bit_width=info.bits,
+        is_unsigned=info.unsigned,
+    ):
+        return True
+    rng = expr_int_range(self, node)
+    if rng is None:
+        return False
+    if info.unsigned:
+        return 0 <= rng[0] and rng[1] <= (1 << info.bits) - 1
+    return range_fits_signed_width(rng, info.bits)
 
 
 def _fixed_binary_expr(self, node: A.BinaryOp, left: str, right: str):
@@ -83,12 +104,13 @@ def _fixed_binary_expr(self, node: A.BinaryOp, left: str, right: str):
             shifted = f"(({uctype})({l}) >> (int64_t)({right}))" if self._unchecked_mode else f"ailang_safe_shr_u{info.bits}(({uctype})({l}), (int64_t)({right}))"
             return f"(({ctype})({shifted}))"
         return f"({l} >> (int64_t)({right}))" if self._unchecked_mode else f"ailang_safe_shr_{suffix}({l}, (int64_t)({right}))"
+    fixed_proven = _fixed_arithmetic_is_proven(self, node, info)
     if op in ("+", "plus"):
-        return f"({l} + {r})" if self._unchecked_mode else f"ailang_safe_add_{suffix}({l}, {r})"
+        return f"({l} + {r})" if self._unchecked_mode or fixed_proven else f"ailang_safe_add_{suffix}({l}, {r})"
     if op in ("-", "minus"):
-        return f"({l} - {r})" if self._unchecked_mode else f"ailang_safe_sub_{suffix}({l}, {r})"
+        return f"({l} - {r})" if self._unchecked_mode or fixed_proven else f"ailang_safe_sub_{suffix}({l}, {r})"
     if op in ("*", "star"):
-        return f"({l} * {r})" if self._unchecked_mode else f"ailang_safe_mul_{suffix}({l}, {r})"
+        return f"({l} * {r})" if self._unchecked_mode or fixed_proven else f"ailang_safe_mul_{suffix}({l}, {r})"
     if op in ("/", "//"):
         return f"({l} / {r})" if self._unchecked_mode else f"ailang_safe_div_{suffix}({l}, {r})"
     if op == "%":

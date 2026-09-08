@@ -19,6 +19,15 @@ def strlen_cache_var_name(var_name: str) -> str:
     return f"__ailang_strlen_{var_name}"
 
 
+def _emission_type_map(emitter: Any) -> Dict[str, str]:
+    """Use the same function-local type facts during analysis and emission."""
+    local_types = getattr(emitter, "_current_local_c_types", None)
+    if isinstance(local_types, dict) and local_types:
+        return local_types
+    fallback = getattr(emitter, "_var_types", None)
+    return fallback if isinstance(fallback, dict) else {}
+
+
 def _is_integer_type_name(owner: Any, type_name: Any) -> bool:
     if owner._is_integer_type_name(type_name):
         return True
@@ -168,7 +177,8 @@ def update_strlen_cache_after_assign(
         return
 
     cache_var = strlen_cache_var_name(var_name)
-    value_arg = str_known_integer_arg(emitter, value)
+    type_map = _emission_type_map(emitter)
+    value_arg = str_known_integer_arg(emitter, value, type_map)
     if value_arg is not None:
         emitter.used_helpers.add("i64_decimal_len")
         emitter.emit(
@@ -177,13 +187,13 @@ def update_strlen_cache_after_assign(
         cache[var_name] = cache_var
         return
 
-    base_arg = baseconv_known_integer_arg(emitter, value)
+    base_arg = baseconv_known_integer_arg(emitter, value, type_map)
     if base_arg is not None:
         kind, arg = base_arg
         emitter.emit(f"{cache_var} = {baseconv_len_expr(emitter, kind, arg)};")
         cache[var_name] = cache_var
         return
-    if interpolation_known_length(emitter, value, getattr(emitter, "_var_types", {})):
+    if interpolation_known_length(emitter, value, type_map):
         emitter.emit(f"{cache_var} = {emitter._emit_known_strlen(value)};")
         cache[var_name] = cache_var
         return
@@ -372,5 +382,5 @@ def emit_length_only_string_reassign(
     if var_name not in (getattr(emitter, "_length_only_string_locals", None) or set()):
         return False
     return is_length_only_string_producer(
-        emitter, value, getattr(emitter, "_var_types", {})
+        emitter, value, _emission_type_map(emitter)
     )

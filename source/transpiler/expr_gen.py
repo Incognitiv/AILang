@@ -322,12 +322,15 @@ class CExprEmitter:
                 if len(parts) == 1:
                     return parts[0]
                 return "(" + " + ".join(parts) + ")"
-        dynamic_len = emit_dynamic_strlen_c(self, node)
-        if dynamic_len is not None:
-            return dynamic_len
+        # Prefer the allocation-free numeric specialization before the
+        # generic dynamic planner. Hidden string-length arguments must not
+        # materialize str(i) merely to measure it.
         virtual_len = self._emit_virtual_strlen(node)
         if virtual_len is not None:
             return virtual_len
+        dynamic_len = emit_dynamic_strlen_c(self, node)
+        if dynamic_len is not None:
+            return dynamic_len
         if isinstance(node, A.Variable):
             cached_len = lookup_c_strlen_cache(self, node)
             if cached_len is not None:
@@ -390,7 +393,14 @@ class CExprEmitter:
         if isinstance(node, A.Number):
             return not node.is_float
         if isinstance(node, A.Variable):
-            var_type = getattr(self, "_var_types", {}).get(node.name)
+            local_types = getattr(self, "_current_local_c_types", None)
+            var_type = (
+                local_types.get(node.name)
+                if isinstance(local_types, dict)
+                else None
+            )
+            if var_type is None:
+                var_type = getattr(self, "_var_types", {}).get(node.name)
             return var_type is not None and self._is_integer_type_name(var_type)
         if isinstance(node, A.UnaryOp):
             return node.op in ("+", "plus", "-", "minus") and (
@@ -436,6 +446,18 @@ class CExprEmitter:
             "u32",
             "u64",
             "usize",
+            "int8_t",
+            "int16_t",
+            "int32_t",
+            "int64_t",
+            "uint8_t",
+            "uint16_t",
+            "uint32_t",
+            "uint64_t",
+            "size_t",
+            "ssize_t",
+            "long long",
+            "unsigned long long",
         }:
             return True
         if lowered.startswith("int") and lowered[3:].isdigit():

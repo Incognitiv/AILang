@@ -195,6 +195,7 @@ class _CTranspilerTypeLoweringMixin:
             # f128/quad is intentionally handled fail-closed above the map.
             # Other types
             "bool": "bool",
+            "i1": "bool",  # parser canonical spelling for AILang bool
             "string": "const char *",
             "str": "const char *",
             "void": "void",
