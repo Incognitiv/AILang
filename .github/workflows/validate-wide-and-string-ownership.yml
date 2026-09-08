@@ -57,9 +57,15 @@ jobs:
           s = s.replace(old, new, 1)
 
           old = '''        if isinstance(node, A.Variable):\n            var_type = getattr(self, "_var_types", {}).get(node.name)\n            return var_type is not None and self._is_integer_type_name(var_type)\n'''
-          new = '''        if isinstance(node, A.Variable):\n            # Expression emission must use the same function-local type facts\n            # as the scanner. `_var_types` is mutable cross-function state and\n            # can miss locals such as loop counters, disabling virtual strlen\n            # and causing hidden str(i) allocations.\n            local_types = getattr(self, "_current_local_c_types", None)\n            var_type = (\n                local_types.get(node.name)\n                if isinstance(local_types, dict)\n                else None\n            )\n            if var_type is None:\n                var_type = getattr(self, "_var_types", {}).get(node.name)\n            return var_type is not None and self._is_integer_type_name(var_type)\n'''
+          new = '''        if isinstance(node, A.Variable):\n            local_types = getattr(self, "_current_local_c_types", None)\n            var_type = (\n                local_types.get(node.name)\n                if isinstance(local_types, dict)\n                else None\n            )\n            if var_type is None:\n                var_type = getattr(self, "_var_types", {}).get(node.name)\n            return var_type is not None and self._is_integer_type_name(var_type)\n'''
           if old not in s:
               raise SystemExit('known integer local-type anchor missing')
+          s = s.replace(old, new, 1)
+
+          old = '''            "usize",\n        }:\n            return True\n        if lowered.startswith("int") and lowered[3:].isdigit():\n'''
+          new = '''            "usize",\n            "int8_t",\n            "int16_t",\n            "int32_t",\n            "int64_t",\n            "uint8_t",\n            "uint16_t",\n            "uint32_t",\n            "uint64_t",\n            "size_t",\n            "ssize_t",\n            "long long",\n            "unsigned long long",\n        }:\n            return True\n        if lowered.startswith("int") and lowered[3:].isdigit():\n'''
+          if old not in s:
+              raise SystemExit('integer type-name set anchor missing')
           p.write_text(s.replace(old, new, 1), encoding='utf-8')
           PY
           python -m py_compile source/transpiler/strlen_assign_cache.py source/transpiler/expr_gen.py
