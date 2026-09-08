@@ -543,7 +543,13 @@ def compile_to_native(
         print(f"Error: {exc}")
         return False
     auto_link_flags = _detect_llvm_link_flags(_ll_src)
-    link_flags = _merge_link_flags(explicit_link_flags, ["-lm"], auto_link_flags)
+    platform_link_flags: list[str] = []
+    if os_from_platform() == "freebsd" and Path("/usr/local/lib").is_dir():
+        # FreeBSD Ports libraries are outside the base-system clang search path.
+        platform_link_flags.append("-L/usr/local/lib")
+    link_flags = _merge_link_flags(
+        explicit_link_flags, ["-lm"], platform_link_flags, auto_link_flags
+    )
     if pgo_generate_dir or pgo_use_dir:
         print(
             "Error: --pgo-generate/--pgo-use are C-backend PGO flags. "
