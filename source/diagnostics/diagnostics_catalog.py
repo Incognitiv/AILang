@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Dict, Optional, Tuple
-
 from diagnostics.diagnostics_catalog_builtins import BUILTINS
 
 # Token sequence patterns: (pattern) -> (message, suggested_fix)
-PATTERN_FIXES: Dict[Tuple[str, ...], Tuple[Optional[str], Optional[str]]] = {
+PATTERN_FIXES: dict[tuple[str, ...], tuple[str | None, str | None]] = {
     # Assignment in condition (should be ==)
     ("IF", "IDENT", "ASSIGN", "NUMBER", "THEN"): (
         "Assignment in condition. Use '==' for comparison.",
@@ -36,7 +34,7 @@ PATTERN_FIXES: Dict[Tuple[str, ...], Tuple[Optional[str], Optional[str]]] = {
 }
 
 # Single token mistakes
-TOKEN_HINTS: Dict[str, Tuple[str, Optional[str]]] = {
+TOKEN_HINTS: dict[str, tuple[str, str | None]] = {
     "elif": ("AILang uses 'elsif', not 'elif'.", "elsif"),
     "else if": ("AILang uses 'elsif', not 'else if'.", "elsif"),
     "elseif": ("AILang uses 'elsif', not 'elseif'.", "elsif"),

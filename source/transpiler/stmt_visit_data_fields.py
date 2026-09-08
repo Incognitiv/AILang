@@ -206,9 +206,7 @@ def visit_DictAssign(self, node: A.DictAssign) -> None:
                 f"  if (__ailang_fixed_idx < 0 || __ailang_fixed_idx >= {int(fixed_len)}) "
                 f'__ailang_safety_trap("array index out of bounds");'
             )
-            self.emit(
-                f"  {dict_expr}[__ailang_fixed_idx] = {val};"
-            )
+            self.emit(f"  {dict_expr}[__ailang_fixed_idx] = {val};")
             self.emit("}")
             return
 

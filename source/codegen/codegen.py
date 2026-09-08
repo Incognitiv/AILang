@@ -8,7 +8,7 @@ import os
 from parser.ast import (
     Function,
 )
-from typing import Any, Optional
+from typing import Any
 
 from llvmlite import binding, ir
 from runtime.arena import ArenaGenerator
@@ -44,8 +44,8 @@ class CodeGen(
     """
 
     module: ir.Module
-    builder: Optional[ir.IRBuilder]
-    func: Optional[ir.Function]
+    builder: ir.IRBuilder | None
+    func: ir.Function | None
     locals: dict[str, ir.Value]
     functions: dict[str, ir.Function]
     loop_stack: list[tuple[ir.Block, ir.Block]]
@@ -55,8 +55,8 @@ class CodeGen(
     record_field_defaults: dict[str, dict[str, Any]]
     enum_values: dict[str, int]
     in_try_block: bool
-    current_landingpad: Optional[Any]
-    personality_func: Optional[ir.Function]
+    current_landingpad: Any | None
+    personality_func: ir.Function | None
     monomorphizer: Monomorphizer
 
     def __init__(self) -> None:
@@ -101,9 +101,7 @@ class CodeGen(
         self.loop_depth: int = 0
         # Array metadata: varname -> (length, element_type)
         self.array_metadata: dict[str, tuple[int, Any]] = {}
-        self._array_literal_value_hints: dict[
-            tuple[Optional[str], str], tuple[int, ...]
-        ]
+        self._array_literal_value_hints: dict[tuple[str | None, str], tuple[int, ...]]
         self._array_literal_value_hints = {}
         # Global variables registry
         self.globals: dict[str, ir.GlobalVariable] = {}  # name -> ir.GlobalVariable
@@ -121,8 +119,8 @@ class CodeGen(
             {}
         )  # name -> [(visibility, field_name, field_type, init_value), ...]
         self.class_methods: dict[str, list[Function]] = {}  # name -> [Function, ...]
-        self.current_class: Optional[str] = None  # Current class being compiled
-        self.current_this: Optional[ir.Value] = None  # 'this' pointer in methods
+        self.current_class: str | None = None  # Current class being compiled
+        self.current_this: ir.Value | None = None  # 'this' pointer in methods
         # Parameter class types for type annotations (Option 2: explicit types)
         # Maps (function_name, param_name) -> class_type_name
         self.param_class_types: dict[tuple[str, str], str] = {}
@@ -132,7 +130,7 @@ class CodeGen(
         self._virtual_string_length_only_fields: set[tuple[str, str]] = set()
         self._virtual_string_elidable_params: set[tuple[str, str, int]] = set()
         self._stack_array_field_values: dict[tuple[str, str], tuple[Any, ...]] = {}
-        self._inline_this_stack_var: Optional[str] = None
+        self._inline_this_stack_var: str | None = None
         self._optimizer_decisions: list[dict[str, object]] = []
         self._optimizer_summary: dict[str, int] = {}
         # Stack of objects that need cleanup when scope exits
@@ -158,91 +156,91 @@ class CodeGen(
         self.in_try_block = False
         self.current_landingpad = None
         self.personality_func = None
-        self._exc_msg_global: Optional[ir.GlobalVariable] = None
-        self._exc_type_global: Optional[ir.GlobalVariable] = None
+        self._exc_msg_global: ir.GlobalVariable | None = None
+        self._exc_type_global: ir.GlobalVariable | None = None
         self._exc_handler_stack: list[ir.Block] = []
         # @synchronized mutex state (per-function, set during codegen)
-        self._synchronized_mutex_ptr: Optional[Any] = None
+        self._synchronized_mutex_ptr: Any | None = None
         # Lazy-loaded external functions (only declare when needed)
-        self.printf_func: Optional[ir.Function] = None
-        self.puts_func: Optional[ir.Function] = None
-        self.strlen_func: Optional[ir.Function] = None
-        self.strcat_func: Optional[ir.Function] = None
-        self.strcmp_func: Optional[ir.Function] = None
-        self.sprintf_func: Optional[ir.Function] = None
-        self.snprintf_func: Optional[ir.Function] = None
-        self.malloc_func: Optional[ir.Function] = None
-        self.strcpy_func: Optional[ir.Function] = None
-        self.fopen_func: Optional[ir.Function] = None
-        self.fclose_func: Optional[ir.Function] = None
-        self.fwrite_func: Optional[ir.Function] = None
-        self.fread_func: Optional[ir.Function] = None
-        self.fseek_func: Optional[ir.Function] = None
-        self.ftell_func: Optional[ir.Function] = None
-        self.fgets_func: Optional[ir.Function] = None
-        self.fgetc_func: Optional[ir.Function] = None
-        self.setvbuf_func: Optional[ir.Function] = None
-        self.strncpy_func: Optional[ir.Function] = None
-        self.strncmp_func: Optional[ir.Function] = None
-        self.stdin_var: Optional[ir.GlobalVariable] = None
-        self.memcpy_func: Optional[ir.Function] = None
-        self.strstr_func: Optional[ir.Function] = None
-        self.realloc_func: Optional[ir.Function] = None
-        self.sqlite3_open_func: Optional[ir.Function] = None
-        self.sqlite3_open_v2_func: Optional[ir.Function] = None
-        self.sqlite3_close_func: Optional[ir.Function] = None
-        self.sqlite3_exec_func: Optional[ir.Function] = None
-        self.sqlite3_errmsg_func: Optional[ir.Function] = None
-        self.sqlite3_prepare_v2_func: Optional[ir.Function] = None
-        self.sqlite3_step_func: Optional[ir.Function] = None
-        self.sqlite3_bind_int64_func: Optional[ir.Function] = None
-        self.sqlite3_bind_text_func: Optional[ir.Function] = None
-        self.sqlite3_bind_null_func: Optional[ir.Function] = None
-        self.sqlite3_clear_bindings_func: Optional[ir.Function] = None
-        self.sqlite3_reset_func: Optional[ir.Function] = None
-        self.sqlite3_column_int64_func: Optional[ir.Function] = None
-        self.sqlite3_column_text_func: Optional[ir.Function] = None
-        self.sqlite3_finalize_func: Optional[ir.Function] = None
+        self.printf_func: ir.Function | None = None
+        self.puts_func: ir.Function | None = None
+        self.strlen_func: ir.Function | None = None
+        self.strcat_func: ir.Function | None = None
+        self.strcmp_func: ir.Function | None = None
+        self.sprintf_func: ir.Function | None = None
+        self.snprintf_func: ir.Function | None = None
+        self.malloc_func: ir.Function | None = None
+        self.strcpy_func: ir.Function | None = None
+        self.fopen_func: ir.Function | None = None
+        self.fclose_func: ir.Function | None = None
+        self.fwrite_func: ir.Function | None = None
+        self.fread_func: ir.Function | None = None
+        self.fseek_func: ir.Function | None = None
+        self.ftell_func: ir.Function | None = None
+        self.fgets_func: ir.Function | None = None
+        self.fgetc_func: ir.Function | None = None
+        self.setvbuf_func: ir.Function | None = None
+        self.strncpy_func: ir.Function | None = None
+        self.strncmp_func: ir.Function | None = None
+        self.stdin_var: ir.GlobalVariable | None = None
+        self.memcpy_func: ir.Function | None = None
+        self.strstr_func: ir.Function | None = None
+        self.realloc_func: ir.Function | None = None
+        self.sqlite3_open_func: ir.Function | None = None
+        self.sqlite3_open_v2_func: ir.Function | None = None
+        self.sqlite3_close_func: ir.Function | None = None
+        self.sqlite3_exec_func: ir.Function | None = None
+        self.sqlite3_errmsg_func: ir.Function | None = None
+        self.sqlite3_prepare_v2_func: ir.Function | None = None
+        self.sqlite3_step_func: ir.Function | None = None
+        self.sqlite3_bind_int64_func: ir.Function | None = None
+        self.sqlite3_bind_text_func: ir.Function | None = None
+        self.sqlite3_bind_null_func: ir.Function | None = None
+        self.sqlite3_clear_bindings_func: ir.Function | None = None
+        self.sqlite3_reset_func: ir.Function | None = None
+        self.sqlite3_column_int64_func: ir.Function | None = None
+        self.sqlite3_column_text_func: ir.Function | None = None
+        self.sqlite3_finalize_func: ir.Function | None = None
         # Dict runtime functions (generated inline)
-        self.dict_create_func: Optional[ir.Function] = None
-        self.dict_set_func: Optional[ir.Function] = None
-        self.dict_get_func: Optional[ir.Function] = None
-        self.dict_get_type_func: Optional[ir.Function] = None
-        self.dict_type: Optional[ir.LiteralStructType] = None
+        self.dict_create_func: ir.Function | None = None
+        self.dict_set_func: ir.Function | None = None
+        self.dict_get_func: ir.Function | None = None
+        self.dict_get_type_func: ir.Function | None = None
+        self.dict_type: ir.LiteralStructType | None = None
         # Threading runtime functions (Windows: CreateThread, etc.)
-        self.create_thread_func: Optional[ir.Function] = None
-        self.wait_for_single_object_func: Optional[ir.Function] = None
-        self.close_handle_func: Optional[ir.Function] = None
-        self.get_exit_code_thread_func: Optional[ir.Function] = None
-        self.exit_func: Optional[ir.Function] = None  # C exit() function
+        self.create_thread_func: ir.Function | None = None
+        self.wait_for_single_object_func: ir.Function | None = None
+        self.close_handle_func: ir.Function | None = None
+        self.get_exit_code_thread_func: ir.Function | None = None
+        self.exit_func: ir.Function | None = None  # C exit() function
         # Threading runtime functions (POSIX: pthread_create, etc.)
-        self.pthread_create_func: Optional[ir.Function] = None
-        self.pthread_join_func: Optional[ir.Function] = None
+        self.pthread_create_func: ir.Function | None = None
+        self.pthread_join_func: ir.Function | None = None
         # Synchronization primitives (mutex, condvar, rwlock)
-        self._mutex_funcs: dict[str, Optional[ir.Function]] = {}
-        self._cond_funcs: dict[str, Optional[ir.Function]] = {}
-        self._rwlock_funcs: dict[str, Optional[ir.Function]] = {}
+        self._mutex_funcs: dict[str, ir.Function | None] = {}
+        self._cond_funcs: dict[str, ir.Function | None] = {}
+        self._rwlock_funcs: dict[str, ir.Function | None] = {}
         # Clock/timing functions (Windows: QueryPerformanceCounter, POSIX: clock_gettime)
-        self.qpc_func: Optional[ir.Function] = None  # QueryPerformanceCounter
-        self.qpf_func: Optional[ir.Function] = None  # QueryPerformanceFrequency
-        self.clock_gettime_func: Optional[ir.Function] = None  # POSIX clock_gettime
+        self.qpc_func: ir.Function | None = None  # QueryPerformanceCounter
+        self.qpf_func: ir.Function | None = None  # QueryPerformanceFrequency
+        self.clock_gettime_func: ir.Function | None = None  # POSIX clock_gettime
         # Math functions (libm)
-        self.exp_func: Optional[ir.Function] = None
-        self.log_func: Optional[ir.Function] = None
-        self.sqrt_func: Optional[ir.Function] = None
-        self.sin_func: Optional[ir.Function] = None
-        self.cos_func: Optional[ir.Function] = None
-        self.tan_func: Optional[ir.Function] = None
-        self.tanh_func: Optional[ir.Function] = None
-        self.pow_func: Optional[ir.Function] = None
-        self.floor_func: Optional[ir.Function] = None
-        self.ceil_func: Optional[ir.Function] = None
-        self.fabs_func: Optional[ir.Function] = None
+        self.exp_func: ir.Function | None = None
+        self.log_func: ir.Function | None = None
+        self.sqrt_func: ir.Function | None = None
+        self.sin_func: ir.Function | None = None
+        self.cos_func: ir.Function | None = None
+        self.tan_func: ir.Function | None = None
+        self.tanh_func: ir.Function | None = None
+        self.pow_func: ir.Function | None = None
+        self.floor_func: ir.Function | None = None
+        self.ceil_func: ir.Function | None = None
+        self.fabs_func: ir.Function | None = None
         # Channel type: struct { capacity, head, tail, closed, lock, buffer_ptr }
         # This is a bounded SPMC (single-producer multiple-consumer) channel
-        self.channel_type: Optional[ir.LiteralStructType] = None
+        self.channel_type: ir.LiteralStructType | None = None
         # Recursion depth tracking for stack overflow protection
-        self.recursion_depth_global: Optional[ir.GlobalVariable] = None
+        self.recursion_depth_global: ir.GlobalVariable | None = None
         self.max_recursion_depth = 10000  # Configurable limit
         # Profile instrumentation (--profile). When True, generate_function
         # injects calls to __ailang_prof_enter/__ailang_prof_exit at entry
@@ -255,8 +253,8 @@ class CodeGen(
         # this without setting profile_enabled - they want gdb/perf to see
         # AILang names but cannot link the Python thunks the JIT path uses.
         self.debug_info_enabled: bool = False
-        self._prof_enter_func: Optional[ir.Function] = None
-        self._prof_exit_func: Optional[ir.Function] = None
+        self._prof_enter_func: ir.Function | None = None
+        self._prof_exit_func: ir.Function | None = None
         # Cache one global string constant per function name so we don't
         # re-emit the same NUL-terminated literal for every return path.
         self._prof_name_consts: dict[str, ir.Value] = {}
@@ -277,25 +275,25 @@ class CodeGen(
         self._di_module_flags_emitted: bool = False
         self._di_files: dict[str, ir.DIValue] = {}
         self._di_cus: dict[str, ir.DIValue] = {}
-        self._di_subroutine_type: Optional[ir.DIValue] = None
+        self._di_subroutine_type: ir.DIValue | None = None
         # Currently-being-generated function's DISubprogram (set in
         # generate_function entry, restored on exit). stmt_generator reads
         # this to attach per-statement !DILocation to the IRBuilder.
-        self._current_di_sp: Optional[ir.DIValue] = None
+        self._current_di_sp: ir.DIValue | None = None
         # Memoized DILocation per (function_name, line) so we don't emit
         # one node per statement-instance - typical AILang programs have
         # at most a few hundred unique lines per function.
         self._di_loc_cache: dict[tuple[str, int], ir.DIValue] = {}
         # Command-line argument globals (argc/argv)
-        self.argc_global: Optional[ir.GlobalVariable] = None
-        self.argv_global: Optional[ir.GlobalVariable] = None
+        self.argc_global: ir.GlobalVariable | None = None
+        self.argv_global: ir.GlobalVariable | None = None
         self._module_uses_program_args: bool = False
         # Unchecked mode: when True, skip overflow/bounds checking for max speed
         self._unchecked_mode: bool = False
         # Fastmath mode: when True, allow less precise but faster float ops
         self._fastmath_mode: bool = False
         # Function scope marker used by proof-based arithmetic elision.
-        self._current_function_name: Optional[str] = None
+        self._current_function_name: str | None = None
         self._stack_class_cleanup_plans: dict[str, Any] = {}
         self._loop_stack_class_cleanup: list[list[str]] = []
         self._recursive_functions: set[str] = set()
@@ -307,28 +305,28 @@ class CodeGen(
         self._codegen_int_ranges: dict[str, tuple[int, int]] = {}
         self._codegen_field_int_ranges: dict[tuple[str, str], tuple[int, int]] = {}
         # File streaming optimization - global state for cached file handle
-        self._stream_file_global: Optional[ir.GlobalVariable] = None
-        self._stream_path_global: Optional[ir.GlobalVariable] = None
-        self._stream_write_func: Optional[ir.Function] = None
-        self._stream_close_func: Optional[ir.Function] = None
+        self._stream_file_global: ir.GlobalVariable | None = None
+        self._stream_path_global: ir.GlobalVariable | None = None
+        self._stream_write_func: ir.Function | None = None
+        self._stream_close_func: ir.Function | None = None
         # Refactored generators
         self.expr_generator = ExprGenerator(self)
         self.stmt_generator = StmtGenerator(self)
         # Bigint (unbounded) type support
-        self._bigint_type: Optional[ir.LiteralStructType] = None
-        self._bigint_new_func: Optional[ir.Function] = None
-        self._bigint_from_int_func: Optional[ir.Function] = None
-        self._bigint_add_func: Optional[ir.Function] = None
-        self._bigint_sub_func: Optional[ir.Function] = None
-        self._bigint_mul_func: Optional[ir.Function] = None
-        self._bigint_div_func: Optional[ir.Function] = None
-        self._bigint_pow_func: Optional[ir.Function] = None
-        self._bigint_cmp_func: Optional[ir.Function] = None
-        self._bigint_print_func: Optional[ir.Function] = None
-        self._bigint_digits_func: Optional[ir.Function] = None
-        self._bigint_free_func: Optional[ir.Function] = None
+        self._bigint_type: ir.LiteralStructType | None = None
+        self._bigint_new_func: ir.Function | None = None
+        self._bigint_from_int_func: ir.Function | None = None
+        self._bigint_add_func: ir.Function | None = None
+        self._bigint_sub_func: ir.Function | None = None
+        self._bigint_mul_func: ir.Function | None = None
+        self._bigint_div_func: ir.Function | None = None
+        self._bigint_pow_func: ir.Function | None = None
+        self._bigint_cmp_func: ir.Function | None = None
+        self._bigint_print_func: ir.Function | None = None
+        self._bigint_digits_func: ir.Function | None = None
+        self._bigint_free_func: ir.Function | None = None
         # Memory management functions
-        self.free_func: Optional[ir.Function] = None
+        self.free_func: ir.Function | None = None
         # Template system - compiled foreign code IRs
         self.template_irs: list[str] = []
         # Arena-based string memory management.
@@ -354,12 +352,12 @@ class CodeGen(
         # See core/memory.ail for helpers that check arena_used /
         # system_ram_total and abort gracefully before exhaustion.
         self._arena_gen = ArenaGenerator(self)
-        self._string_arena: Optional[ir.Value] = None  # Active string arena (i8*)
+        self._string_arena: ir.Value | None = None  # Active string arena (i8*)
         self._module_uses_string_arena = True
         # Per-function request-arena routing slot. arena_use(handle) stores
         # the currently selected arena pointer here; string_alloc() loads it
         # on each allocation so control-flow updates remain sound.
-        self._request_arena_slot: Optional[ir.Value] = None
+        self._request_arena_slot: ir.Value | None = None
         self._string_arena_size = 16 * 1024 * 1024  # 16 MB initial chunk
         # Track heap-allocated temporary strings for cleanup (legacy, used without arena)
         self.temp_strings: set[str] = set()

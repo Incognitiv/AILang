@@ -75,17 +75,17 @@ def report_runtime_needs(source_file: str, *, as_json: bool = False) -> bool:
         return True
 
     print(f"Runtime needs report for: {source_file}")
-    print("")
+    print()
     print(f"helper_count={helper_count}")
     print(f"generated_c_bytes={generated_c_bytes}")
     print(f"spawn_target_count={spawn_target_count}")
-    print("")
+    print()
     print("families:")
     for name in RUNTIME_FAMILY_NAMES:
         enabled = "yes" if normalized_families.get(name, False) else "no"
         count = normalized_family_helper_counts.get(name, 0)
         print(f"  {name}: {enabled} (helpers={count})")
-    print("")
+    print()
     print("helpers:")
     if helpers_sorted:
         for name in helpers_sorted:
@@ -376,7 +376,7 @@ def report_ffi(source_file: str, *, as_json: bool = False) -> bool:
         return True
 
     print(f"FFI report for: {source_file}")
-    print("")
+    print()
     print(f"target_os={payload['target_os']}")
     for key in (
         "include_count",
@@ -399,16 +399,16 @@ def report_ffi(source_file: str, *, as_json: bool = False) -> bool:
         print(
             "unsupported_cinclude_backends=" + ",".join(unsupported_cinclude_backends)
         )
-    print("")
+    print()
     print("cinclude support:")
     for backend, support in cinclude_support.items():
         print(f"  {backend}: {support['status']}")
-    print("")
+    print()
     if backend_warnings:
         print("backend warnings:")
         for warning in backend_warnings:
             print(f"  {warning}")
-        print("")
+        print()
     print("cinclude diagnostics:")
     if cinclude_diagnostics:
         for row in cinclude_diagnostics:
@@ -419,7 +419,7 @@ def report_ffi(source_file: str, *, as_json: bool = False) -> bool:
             print(f"    hint: {row['suggestion']}")
     else:
         print("  (none)")
-    print("")
+    print()
     print("includes:")
     for row in includes or [{"path": "(none)", "system": False}]:
         scope = "system" if row.get("system") else "local"
@@ -550,14 +550,14 @@ def report_checks(source_file: str, *, as_json: bool = False) -> bool:
         return True
 
     print(f"Check report for: {source_file}")
-    print("")
+    print()
     if not summary:
         print("summary: no check decisions recorded")
     else:
         print("summary:")
         for key in sorted(summary):
             print(f"  {key}={summary[key]}")
-    print("")
+    print()
     print("decisions:")
     if not decisions:
         print("  (none)")
@@ -614,14 +614,14 @@ def report_format(source_file: str, *, as_json: bool = False) -> bool:
         return True
 
     print(f"Format report for: {source_file}")
-    print("")
+    print()
     if not summary:
         print("summary: no format decisions recorded")
     else:
         print("summary:")
         for key in sorted(summary):
             print(f"  {key}={summary[key]}")
-    print("")
+    print()
     print("decisions:")
     if not decisions:
         print("  (none)")
@@ -710,7 +710,7 @@ def report_effect_policy(source_file: str, *, as_json: bool = False) -> bool:
         for key in sorted(by_effect):
             print(f"  {key}={by_effect[key]}")
     if violations:
-        print("")
+        print()
         print("violations:")
         for row in violations:
             print(

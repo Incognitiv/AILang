@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 from parser import ast as A
-from typing import Any, List, Optional, Set
+from typing import Any
 
 from ast_access import arg_at
 from transpiler.class_field_ownership import (
@@ -52,10 +52,10 @@ class CExprEmitter:
     # mypy uses these to type-check the legacy ``self.X`` access patterns
     # in the method bodies below; at runtime every read/write is
     # forwarded to the transpiler via ``__getattr__`` / ``__setattr__``.
-    output: List[str]
-    current_function: Optional[str]
-    user_defined_funcs: Set[str]
-    _current_class: Optional[str]
+    output: list[str]
+    current_function: str | None
+    user_defined_funcs: set[str]
+    _current_class: str | None
     _unchecked_mode: bool
     _scanning_unchecked: bool
     _loop_depth: int
@@ -194,11 +194,11 @@ class CExprEmitter:
             return f"({left} {op} {right})"
         return f"/* unknown: {type(node).__name__} */"
 
-    def _flatten_string_concat(self, node: A.BinaryOp) -> Optional[List[A.ASTNode]]:
+    def _flatten_string_concat(self, node: A.BinaryOp) -> list[A.ASTNode] | None:
         """Walk a left-associative `+` chain of strings into a flat
         list of operand nodes. Returns None if any operand isn't
         clearly string-typed (so we fall back to the pairwise path)."""
-        operands: List[A.ASTNode] = []
+        operands: list[A.ASTNode] = []
 
         def walk(n: A.ASTNode) -> bool:
             if (
@@ -218,7 +218,7 @@ class CExprEmitter:
             return None
         return operands
 
-    def _emit_strcat_n(self, parts: List[A.ASTNode]) -> str:
+    def _emit_strcat_n(self, parts: list[A.ASTNode]) -> str:
         """Emit a single `ailang_strcat_n(N, parts_arr, owned_arr, lens_arr)`
         call covering all operands of a `+`-chain. The lens_arr lets the
         helper skip strlen() on parts whose length is known at compile
@@ -226,9 +226,9 @@ class CExprEmitter:
         the SQLite/printf wins; literals account for ~half of strcat_n
         parts in the status hot path. `(size_t)-1` means
         "unknown, call strlen"."""
-        rendered: List[str] = []
-        owned: List[str] = []
-        lens: List[str] = []
+        rendered: list[str] = []
+        owned: list[str] = []
+        lens: list[str] = []
         for p in parts:
             rendered.append(f"(const char *)({self.expr(p)})")
             owned.append("1" if self._is_owned_string_alloc(p) else "0")
@@ -239,7 +239,7 @@ class CExprEmitter:
         lens_lit = "(const size_t []){" + ", ".join(lens) + "}"
         return f"ailang_strcat_n({len(parts)}, {parts_lit}, {owned_lit}, {lens_lit})"
 
-    def _emit_lit_i64_concat(self, node: A.BinaryOp) -> Optional[str]:
+    def _emit_lit_i64_concat(self, node: A.BinaryOp) -> str | None:
         """Fuse `"literal" + str(i64)` into one allocation.
 
         The generic lowering allocates `str(i)` and then allocates the
@@ -263,7 +263,7 @@ class CExprEmitter:
         value = self.expr(arg_at(node.right, 0))
         return f"ailang_strcat_lit_i64({prefix}, {prefix_len}u, {value})"
 
-    def _emit_virtual_strlen(self, node: A.ASTNode) -> Optional[str]:
+    def _emit_virtual_strlen(self, node: A.ASTNode) -> str | None:
         """Lower strlen("literal" + str(int)) without materializing a string."""
         if not isinstance(node, A.BinaryOp):
             return None
@@ -287,9 +287,7 @@ class CExprEmitter:
             return f"ailang_i64_decimal_len({value})"
         return f"({prefix_len}LL + ailang_i64_decimal_len({value}))"
 
-    def _emit_known_strlen(
-        self, node: A.ASTNode, rendered: Optional[str] = None
-    ) -> str:
+    def _emit_known_strlen(self, node: A.ASTNode, rendered: str | None = None) -> str:
         """Return a known/cached string length expression when possible."""
         static_len = static_string_byte_length(node)
         if static_len is not None:
@@ -368,7 +366,7 @@ class CExprEmitter:
             param_index,
         ) in getattr(self, "_virtual_string_elidable_params", set())
 
-    def _cached_field_strlen(self, node: A.FieldAccess) -> Optional[str]:
+    def _cached_field_strlen(self, node: A.FieldAccess) -> str | None:
         owner_class = None
         if isinstance(node.object_expr, A.ThisExpr):
             owner_class = self._current_class
@@ -395,9 +393,7 @@ class CExprEmitter:
         if isinstance(node, A.Variable):
             local_types = getattr(self, "_current_local_c_types", None)
             var_type = (
-                local_types.get(node.name)
-                if isinstance(local_types, dict)
-                else None
+                local_types.get(node.name) if isinstance(local_types, dict) else None
             )
             if var_type is None:
                 var_type = getattr(self, "_var_types", {}).get(node.name)
@@ -500,9 +496,17 @@ class CExprEmitter:
                 if index < len(ownership_sources):
                     source = ownership_sources[index]
                     if init_method is not None:
-                        source_type = source[1] if isinstance(source, tuple) and len(source) >= 2 else None
+                        source_type = (
+                            source[1]
+                            if isinstance(source, tuple) and len(source) >= 2
+                            else None
+                        )
                     else:
-                        source_type = source[2] if isinstance(source, tuple) and len(source) >= 3 else None
+                        source_type = (
+                            source[2]
+                            if isinstance(source, tuple) and len(source) >= 3
+                            else None
+                        )
                     if source_type is not None:
                         checked_arg = checked_fixed_int_conversion_expr(
                             self, arg, arg_expr, source_type
@@ -585,7 +589,9 @@ class CExprEmitter:
                         checked_arg = checked_fixed_int_conversion_expr(
                             self, arg_node, arg_code, field_type
                         )
-                        args.append(checked_arg if checked_arg is not None else arg_code)
+                        args.append(
+                            checked_arg if checked_arg is not None else arg_code
+                        )
                     field_inits = ", ".join(
                         f".{field_name} = {arg}"
                         for (field_name, _), arg in zip(
@@ -628,7 +634,7 @@ class CExprEmitter:
                 )
         return f"{enum_name}_{variant_name}"
 
-    def _expr_concurrency(self, node: A.ASTNode) -> Optional[str]:
+    def _expr_concurrency(self, node: A.ASTNode) -> str | None:
         """Generate C code for concurrency-related expressions."""
         # Threading: spawn - create new thread.
         # ailang_spawn / per-target callers return `ailang_thread_t *` but
@@ -694,7 +700,7 @@ class CExprEmitter:
             return f"ailang_atomic_cas(&{ptr}, {expected}, {desired})"
         return f"/* atomic_{node.op}: unknown operation */"
 
-    def _expr_channel(self, node: A.ASTNode) -> Optional[str]:
+    def _expr_channel(self, node: A.ASTNode) -> str | None:
         """Generate C code for channel operations.
         Like the SQLite handle bridge: AILang exposes channels as
         int64_t to user code, but the C runtime works with

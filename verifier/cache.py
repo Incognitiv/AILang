@@ -4,13 +4,12 @@ import hashlib
 import json
 import time
 from pathlib import Path
-from typing import Dict, Optional
 
 
 class VerificationCache:
     """Cache verification results keyed by file content hash"""
 
-    def __init__(self, cache_dir: Optional[Path] = None):
+    def __init__(self, cache_dir: Path | None = None):
         if cache_dir is None:
             cache_dir = Path.home() / ".cache" / "python_verifier"
         self.cache_dir = cache_dir
@@ -26,7 +25,7 @@ class VerificationCache:
         """Get cache file path for given hash"""
         return self.cache_dir / f"{code_hash}.json"
 
-    def get(self, code: str, preset: str) -> Optional[Dict]:
+    def get(self, code: str, preset: str) -> dict | None:
         """Retrieve cached results if valid, None otherwise"""
         code_hash = self._compute_hash(code, preset)
         cache_file = self._cache_path(code_hash)
@@ -49,7 +48,7 @@ class VerificationCache:
         except (json.JSONDecodeError, OSError):
             return None
 
-    def set(self, code: str, preset: str, results: Dict) -> None:
+    def set(self, code: str, preset: str, results: dict) -> None:
         """Cache verification results"""
         code_hash = self._compute_hash(code, preset)
         cache_file = self._cache_path(code_hash)

@@ -471,7 +471,7 @@ def test_ui_layout_state_check_runs_with_null_backend(tmp_path: Path) -> None:
     build_proc = subprocess.run(
         [
             gcc,
-            "-std=gnu23",
+            "-std=gnu2x",
             str(generated_c),
             str(NULL_BACKEND),
             "-o",

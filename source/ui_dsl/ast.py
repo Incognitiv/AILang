@@ -40,7 +40,7 @@ class UiNode:
     tag: str
     name: str = ""
     properties: list[UiProperty] = field(default_factory=list)
-    children: list["UiNode"] = field(default_factory=list)
+    children: list[UiNode] = field(default_factory=list)
     line: int = 0
     col: int = 0
 

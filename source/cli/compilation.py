@@ -335,7 +335,7 @@ def compile_via_c(
         # standard, etc. Pass -std=c23 (gcc 14+, clang 18+) and fall back
         # to gnu23 if the strict mode rejects MinGW-specific extensions
         # like winsock. -fpermissive on g++ would help; for C the right
-        # knob is -std=gnu23 which keeps C23 semantics + GNU extensions.
+        # knob is -std=gnu2x which keeps C23 semantics + GNU extensions.
         optimization_flags = [
             f"-{opt_level}" if isinstance(opt_level, str) else f"-O{opt_level}"
         ]
@@ -343,7 +343,7 @@ def compile_via_c(
             optimization_flags.extend(["-fdata-sections", "-ffunction-sections"])
         cmd = [
             exe_path,
-            "-std=gnu23",
+            "-std=gnu2x",
             *optimization_flags,
             "-march=native",
             *pgo_flags,

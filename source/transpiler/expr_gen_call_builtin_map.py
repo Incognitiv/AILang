@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from transpiler.expr_gen_call_fd import fd_c_builtin_mappings
 from transpiler.expr_gen_call_process import process_c_builtin_mappings

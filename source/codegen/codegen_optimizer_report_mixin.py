@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from parser import ast as A
-from typing import Any, Dict
+from typing import Any
 
 
 class _CodeGenOptimizerReportMixin:
@@ -15,12 +15,12 @@ class _CodeGenOptimizerReportMixin:
         target: str,
         decision: str,
         reason: str,
-        details: Dict[str, Any] | None = None,
+        details: dict[str, Any] | None = None,
     ) -> None:
         line = int(getattr(node, "line", 0) or 0)
         col = int(getattr(node, "col", 0) or 0)
         func = getattr(self, "_current_function_name", None) or "<global>"
-        row: Dict[str, Any] = {
+        row: dict[str, Any] = {
             "opt_kind": opt_kind,
             "target": target,
             "decision": decision,
@@ -35,7 +35,7 @@ class _CodeGenOptimizerReportMixin:
         key = f"{opt_kind}:{decision}"
         self._optimizer_summary[key] = int(self._optimizer_summary.get(key, 0)) + 1
 
-    def get_optimizer_report(self: Any) -> Dict[str, Any]:
+    def get_optimizer_report(self: Any) -> dict[str, Any]:
         return {
             "summary": dict(self._optimizer_summary),
             "decisions": list(self._optimizer_decisions),

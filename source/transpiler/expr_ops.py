@@ -23,8 +23,8 @@ from transpiler.expr_common import ARG_FIRST, ExprGenError
 from transpiler.llvm_bigint import (
     bigint_from_decimal_literal,
     clone_if_borrowed,
-    free_if_owned_temp,
     fixed_to_bigint,
+    free_if_owned_temp,
     is_bigint_value,
     is_unbounded_spec,
 )
@@ -124,17 +124,13 @@ class ExprOpsEmitter:
                     self.codegen._get_bigint_sub(), [zero, operand], name="bigint_neg"
                 )
                 self.builder.call(self.codegen._get_bigint_free(), [zero])
-                free_if_owned_temp(
-                    self.codegen, self.builder, node.operand, operand
-                )
+                free_if_owned_temp(self.codegen, self.builder, node.operand, operand)
                 return result
             if op in {"NOT", "bnot", "~", "tilde"}:
                 result = self.builder.call(
                     self.codegen._get_bigint_not(), [operand], name="bigint_not"
                 )
-                free_if_owned_temp(
-                    self.codegen, self.builder, node.operand, operand
-                )
+                free_if_owned_temp(self.codegen, self.builder, node.operand, operand)
                 return result
             if op.lower() in {"not", "!"}:
                 result = self.builder.xor(
@@ -142,9 +138,7 @@ class ExprOpsEmitter:
                     ir.Constant(ir.IntType(1), 1),
                     name="not",
                 )
-                free_if_owned_temp(
-                    self.codegen, self.builder, node.operand, operand
-                )
+                free_if_owned_temp(self.codegen, self.builder, node.operand, operand)
                 return result
             raise ExprGenError(f"Unknown unary operator for unbounded: {node.op}")
 
@@ -292,7 +286,9 @@ class ExprOpsEmitter:
             spec = getattr(fn, "return_type", None)
             return spec is not None and is_unbounded_spec(self.codegen, spec)
         if isinstance(node, BinaryOp):
-            return self._expr_is_unbounded(node.left) or self._expr_is_unbounded(node.right)
+            return self._expr_is_unbounded(node.left) or self._expr_is_unbounded(
+                node.right
+            )
         if isinstance(node, UnaryOp):
             return self._expr_is_unbounded(node.operand)
         return False
@@ -305,6 +301,7 @@ class ExprOpsEmitter:
         value = self.generate_expr(node)
         if is_bigint_value(self.codegen, value):
             from transpiler.llvm_bigint import expression_is_borrowed_bigint
+
             return value, not expression_is_borrowed_bigint(node)
         if isinstance(value.type, ir.IntType):
             value = fixed_to_bigint(
@@ -314,7 +311,9 @@ class ExprOpsEmitter:
                 unsigned=self.codegen.is_unsigned_value(value),
             )
             return value, True
-        raise ExprGenError(f"unbounded arithmetic requires integer operand, got {value.type}")
+        raise ExprGenError(
+            f"unbounded arithmetic requires integer operand, got {value.type}"
+        )
 
     def _bigint_nonnegative_i64(self, node: Any) -> tuple[ir.Value, ir.Value | None]:
         """Convert exponent/shift count to non-negative i64 without truncation."""
@@ -371,7 +370,18 @@ class ExprOpsEmitter:
     def _visit_bigint_binary(self, node: BinaryOp) -> ir.Value:
         op = node.op
         op_lower = op.lower()
-        if op_lower in {"shl", "<<", "lshift", "shr", ">>", "rshift", "ushr", "**", "^", "power"}:
+        if op_lower in {
+            "shl",
+            "<<",
+            "lshift",
+            "shr",
+            ">>",
+            "rshift",
+            "ushr",
+            "**",
+            "^",
+            "power",
+        }:
             left, own_left = self._bigint_operand(node.left)
             if op_lower == "ushr":
                 if own_left:
@@ -400,30 +410,68 @@ class ExprOpsEmitter:
         left, own_left = self._bigint_operand(node.left)
         right, own_right = self._bigint_operand(node.right)
         binary_fns = {
-            "+": self.codegen._get_bigint_add, "plus": self.codegen._get_bigint_add,
-            "-": self.codegen._get_bigint_sub, "minus": self.codegen._get_bigint_sub,
-            "*": self.codegen._get_bigint_mul, "star": self.codegen._get_bigint_mul,
-            "/": self.codegen._get_bigint_div, "slash": self.codegen._get_bigint_div,
-            "%": self.codegen._get_bigint_mod, "mod": self.codegen._get_bigint_mod,
-            "&": self.codegen._get_bigint_and, "ampersand": self.codegen._get_bigint_and,
-            "|": self.codegen._get_bigint_or, "pipe": self.codegen._get_bigint_or,
-            "band": self.codegen._get_bigint_and, "bor": self.codegen._get_bigint_or,
+            "+": self.codegen._get_bigint_add,
+            "plus": self.codegen._get_bigint_add,
+            "-": self.codegen._get_bigint_sub,
+            "minus": self.codegen._get_bigint_sub,
+            "*": self.codegen._get_bigint_mul,
+            "star": self.codegen._get_bigint_mul,
+            "/": self.codegen._get_bigint_div,
+            "slash": self.codegen._get_bigint_div,
+            "%": self.codegen._get_bigint_mod,
+            "mod": self.codegen._get_bigint_mod,
+            "&": self.codegen._get_bigint_and,
+            "ampersand": self.codegen._get_bigint_and,
+            "|": self.codegen._get_bigint_or,
+            "pipe": self.codegen._get_bigint_or,
+            "band": self.codegen._get_bigint_and,
+            "bor": self.codegen._get_bigint_or,
             "bxor": self.codegen._get_bigint_xor,
         }
         if op in {"AND", "OR", "XOR"}:
-            fn_getter = {"AND": self.codegen._get_bigint_and, "OR": self.codegen._get_bigint_or, "XOR": self.codegen._get_bigint_xor}[op]
-            result = self.builder.call(fn_getter(), [left, right], name="bigint_bitwise")
+            fn_getter = {
+                "AND": self.codegen._get_bigint_and,
+                "OR": self.codegen._get_bigint_or,
+                "XOR": self.codegen._get_bigint_xor,
+            }[op]
+            result = self.builder.call(
+                fn_getter(), [left, right], name="bigint_bitwise"
+            )
         elif op_lower in binary_fns:
-            result = self.builder.call(binary_fns[op_lower](), [left, right], name="bigint_op")
-        elif op_lower in {"==", "eq", "!=", "ne", "<", "lt", "<=", "le", ">", "gt", ">=", "ge"}:
+            result = self.builder.call(
+                binary_fns[op_lower](), [left, right], name="bigint_op"
+            )
+        elif op_lower in {
+            "==",
+            "eq",
+            "!=",
+            "ne",
+            "<",
+            "lt",
+            "<=",
+            "le",
+            ">",
+            "gt",
+            ">=",
+            "ge",
+        }:
             cmpv = self.builder.call(
                 self.codegen._get_bigint_cmp(), [left, right], name="bigint_cmp"
             )
             zero = ir.Constant(ir.IntType(64), 0)
             pred = {
-                "==": "==", "eq": "==", "!=": "!=", "ne": "!=",
-                "<": "<", "lt": "<", "<=": "<=", "le": "<=",
-                ">": ">", "gt": ">", ">=": ">=", "ge": ">=",
+                "==": "==",
+                "eq": "==",
+                "!=": "!=",
+                "ne": "!=",
+                "<": "<",
+                "lt": "<",
+                "<=": "<=",
+                "le": "<=",
+                ">": ">",
+                "gt": ">",
+                ">=": ">=",
+                "ge": ">=",
             }[op_lower]
             result = self.builder.icmp_signed(pred, cmpv, zero, name="bigint_cmp_bool")
         else:
@@ -505,8 +553,12 @@ class ExprOpsEmitter:
         # both AST declarations and the SSA metadata produced by calls/casts;
         # otherwise a u32-returning function such as raw peek32 can be sext'ed
         # to -1 when its top bit is set.
-        left_unsigned = self._is_unsigned_node(node.left) or self.codegen.is_unsigned_value(left)
-        right_unsigned = self._is_unsigned_node(node.right) or self.codegen.is_unsigned_value(right)
+        left_unsigned = self._is_unsigned_node(
+            node.left
+        ) or self.codegen.is_unsigned_value(left)
+        right_unsigned = self._is_unsigned_node(
+            node.right
+        ) or self.codegen.is_unsigned_value(right)
         use_unsigned = left_unsigned or right_unsigned
 
         if op_lower in {"+", "plus"}:
@@ -730,11 +782,15 @@ class ExprOpsEmitter:
             if not is_float:
                 return self._safe_integer_pow(left, right, is_unsigned=use_unsigned)
             pow_func = self._get_pow_intrinsic()
-            left_f = left if self._is_float_type(left.type) else self.builder.sitofp(
-                left, ir.DoubleType(), name="pow_base"
+            left_f = (
+                left
+                if self._is_float_type(left.type)
+                else self.builder.sitofp(left, ir.DoubleType(), name="pow_base")
             )
-            right_f = right if self._is_float_type(right.type) else self.builder.sitofp(
-                right, ir.DoubleType(), name="pow_exp"
+            right_f = (
+                right
+                if self._is_float_type(right.type)
+                else self.builder.sitofp(right, ir.DoubleType(), name="pow_exp")
             )
             return self.builder.call(pow_func, [left_f, right_f], name="pow_call")
 
@@ -799,7 +855,6 @@ class ExprOpsEmitter:
             return res
 
         raise ExprGenError(f"Unknown binary operator: {node.op}")
-
 
     def _safe_integer_pow(
         self, left: ir.Value, right: ir.Value, *, is_unsigned: bool

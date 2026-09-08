@@ -78,8 +78,7 @@ def _normalize_link_symbol(sym: str) -> str:
     text = sym.strip().strip("`'\"")
     # Common import-table decorations seen on Windows linkers.
     for prefix in ("__imp_", "_imp__", "__imp__", "_"):
-        if text.startswith(prefix):
-            text = text[len(prefix) :]
+        text = text.removeprefix(prefix)
     return text
 
 

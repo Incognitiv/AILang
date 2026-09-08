@@ -60,7 +60,9 @@ class ExprTypeHelperEmitter:
     ) -> ir.Value:
         if value.type == target_type:
             if isinstance(value.type, ir.IntType) and target_unsigned is not None:
-                source_unsigned = bool(unsigned or self.codegen.is_unsigned_value(value))
+                source_unsigned = bool(
+                    unsigned or self.codegen.is_unsigned_value(value)
+                )
                 if source_unsigned != target_unsigned:
                     return self._checked_integer_cast(
                         value,
@@ -79,7 +81,9 @@ class ExprTypeHelperEmitter:
             return self._safe_fptosi(value, target_type)
         if isinstance(value.type, ir.IntType) and isinstance(target_type, ir.IntType):
             source_unsigned = bool(unsigned or self.codegen.is_unsigned_value(value))
-            target_unsigned = source_unsigned if target_unsigned is None else target_unsigned
+            target_unsigned = (
+                source_unsigned if target_unsigned is None else target_unsigned
+            )
             return self._checked_integer_cast(
                 value,
                 target_type,
@@ -174,15 +178,23 @@ class ExprTypeHelperEmitter:
                     if source_unsigned
                     else self.builder.icmp_signed(">", value, max_const, name="cast_hi")
                 )
-                invalid = too_high if invalid is None else self.builder.or_(invalid, too_high)
+                invalid = (
+                    too_high if invalid is None else self.builder.or_(invalid, too_high)
+                )
 
             if not target_unsigned and not source_unsigned:
                 target_min = -(1 << (tw - 1))
                 source_min = -(1 << (sw - 1))
                 if target_min > source_min:
                     min_const = ir.Constant(source_type, target_min)
-                    too_low = self.builder.icmp_signed("<", value, min_const, name="cast_lo")
-                    invalid = too_low if invalid is None else self.builder.or_(invalid, too_low)
+                    too_low = self.builder.icmp_signed(
+                        "<", value, min_const, name="cast_lo"
+                    )
+                    invalid = (
+                        too_low
+                        if invalid is None
+                        else self.builder.or_(invalid, too_low)
+                    )
 
             if invalid is not None:
                 bad = self.function.append_basic_block("int_cast_range_error")
@@ -203,7 +215,11 @@ class ExprTypeHelperEmitter:
         if sw < tw:
             # After the range check, preserve the numeric value rather than
             # reinterpreting sign bits.
-            ext = self.builder.zext if source_unsigned or target_unsigned else self.builder.sext
+            ext = (
+                self.builder.zext
+                if source_unsigned or target_unsigned
+                else self.builder.sext
+            )
             out = ext(value, target_type, name="int_cast_ext")
         elif sw > tw:
             out = self.builder.trunc(value, target_type, name="int_cast_trunc")

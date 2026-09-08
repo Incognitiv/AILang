@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
 
 
 class Colors:
@@ -38,14 +37,14 @@ class FunctionInfo:
     """Information about a function/method in source code."""
 
     name: str
-    params: List[str]
-    return_type: Optional[str]
+    params: list[str]
+    return_type: str | None
     body_lines: int
     body_hash: str
-    decorators: List[str] = field(default_factory=list)
-    docstring: Optional[str] = None
+    decorators: list[str] = field(default_factory=list)
+    docstring: str | None = None
     is_method: bool = False
-    class_name: Optional[str] = None
+    class_name: str | None = None
     start_line: int = 0
     end_line: int = 0
 
@@ -55,9 +54,9 @@ class ClassInfo:
     """Information about a class in source code."""
 
     name: str
-    bases: List[str]
-    methods: List[FunctionInfo]
-    fields: Dict[str, str]
+    bases: list[str]
+    methods: list[FunctionInfo]
+    fields: dict[str, str]
     start_line: int = 0
     end_line: int = 0
 
@@ -68,17 +67,17 @@ class TranspileResult:
 
     source_file: str
     success: bool
-    python_functions: List[FunctionInfo]
-    ailang_functions: List[FunctionInfo]
-    python_classes: List[ClassInfo]
-    ailang_records: List[str]
-    errors: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
+    python_functions: list[FunctionInfo]
+    ailang_functions: list[FunctionInfo]
+    python_classes: list[ClassInfo]
+    ailang_records: list[str]
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
     functions_matched: int = 0
     functions_missing: int = 0
     functions_extra: int = 0
-    body_mismatches: List[Tuple[str, str]] = field(default_factory=list)
+    body_mismatches: list[tuple[str, str]] = field(default_factory=list)
 
     @property
     def total_functions(self) -> int:
@@ -100,7 +99,7 @@ class ValidationReport:
     files_failed: int = 0
     total_functions: int = 0
     total_matched: int = 0
-    results: List[TranspileResult] = field(default_factory=list)
+    results: list[TranspileResult] = field(default_factory=list)
 
     @property
     def overall_match_rate(self) -> float:

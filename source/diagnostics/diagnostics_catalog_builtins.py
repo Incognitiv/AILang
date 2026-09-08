@@ -250,7 +250,6 @@ BUILTINS = {
     "file_same",
     "fd_is_tty",
     "access",
-    "change_dir",
     "make_dir",
     "mkdir",
     "delete_file",

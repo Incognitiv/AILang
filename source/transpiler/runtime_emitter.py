@@ -21,7 +21,7 @@ diff verifies this.
 
 from __future__ import annotations
 
-from typing import Callable, Dict, List, Set, Tuple
+from collections.abc import Callable
 
 from transpiler.runtime_emit_atomics import emit_runtime_atomics
 from transpiler.runtime_emit_channels import emit_runtime_channels
@@ -31,6 +31,7 @@ from transpiler.runtime_emit_collections import (
     emit_runtime_str_array,
 )
 from transpiler.runtime_emit_fd import emit_runtime_fd
+from transpiler.runtime_emit_fixed_int_casts import emit_runtime_fixed_int_casts
 from transpiler.runtime_emit_io import emit_runtime_fileops, emit_runtime_sqlite
 from transpiler.runtime_emit_math import emit_runtime_math
 from transpiler.runtime_emit_process import emit_runtime_process
@@ -67,9 +68,8 @@ from transpiler.runtime_emit_threading import (
 )
 from transpiler.runtime_emit_threading_utils import emit_runtime_threading_utils
 from transpiler.runtime_emit_time import emit_runtime_time
-from transpiler.runtime_emit_win32 import emit_runtime_win32
 from transpiler.runtime_emit_wideint import emit_runtime_wideint
-from transpiler.runtime_emit_fixed_int_casts import emit_runtime_fixed_int_casts
+from transpiler.runtime_emit_win32 import emit_runtime_win32
 from transpiler.runtime_needs import RuntimeNeeds
 
 
@@ -81,10 +81,10 @@ class RuntimeEmitter:
     def __init__(
         self,
         runtime_needs: RuntimeNeeds,
-        functions: Dict[str, Tuple[List[str], str]],
-        user_defined_funcs: Set[str],
+        functions: dict[str, tuple[list[str], str]],
+        user_defined_funcs: set[str],
         ailang_type_to_c: Callable[[str], str],
-        output: List[str],
+        output: list[str],
     ) -> None:
         self._needs = runtime_needs
         self._functions = functions

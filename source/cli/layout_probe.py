@@ -130,7 +130,7 @@ def probe_ffi_layout(
             return payload
 
         compile_proc = subprocess.run(
-            [compiler, "-std=gnu23", str(source_path), "-o", str(exe_path)],
+            [compiler, "-std=gnu2x", str(source_path), "-o", str(exe_path)],
             cwd=work_dir,
             capture_output=True,
             text=True,

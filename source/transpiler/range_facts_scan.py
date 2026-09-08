@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from parser import ast as A
-from typing import Any, Callable, Dict, Iterable, List, Optional, Set
+from typing import Any
 
 from .range_facts_loop_patterns import (
     derive_specialized_while_ranges,
@@ -24,14 +25,14 @@ from .range_facts_utils import (
 
 
 def _dict_literal_ranges(
-    expr: Optional[A.ASTNode],
-    func_scope: Optional[str],
+    expr: A.ASTNode | None,
+    func_scope: str | None,
     facts: Any,
-    scope: Dict[str, Any],
-) -> Optional[Dict[str, Any]]:
+    scope: dict[str, Any],
+) -> dict[str, Any] | None:
     if not isinstance(expr, A.DictLit):
         return None
-    values: Dict[str, Any] = {}
+    values: dict[str, Any] = {}
     for key_expr, value_expr in expr.pairs:
         if not isinstance(key_expr, A.StringLit):
             return None
@@ -43,10 +44,10 @@ def _dict_literal_ranges(
 
 def _remember_or_clear_dict_info(
     facts: Any,
-    func_scope: Optional[str],
+    func_scope: str | None,
     var_name: str,
-    expr: Optional[A.ASTNode],
-    scope: Dict[str, Any],
+    expr: A.ASTNode | None,
+    scope: dict[str, Any],
 ) -> None:
     values = _dict_literal_ranges(expr, func_scope, facts, scope)
     if values is None:
@@ -58,7 +59,7 @@ def _remember_or_clear_dict_info(
 def scan_if(
     analyzer: Any,
     node: A.If,
-    func_scope: Optional[str],
+    func_scope: str | None,
     facts: Any,
     *,
     interval_ctor: Callable[[int, int], Any],
@@ -132,7 +133,7 @@ def scan_if(
     for stmt in node.else_body or []:
         analyzer._scan_node(stmt, func_scope, facts)
     else_scope = dict(facts.scope_ranges.get(func_scope, {}))
-    merged: Dict[str, Any] = {}
+    merged: dict[str, Any] = {}
     for name in set(then_scope) | set(else_scope):
         left = then_scope.get(name)
         right = else_scope.get(name)
@@ -177,7 +178,7 @@ def scan_function(analyzer: Any, node: A.Function, facts: Any) -> None:
 def scan_node(
     analyzer: Any,
     node: A.ASTNode,
-    func_scope: Optional[str],
+    func_scope: str | None,
     facts: Any,
     *,
     interval_ctor: Callable[[int, int], Any],
@@ -366,7 +367,7 @@ def scan_node(
             name: interval_ctor(low, high)
             for name, (low, high) in raw_refinements.items()
         }
-        loop_scope_reasons: Dict[str, str] = {
+        loop_scope_reasons: dict[str, str] = {
             name: "loop_guard_proven" for name in loop_scope_refinements
         }
         specialized_refinements, preserve_assigned = derive_specialized_while_ranges(
@@ -507,15 +508,15 @@ def scan_node(
 
 def scan_loop(
     analyzer: Any,
-    body: List[A.ASTNode],
-    func_scope: Optional[str],
+    body: list[A.ASTNode],
+    func_scope: str | None,
     facts: Any,
     *,
-    extra_assigned_nodes: Optional[Iterable[A.ASTNode]] = None,
-    loop_scope_refinements: Optional[Dict[str, Any]] = None,
-    loop_scope_reasons: Optional[Dict[str, str]] = None,
+    extra_assigned_nodes: Iterable[A.ASTNode] | None = None,
+    loop_scope_refinements: dict[str, Any] | None = None,
+    loop_scope_reasons: dict[str, str] | None = None,
     ignore_first_break_guard: bool = False,
-    preserve_assigned: Optional[Set[str]] = None,
+    preserve_assigned: set[str] | None = None,
 ) -> None:
     base = dict(facts.scope_ranges.get(func_scope, {}))
     assigned = analyzer._collect_assigned_vars(body)
@@ -533,7 +534,7 @@ def scan_loop(
                 facts.clear_loop_reason(name, func_scope)
     preserved = preserve_assigned or set()
     locked = facts.locked_ranges.get(func_scope, set())
-    invalidated_names: Set[str] = set()
+    invalidated_names: set[str] = set()
     branch_heavy = is_branch_heavy_loop_body(
         body,
         ignore_first_break_guard=ignore_first_break_guard,
@@ -566,7 +567,7 @@ def scan_loop(
     for stmt in body:
         analyzer._scan_node(stmt, func_scope, facts)
     body_scope = dict(facts.scope_ranges.get(func_scope, {}))
-    merged: Dict[str, Any] = {}
+    merged: dict[str, Any] = {}
     for name in set(base) | set(body_scope):
         if name in invalidated_names:
             continue

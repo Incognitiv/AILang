@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from parser import ast as A
-from typing import Optional
 
 from transpiler.arithmetic_literal_proofs import int_literal_in_range
 
@@ -179,7 +178,7 @@ def _expr_array_access(self, node: A.ArrayAccess) -> str:
     return f"{arr}[{idx}]"
 
 
-def _known_array_len_hint(self, array_expr: A.ASTNode) -> Optional[int]:
+def _known_array_len_hint(self, array_expr: A.ASTNode) -> int | None:
     if not isinstance(array_expr, A.Variable):
         return None
     var_name = array_expr.name

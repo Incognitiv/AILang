@@ -11,7 +11,7 @@ These are WARNINGS, not errors - they don't block compilation.
 """
 
 from parser import ast as A
-from typing import ClassVar, Optional
+from typing import ClassVar
 
 from ast_access import arg_at
 from diagnostics.static_analysis_class_cleanup import (
@@ -85,7 +85,7 @@ class StaticAnalyzer:
         # Functions and their contexts
         self.functions: dict[str, FunctionContext] = {}
         # Current function being analyzed
-        self.current_func: Optional[FunctionContext] = None
+        self.current_func: FunctionContext | None = None
         # Functions called via spawn
         self.spawned_functions: set[str] = set()
         # Functions called via parallel_map

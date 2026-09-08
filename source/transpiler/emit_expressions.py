@@ -6,7 +6,8 @@ all node-specific behavior to extracted service objects.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from llvmlite import ir
 from runtime.arena import ArenaGenerator
@@ -39,8 +40,8 @@ class ExprGenerator(_SimdBuiltinsMixin):
 
     def __init__(self, codegen: CodeGen) -> None:
         self.codegen = codegen
-        self._pow_intrinsic: Optional[ir.Function] = None
-        self._call_dispatch: Optional[dict] = None
+        self._pow_intrinsic: ir.Function | None = None
+        self._call_dispatch: dict | None = None
         self.arena_gen = ArenaGenerator(codegen)
 
         # Cache of {NodeClass: bound visitor method}. Expressions are visited

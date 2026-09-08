@@ -3,7 +3,7 @@ AILang AST - Abstract Syntax Tree Node Definitions.
 Defines all AST node types used by the parser.
 """
 
-from typing import Any, Optional
+from typing import Any
 
 # Type alias for parsed type specifications.
 # Supported tuple forms:
@@ -63,7 +63,7 @@ class ASTNode:
 
     line: int
     col: int
-    _source_path: Optional[str] = None
+    _source_path: str | None = None
 
     def set_pos(self, line: int, col: int = 0) -> "ASTNode":
         """Set source position and return self for chaining."""

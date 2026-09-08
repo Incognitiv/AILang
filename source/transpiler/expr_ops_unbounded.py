@@ -7,9 +7,9 @@ the existing checked-i64 contract.
 
 from __future__ import annotations
 
-from llvmlite import ir
 from parser.ast import BinaryOp
 
+from llvmlite import ir
 from transpiler.expr_ops import ExprOpsEmitter
 
 

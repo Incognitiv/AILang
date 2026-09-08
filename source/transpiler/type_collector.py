@@ -16,7 +16,6 @@ from __future__ import annotations
 
 from parser import ast as A
 from parser.ast import parsed_type_to_str
-from typing import Dict, List, Optional, Set, Tuple
 
 from callback_types import is_callback_type
 from transpiler.type_info import ClassField, RecordField, TypeInfo
@@ -28,9 +27,9 @@ class TypeCollector:
     def __init__(self) -> None:
         # Tracks the class whose body we're currently walking, used by
         # the call-graph walk to resolve method-call receivers.
-        self._current_class: Optional[str] = None
+        self._current_class: str | None = None
 
-    def run(self, nodes: List[A.ASTNode], type_info: TypeInfo) -> None:
+    def run(self, nodes: list[A.ASTNode], type_info: TypeInfo) -> None:
         """Populate every type-table field of ``type_info`` in place,
         including ``recursive_funcs``."""
         self._collect_types(nodes, type_info)
@@ -41,7 +40,7 @@ class TypeCollector:
 
     # ==================== type tables ====================
 
-    def _collect_types(self, nodes: List[A.ASTNode], type_info: TypeInfo) -> None:
+    def _collect_types(self, nodes: list[A.ASTNode], type_info: TypeInfo) -> None:
         for node in nodes:
             if isinstance(node, A.ExternRecordDef):
                 type_info.opaque_records.add(node.name)
@@ -77,15 +76,15 @@ class TypeCollector:
                 if decos:
                     type_info.type_decorators[node.name] = decos
             elif isinstance(node, A.UnionDef):
-                union_fields: List[RecordField] = [(f[0], f[1]) for f in node.fields]
+                union_fields: list[RecordField] = [(f[0], f[1]) for f in node.fields]
                 type_info.unions[node.name] = union_fields
                 decos = getattr(node, "decorators", [])
                 if decos:
                     type_info.type_decorators[node.name] = decos
             elif isinstance(node, A.EnumDef):
-                variants: List[Tuple[str, int]] = []
+                variants: list[tuple[str, int]] = []
                 has_data = node.has_data_variants()
-                data_variants: Dict[str, List[Tuple[str, str]]] = {}
+                data_variants: dict[str, list[tuple[str, str]]] = {}
                 for variant in node.variants:
                     val = variant.value if variant.value is not None else len(variants)
                     variants.append((variant.name, val))
@@ -97,7 +96,7 @@ class TypeCollector:
             elif isinstance(node, A.ClassDef):
                 class_fields = self._collect_class_fields(node)
                 type_info.classes[node.name] = (class_fields, node.methods)
-                class_defaults: Dict[str, A.ASTNode] = {}
+                class_defaults: dict[str, A.ASTNode] = {}
                 for entry in node.fields:
                     if isinstance(entry, tuple) and len(entry) >= 4:
                         _vis, field_name, _field_type, init_value, *_ = entry
@@ -107,7 +106,7 @@ class TypeCollector:
                     type_info.class_field_defaults[node.name] = class_defaults
                 # Classes also register a record entry so field-access lowering
                 # can look them up uniformly via type_info.records.
-                record_fields: List[RecordField] = [(f[1], f[2]) for f in class_fields]
+                record_fields: list[RecordField] = [(f[1], f[2]) for f in class_fields]
                 type_info.records[node.name] = record_fields
             elif isinstance(node, A.TypeAlias):
                 type_info.type_aliases[node.name] = node.target_type
@@ -119,14 +118,14 @@ class TypeCollector:
     @staticmethod
     def _collect_record_fields(
         node: A.RecordDef | A.ExternRecordDef,
-    ) -> List[RecordField]:
+    ) -> list[RecordField]:
         """Extract field info from a RecordDef.
 
         Each entry is either a ``(name, type)`` tuple or a bare AST
         node with a ``name`` attribute (older parser variants). Type
         defaults to ``int`` when missing.
         """
-        fields: List[RecordField] = []
+        fields: list[RecordField] = []
         for entry in node.fields:
             if isinstance(entry, tuple):
                 # Destructure rather than index so the verifier's
@@ -149,7 +148,7 @@ class TypeCollector:
         return fields
 
     @staticmethod
-    def _collect_class_fields(node: A.ClassDef) -> List[ClassField]:
+    def _collect_class_fields(node: A.ClassDef) -> list[ClassField]:
         """Extract field info from a ClassDef.
 
         Three tuple shapes accepted, in order of preference:
@@ -158,7 +157,7 @@ class TypeCollector:
         * ``(name, type)`` -- shorthand, defaults visibility to public
         * anything else: skipped
         """
-        fields: List[ClassField] = []
+        fields: list[ClassField] = []
         for entry in node.fields:
             if not isinstance(entry, tuple):
                 continue
@@ -180,8 +179,8 @@ class TypeCollector:
     @staticmethod
     def _collect_function_info(node: A.Function, type_info: TypeInfo) -> None:
         """Register a function's signature + default-arg metadata."""
-        param_types: List[str] = []
-        defaults: List[Tuple[int, A.ASTNode]] = []
+        param_types: list[str] = []
+        defaults: list[tuple[int, A.ASTNode]] = []
         for i, p in enumerate(node.params or []):
             if isinstance(p, tuple) and len(p) > 1:
                 param_types.append(parsed_type_to_str(p[1]))
@@ -229,11 +228,11 @@ class TypeCollector:
     )
 
     def _identify_owned_string_returns(
-        self, nodes: List[A.ASTNode], type_info: TypeInfo
-    ) -> Set[str]:
+        self, nodes: list[A.ASTNode], type_info: TypeInfo
+    ) -> set[str]:
         """Find user functions whose string result must be freed by callers."""
         funcs = [node for node in nodes if isinstance(node, A.Function)]
-        owned: Set[str] = set()
+        owned: set[str] = set()
         changed = True
         while changed:
             changed = False
@@ -258,8 +257,8 @@ class TypeCollector:
                         changed = True
         return owned
 
-    def _return_values(self, body: List[A.ASTNode]) -> List[A.ASTNode]:
-        out: List[A.ASTNode] = []
+    def _return_values(self, body: list[A.ASTNode]) -> list[A.ASTNode]:
+        out: list[A.ASTNode] = []
 
         def walk(node: A.ASTNode) -> None:
             if isinstance(node, A.Return) and node.value is not None:
@@ -290,12 +289,12 @@ class TypeCollector:
 
     def _local_string_ownership(
         self,
-        body: List[A.ASTNode],
+        body: list[A.ASTNode],
         type_info: TypeInfo,
-        owned_funcs: Set[str],
-    ) -> Tuple[Set[str], Set[str]]:
-        owned: Set[str] = set()
-        strings: Set[str] = set()
+        owned_funcs: set[str],
+    ) -> tuple[set[str], set[str]]:
+        owned: set[str] = set()
+        strings: set[str] = set()
 
         def walk(node: A.ASTNode) -> None:
             if isinstance(node, A.Assign):
@@ -334,9 +333,9 @@ class TypeCollector:
         self,
         expr: A.ASTNode,
         type_info: TypeInfo,
-        owned_funcs: Set[str],
-        local_owned: Set[str],
-        local_strings: Set[str],
+        owned_funcs: set[str],
+        local_owned: set[str],
+        local_strings: set[str],
     ) -> bool:
         if isinstance(expr, (A.InterpolatedString, A.StringSlice)):
             return True
@@ -356,8 +355,8 @@ class TypeCollector:
         self,
         expr: A.ASTNode,
         type_info: TypeInfo,
-        owned_funcs: Set[str],
-        local_strings: Set[str],
+        owned_funcs: set[str],
+        local_strings: set[str],
     ) -> bool:
         if isinstance(expr, (A.StringLit, A.InterpolatedString, A.StringSlice)):
             return True
@@ -378,7 +377,7 @@ class TypeCollector:
 
     # ==================== call graph + recursion detection ====================
 
-    def _identify_recursive_functions(self, nodes: List[A.ASTNode]) -> Set[str]:
+    def _identify_recursive_functions(self, nodes: list[A.ASTNode]) -> set[str]:
         """Return the set of functions / methods that participate in a cycle.
 
         Names are bare for free functions, ``Class_method`` for class
@@ -386,26 +385,26 @@ class TypeCollector:
         dispatch are conservatively ignored (worst case: we keep the
         guard for a function that didn't need it -- still correct).
         """
-        graph: Dict[str, Set[str]] = {}
+        graph: dict[str, set[str]] = {}
         for node in nodes:
             if isinstance(node, A.Function):
-                calls: Set[str] = set()
+                calls: set[str] = set()
                 for stmt in node.body or []:
                     self._walk_calls(stmt, calls)
                 graph[node.name] = calls
             elif isinstance(node, A.ClassDef):
                 for method in node.methods:
                     self._current_class = node.name
-                    method_calls: Set[str] = set()
+                    method_calls: set[str] = set()
                     for stmt in method.body or []:
                         self._walk_calls(stmt, method_calls)
                     graph[f"{node.name}_{method.name}"] = method_calls
                 self._current_class = None
 
-        recursive: Set[str] = set()
+        recursive: set[str] = set()
         for start in graph:
-            visited: Set[str] = set()
-            stack: List[str] = list(graph[start])
+            visited: set[str] = set()
+            stack: list[str] = list(graph[start])
             while stack:
                 cur = stack.pop()
                 if cur == start:
@@ -417,7 +416,7 @@ class TypeCollector:
                 stack.extend(graph.get(cur, set()))
         return recursive
 
-    def _walk_calls(self, node: A.ASTNode, calls: Set[str]) -> None:
+    def _walk_calls(self, node: A.ASTNode, calls: set[str]) -> None:
         """Recursively collect names of functions/methods called from ``node``."""
         if node is None:
             return
@@ -472,7 +471,7 @@ class TypeCollector:
                     for child in branch_body:
                         self._walk_calls(child, calls)
 
-    def _resolve_method_class(self, node: A.MethodCall) -> Optional[str]:
+    def _resolve_method_class(self, node: A.MethodCall) -> str | None:
         """Best-effort method-call receiver class resolution for the
         recursion-detection walk. Falls back to ``self._current_class``
         when the receiver is an implicit ``this`` reference. Indirect

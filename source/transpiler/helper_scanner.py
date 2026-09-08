@@ -7,8 +7,9 @@ state directly.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from parser import ast as A
-from typing import Any, Callable, ClassVar, Dict, List, Optional, Set, Tuple
+from typing import Any, ClassVar
 
 from ast_access import arg_at
 from transpiler.arithmetic_literal_proofs import (
@@ -44,13 +45,13 @@ from transpiler.helper_scanner_string_array import (
     _virtual_strlen_numeric_arg,
 )
 from transpiler.runtime_needs import RuntimeNeeds
-from transpiler.wide_int_types import info_for_ailang
 from transpiler.strlen_assign_cache import (
     baseconv_known_integer_arg,
     collect_length_only_string_locals,
     interpolation_known_length,
     str_known_integer_arg,
 )
+from transpiler.wide_int_types import info_for_ailang
 
 
 class HelperScanner:
@@ -66,7 +67,7 @@ class HelperScanner:
     # consumer of this table; it lived on CTranspiler when the scanner
     # was a mixin. Moving it here removes a piece of CTranspiler's
     # surface area.
-    _CALL_HELPER_MAP: ClassVar[Dict[str, str]] = {
+    _CALL_HELPER_MAP: ClassVar[dict[str, str]] = {
         "strlen": "strlen",
         "len": "strlen",
         "char_at": "char_at",
@@ -210,16 +211,14 @@ class HelperScanner:
 
     def __init__(
         self,
-        functions: Dict[str, Tuple[List[str], str]],
-        array_vars: Set[str],
-        dict_vars: Set[str],
-        dyn_array_vars: Set[str],
-        classes: Dict[str, Any],
+        functions: dict[str, tuple[list[str], str]],
+        array_vars: set[str],
+        dict_vars: set[str],
+        dyn_array_vars: set[str],
+        classes: dict[str, Any],
         is_owned_string_alloc: Callable[[A.ASTNode], bool],
         is_string_expr: Callable[[A.ASTNode], bool],
-        can_elide_binary_safety: Optional[
-            Callable[[A.BinaryOp, Optional[str]], bool]
-        ] = None,
+        can_elide_binary_safety: Callable[[A.BinaryOp, str | None], bool] | None = None,
     ) -> None:
         self._functions = functions
         self._array_vars = array_vars
@@ -233,14 +232,14 @@ class HelperScanner:
         self._needs = RuntimeNeeds()
         # Tracks @unchecked decorator scope across nested function walks.
         self._scanning_unchecked = False
-        self._func_scope: Optional[str] = None
-        self._current_class: Optional[str] = None
-        self._local_types: Dict[str, str] = {}
-        self._length_only_string_locals: Set[str] = set()
-        self._array_len_hints: Dict[Tuple[Optional[str], str], int] = {}
-        self._fixed_dict_literal_slots: Dict[str, Dict[str, int]] = {}
+        self._func_scope: str | None = None
+        self._current_class: str | None = None
+        self._local_types: dict[str, str] = {}
+        self._length_only_string_locals: set[str] = set()
+        self._array_len_hints: dict[tuple[str | None, str], int] = {}
+        self._fixed_dict_literal_slots: dict[str, dict[str, int]] = {}
 
-    def run(self, nodes: List[A.ASTNode]) -> RuntimeNeeds:
+    def run(self, nodes: list[A.ASTNode]) -> RuntimeNeeds:
         """Walk every top-level node and return the populated RuntimeNeeds."""
         for node in nodes:
             self._scan_node(node)
@@ -513,8 +512,8 @@ class HelperScanner:
 
     # ==================== specific node families ====================
 
-    def _collect_local_type_hints(self, body: List[A.ASTNode]) -> None:
-        def infer_expr_type(node: Any) -> Optional[str]:
+    def _collect_local_type_hints(self, body: list[A.ASTNode]) -> None:
+        def infer_expr_type(node: Any) -> str | None:
             if isinstance(node, A.Number):
                 return None if node.is_float else "int64_t"
             if isinstance(node, A.StringLit):
@@ -543,8 +542,8 @@ class HelperScanner:
                     return "int64_t"
             return None
 
-        def nested_bodies(node: Any) -> list[List[A.ASTNode]]:
-            out: list[List[A.ASTNode]] = []
+        def nested_bodies(node: Any) -> list[list[A.ASTNode]]:
+            out: list[list[A.ASTNode]] = []
             for attr in ("body", "then_body", "else_body", "try_body", "finally_block"):
                 value = getattr(node, attr, None)
                 if isinstance(value, list):
@@ -559,7 +558,7 @@ class HelperScanner:
                         out.append(case_branch)
             return out
 
-        def visit(nodes: List[A.ASTNode]) -> None:
+        def visit(nodes: list[A.ASTNode]) -> None:
             for item in nodes:
                 if isinstance(item, A.VarDecl):
                     self._local_types[item.var_name] = A.parsed_type_to_str(
@@ -623,7 +622,10 @@ class HelperScanner:
         # prologue is emitted for that form too.
         if name == "sizeof" and node.args:
             first = arg_at(node, 0)
-            if isinstance(first, A.StringLit) and info_for_ailang(first.value) is not None:
+            if (
+                isinstance(first, A.StringLit)
+                and info_for_ailang(first.value) is not None
+            ):
                 self._needs.wide_ints = True
         if self._scan_streq_slice_fastpath(node):
             return

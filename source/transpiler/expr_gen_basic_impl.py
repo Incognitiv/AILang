@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from parser import ast as A
-from typing import Any, List
+from typing import Any
 
 from transpiler.fixed_int_types import info_for_c_fixed
 
@@ -36,8 +36,8 @@ def _expr_literal(self: Any, node: A.ASTNode) -> str:
 
 
 def _expr_interpolated_string(self: Any, node: A.InterpolatedString) -> str:
-    parts_code: List[str] = []
-    parts_owned: List[bool] = []
+    parts_code: list[str] = []
+    parts_owned: list[bool] = []
     for part in node.parts:
         if isinstance(part, str):
             escaped = (

@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-from typing import List, Set, Tuple
-
 from token_access import token_text_at, token_type_at
 
 from .diagnostics_models import Diagnostic
 
 
 def _check_opaque_record_by_value_use(
-    self, source: str, tokens: List[Tuple[str, str, int, int]]
+    self, source: str, tokens: list[tuple[str, str, int, int]]
 ) -> None:
     """Reject layoutless C records inside owned records/unions.
 
@@ -25,7 +23,7 @@ def _check_opaque_record_by_value_use(
     if not layoutless:
         return
 
-    reported: Set[Tuple[int, int, str]] = set()
+    reported: set[tuple[int, int, str]] = set()
     i = 0
     while i < len(tokens):
         token_type = token_type_at(tokens, i)
@@ -71,7 +69,7 @@ def _check_opaque_record_by_value_use(
         i = j + 1
 
 
-def _collect_layoutless_c_record_names(source: str, filepath: str) -> Set[str]:
+def _collect_layoutless_c_record_names(source: str, filepath: str) -> set[str]:
     """Return opaque/extern record names that cannot be used by value."""
     try:
         from parser import ast as A
@@ -87,12 +85,13 @@ def _collect_layoutless_c_record_names(source: str, filepath: str) -> Set[str]:
     except (OSError, RuntimeError, SyntaxError, ValueError, TypeError):
         return set()
 
-    names: Set[str] = set()
+    names: set[str] = set()
     for node in parsed:
         if not isinstance(node, A.ExternRecordDef):
             continue
-        if getattr(node, "is_opaque", False):
-            names.add(str(getattr(node, "name", "")))
-        elif getattr(node, "layout_size", None) is None:
+        if (
+            getattr(node, "is_opaque", False)
+            or getattr(node, "layout_size", None) is None
+        ):
             names.add(str(getattr(node, "name", "")))
     return {name for name in names if name}

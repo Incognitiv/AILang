@@ -24,7 +24,7 @@ from parser.ast import (
     Use,
     VarDecl,
 )
-from typing import Any, Optional
+from typing import Any
 
 from ast_access import arg_at
 from calling_conventions import llvm_calling_convention, normalized_decorators
@@ -36,7 +36,7 @@ from .codegen_errors import CodeGenError
 class _CodeGenSupportMixin:
     def __init__(self: Any) -> None:
         # Linter-only declaration for mixin-owned lazy attribute.
-        self.free_func: Optional[ir.Function] = None
+        self.free_func: ir.Function | None = None
 
     def _get_free(self: Any) -> ir.Function:
         """Lazy declaration of free for temporary string cleanup."""
@@ -76,6 +76,7 @@ class _CodeGenSupportMixin:
         self.current_builder.call(self.get_strcpy(), [new_str, left_str])
         # Concatenate right string
         self.current_builder.call(self.get_strcat(), [new_str, right_str])
+
         # Free heap intermediates, but never individually free pointers owned
         # by the main/request arena. Request-arena temps are reclaimed by
         # arena_reset() and main-arena temps by arena_destroy().
@@ -525,7 +526,7 @@ class _CodeGenSupportMixin:
         except ImportError as e:
             raise CodeGenError(f"Cannot load library '{node.module_path}': {e}") from e
 
-    def _process_ast_node(self: Any, node: ASTNode) -> Optional[Function]:
+    def _process_ast_node(self: Any, node: ASTNode) -> Function | None:
         """Process a single AST node in Pass 1. Returns Function if it's a function."""
         from parser.ast import Assign
 
@@ -664,8 +665,7 @@ class _CodeGenSupportMixin:
         for _fname, ftype_name in node.fields:
             ftype = self.get_llvm_type(ftype_name)
             bits = self._type_size_bits(ftype)
-            if bits > max_bits:
-                max_bits = bits
+            max_bits = max(max_bits, bits)
         max_bytes = (max_bits + 7) // 8
         if max_bytes == 0:
             max_bytes = 8

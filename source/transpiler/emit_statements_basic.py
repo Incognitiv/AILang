@@ -44,17 +44,19 @@ from transpiler.codegen_int_ranges import (
     expr_invalidates_local_int_proofs,
     remember_assign_range,
 )
-from transpiler.llvm_fixed_dicts import emit_fixed_dict_init
-from transpiler.llvm_fixed_int_casts import cast_to_declared_int, fixed_int_info_for_spec
 from transpiler.llvm_bigint import (
     bigint_from_decimal_literal,
     bigint_to_fixed,
     clone_if_borrowed,
-    expression_is_borrowed_bigint,
     fixed_to_bigint,
     free_if_owned_temp,
     is_bigint_value,
     is_unbounded_spec,
+)
+from transpiler.llvm_fixed_dicts import emit_fixed_dict_init
+from transpiler.llvm_fixed_int_casts import (
+    cast_to_declared_int,
+    fixed_int_info_for_spec,
 )
 from transpiler.llvm_int_narrowing import (
     cast_for_narrowed_storage,
@@ -121,11 +123,19 @@ def visit_Return(self, node: Return):
             value = self.codegen.generate_expr(node.value)
             if isinstance(value, tuple) and len(value) == 3:
                 value = value[0]
-            if is_bigint_value(self.codegen, value) and isinstance(ret_type, ir.IntType):
+            if is_bigint_value(self.codegen, value) and isinstance(
+                ret_type, ir.IntType
+            ):
                 return_info = fixed_int_info_for_spec(self.codegen, return_spec)
-                target_unsigned = bool(return_info.unsigned) if return_info is not None else False
+                target_unsigned = (
+                    bool(return_info.unsigned) if return_info is not None else False
+                )
                 converted = bigint_to_fixed(
-                    self.codegen, self.builder, value, ret_type, unsigned=target_unsigned
+                    self.codegen,
+                    self.builder,
+                    value,
+                    ret_type,
+                    unsigned=target_unsigned,
                 )
                 free_if_owned_temp(self.codegen, self.builder, node.value, value)
                 value = converted
@@ -509,13 +519,10 @@ def visit_VarDecl(self, node: VarDecl):
                     elem_value = self.codegen.generate_expr(
                         node.init_value.elements[idx]
                     )
-                    if (
-                        elem_value.type != elem_type
-                        or (
-                            isinstance(elem_value.type, ir.IntType)
-                            and fixed_int_info_for_spec(self.codegen, elem_type_name)
-                            is not None
-                        )
+                    if elem_value.type != elem_type or (
+                        isinstance(elem_value.type, ir.IntType)
+                        and fixed_int_info_for_spec(self.codegen, elem_type_name)
+                        is not None
                     ):
                         elem_value = cast_to_declared_int(
                             self.codegen, elem_value, elem_type, elem_type_name
@@ -857,7 +864,9 @@ def visit_Assign(self, node: Assign):
     if declared_spec is not None and is_unbounded_spec(self.codegen, declared_spec):
         slot = self.codegen.locals.get(node.var_name)
         if slot is None or not isinstance(getattr(slot, "type", None), ir.PointerType):
-            raise StmtGenError(f"unbounded assignment target {node.var_name!r} has no owning slot")
+            raise StmtGenError(
+                f"unbounded assignment target {node.var_name!r} has no owning slot"
+            )
         new_value = _emit_owned_bigint_for_expr(self, node.value)
         old_value = self.builder.load(slot, name=f"{node.var_name}_bigint_old")
         self.builder.store(new_value, slot)
@@ -922,7 +931,9 @@ def visit_Assign(self, node: Assign):
         if global_var.global_constant:
             raise StmtGenError(f"Cannot assign to constant '{node.var_name}'")
         target_type = global_var.type.pointee
-        declared_spec = getattr(self.codegen, "global_decl_types", {}).get(node.var_name)
+        declared_spec = getattr(self.codegen, "global_decl_types", {}).get(
+            node.var_name
+        )
         if value.type != target_type or (
             isinstance(value.type, ir.IntType)
             and declared_spec is not None

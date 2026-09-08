@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 import re
-from typing import List, Optional, Tuple
 
 from token_access import token_text_at, token_type_at
 
@@ -12,7 +11,7 @@ from .diagnostics_catalog import TYPE_NAMES, TYPE_PREFIX_TOKENS, VECTOR_TYPE_NAM
 from .diagnostics_utils import tokenize
 
 
-def _type_alias_symbol(tokens: List[Tuple], start: int) -> Optional[str]:
+def _type_alias_symbol(tokens: list[tuple], start: int) -> str | None:
     """Return the alias name from `type`/`typedef` token streams."""
     if start + 1 >= len(tokens):
         return None
@@ -23,8 +22,8 @@ def _type_alias_symbol(tokens: List[Tuple], start: int) -> Optional[str]:
     if ttype != "TYPEDEF":
         return None
 
-    first_ident: Optional[str] = None
-    last_ident: Optional[str] = None
+    first_ident: str | None = None
+    last_ident: str | None = None
     j = start + 1
     while j < len(tokens):
         jtype, jval, *_ = tokens[j]
@@ -46,7 +45,7 @@ def _is_ident_type_name(value: str) -> bool:
     )
 
 
-def _collect_symbols(self, tokens: List[Tuple]) -> None:
+def _collect_symbols(self, tokens: list[tuple]) -> None:
     """Collect all user-defined symbols (functions, variables, parameters)."""
     i = 0
     while i < len(tokens):
@@ -258,7 +257,7 @@ def _collect_symbols(self, tokens: List[Tuple]) -> None:
         i += 1
 
 
-def _resolve_imports(self, tokens: List[Tuple]) -> None:
+def _resolve_imports(self, tokens: list[tuple]) -> None:
     """Resolve import statements and collect exported symbols from imported modules."""
     if not self.filepath:
         return
@@ -270,7 +269,7 @@ def _resolve_imports(self, tokens: List[Tuple]) -> None:
             continue
 
         # Collect the dotted module name: import foo.bar.baz
-        parts: List[str] = []
+        parts: list[str] = []
         j = i + 1
         while j < len(tokens):
             if token_type_at(tokens, j) == "IDENT":
@@ -351,9 +350,9 @@ def _collect_cimport_symbols(self) -> None:
             self.user_symbols.add(node.name)
             for param_name, _param_type in getattr(node, "params", []) or []:
                 self.user_symbols.add(str(param_name))
-        elif isinstance(node, A.ExternVar):
-            self.user_symbols.add(node.name)
-        elif isinstance(node, (A.RecordDef, A.ExternRecordDef, A.ClassDef, A.UnionDef)):
+        elif isinstance(node, A.ExternVar) or isinstance(
+            node, (A.RecordDef, A.ExternRecordDef, A.ClassDef, A.UnionDef)
+        ):
             self.user_symbols.add(node.name)
         elif isinstance(node, A.EnumDef):
             self.user_symbols.add(node.name)
@@ -361,9 +360,7 @@ def _collect_cimport_symbols(self) -> None:
                 self.user_symbols.add(getattr(variant, "name", ""))
 
 
-def _collect_symbols_from_file(
-    self, filepath: str, visited: Optional[set] = None
-) -> None:
+def _collect_symbols_from_file(self, filepath: str, visited: set | None = None) -> None:
     """Tokenize an imported file and harvest its top-level symbols.
 
     Follows transitive imports (e.g. barrel files that re-export
@@ -381,7 +378,7 @@ def _collect_symbols_from_file(
             source = f.read()
 
         imported_tokens = tokenize(source)
-        tok_list: List[Tuple[str, str, int, int]] = []
+        tok_list: list[tuple[str, str, int, int]] = []
         for raw_tok in imported_tokens:
             parts = tuple(raw_tok)
             if len(parts) >= 4:
@@ -460,7 +457,7 @@ def _collect_symbols_from_file(
         i = 0
         while i < len(tok_list):
             if tok_list[i][0] == "IMPORT":
-                sub_parts: List[str] = []
+                sub_parts: list[str] = []
                 j = i + 1
                 while j < len(tok_list):
                     if tok_list[j][0] == "IDENT":
@@ -473,7 +470,9 @@ def _collect_symbols_from_file(
                     j += 1
                 if sub_parts:
                     sub_rel = os.sep.join(sub_parts) + ".ail"
-                    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+                    repo_root = os.path.abspath(
+                        os.path.join(os.path.dirname(__file__), "..", "..")
+                    )
                     sub_candidates = [
                         os.path.join(imported_dir, sub_rel),
                         os.path.join(imported_dir, "..", sub_rel),

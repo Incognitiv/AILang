@@ -23,7 +23,7 @@ from parser.ast import (
     VarDecl,
 )
 from parser.parser import Parser
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Optional
 
 from lexer.scan import tokenize
 
@@ -32,9 +32,9 @@ class ModuleCache:
     """Caches loaded modules to avoid re-parsing"""
 
     def __init__(self):
-        self.modules: Dict[str, "Module"] = {}
-        self.loading: Set[str] = set()  # Detect circular imports
-        self.mtimes: Dict[str, float] = {}  # L13 fix: Track file modification times
+        self.modules: dict[str, Module] = {}
+        self.loading: set[str] = set()  # Detect circular imports
+        self.mtimes: dict[str, float] = {}  # L13 fix: Track file modification times
 
     @staticmethod
     def _cache_key(path: str) -> str:
@@ -90,14 +90,14 @@ class ModuleCache:
 class Module:
     """Represents a loaded AILang module"""
 
-    def __init__(self, name: str, path: str, ast: List[ASTNode]):
+    def __init__(self, name: str, path: str, ast: list[ASTNode]):
         self.name = name
         self.path = path
         self.ast = ast
-        self.exports: Dict[str, ASTNode] = {}
-        self.link_directives: List[LinkDirective] = []
+        self.exports: dict[str, ASTNode] = {}
+        self.link_directives: list[LinkDirective] = []
         self.is_library = False
-        self.library_name: Optional[str] = None
+        self.library_name: str | None = None
 
         self._extract_exports()
 
@@ -139,17 +139,17 @@ class Module:
             elif isinstance(node, LinkDirective):
                 self.link_directives.append(node)
 
-    def get_export(self, name: str) -> Optional[ASTNode]:
+    def get_export(self, name: str) -> ASTNode | None:
         """Get an exported symbol by name"""
         return self.exports.get(name)
 
-    def get_all_exports(self) -> Dict[str, ASTNode]:
+    def get_all_exports(self) -> dict[str, ASTNode]:
         """Get all exported symbols"""
         return self.exports.copy()
 
 
 def _has_link_directive(
-    directives: List[LinkDirective], candidate: LinkDirective
+    directives: list[LinkDirective], candidate: LinkDirective
 ) -> bool:
     """Return True if an equivalent link directive is already present."""
     return any(
@@ -162,23 +162,24 @@ def _has_link_directive(
 class ModuleLoader:
     """Loads and resolves AILang modules"""
 
-    def __init__(self, search_paths: Optional[List[str]] = None):
+    def __init__(self, search_paths: list[str] | None = None):
         self.cache = ModuleCache()
         # Canonical language-module root.  Standard-library imports must not
         # depend on the caller's CWD or on the source file living inside the
         # repository tree (native/JIT temporary files commonly do not).
-        repo_root = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "..", "..")
-        )
+        repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
         requested = list(search_paths or [])
-        self.search_paths = [repo_root, *[p for p in requested if os.path.abspath(p) != repo_root]]
-        self.current_file: Optional[str] = None
+        self.search_paths = [
+            repo_root,
+            *[p for p in requested if os.path.abspath(p) != repo_root],
+        ]
+        self.current_file: str | None = None
 
     def set_current_file(self, path: str) -> None:
         """Set the current file being compiled (for relative imports)"""
         self.current_file = os.path.abspath(path)
 
-    def resolve_module_path(self, module_name: str) -> Optional[str]:
+    def resolve_module_path(self, module_name: str) -> str | None:
         """Resolve a module name to a file path
 
         Search order:
@@ -308,16 +309,16 @@ class ModuleLoader:
         return module
 
     def process_imports(
-        self, ast: List[ASTNode]
-    ) -> Tuple[List[ASTNode], Dict[str, Module]]:
+        self, ast: list[ASTNode]
+    ) -> tuple[list[ASTNode], dict[str, Module]]:
         """Process import statements in an AST
 
         Returns:
         - Modified AST with imports removed
         - Dict of imported modules (name -> Module)
         """
-        imports: Dict[str, Module] = {}
-        remaining_ast: List[ASTNode] = []
+        imports: dict[str, Module] = {}
+        remaining_ast: list[ASTNode] = []
 
         for node in ast:
             if isinstance(node, Import):
@@ -346,7 +347,7 @@ class ModuleLoader:
 
 
 # Module-level singleton holder (simple list avoids 'global' statement and class with too-few-methods)
-_LOADER_INSTANCE: List[ModuleLoader] = []
+_LOADER_INSTANCE: list[ModuleLoader] = []
 
 
 def get_loader() -> ModuleLoader:
@@ -356,7 +357,7 @@ def get_loader() -> ModuleLoader:
     return _LOADER_INSTANCE[0]
 
 
-def set_search_paths(paths: List[str]) -> None:
+def set_search_paths(paths: list[str]) -> None:
     """Set the module search paths"""
     get_loader().search_paths = paths
 
@@ -367,8 +368,8 @@ def load_module(name: str) -> Module:
 
 
 def process_imports(
-    ast: List[ASTNode], current_file: Optional[str] = None
-) -> Tuple[List[ASTNode], Dict[str, Module]]:
+    ast: list[ASTNode], current_file: str | None = None
+) -> tuple[list[ASTNode], dict[str, Module]]:
     """Process imports in an AST"""
     loader = get_loader()
     if current_file:

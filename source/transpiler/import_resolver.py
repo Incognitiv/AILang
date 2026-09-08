@@ -26,7 +26,7 @@ import sys
 from parser import ast as A
 from parser.parser import Parser
 from pathlib import Path
-from typing import Any, List, Optional, Set
+from typing import Any
 
 from lexer.scan import tokenize
 from target_info import os_from_platform, target_matches
@@ -45,12 +45,12 @@ class ImportResolver:
     # up the directory tree looking for the module file.
     _MAX_PARENT_WALK = 10
 
-    def run(self, nodes: List[A.ASTNode], source_file: str) -> List[A.ASTNode]:
+    def run(self, nodes: list[A.ASTNode], source_file: str) -> list[A.ASTNode]:
         """Return the AST with all transitive imports inlined."""
-        result: List[A.ASTNode] = []
-        imported_funcs: Set[str] = set()
+        result: list[A.ASTNode] = []
+        imported_funcs: set[str] = set()
         base_dir = Path(source_file).parent if source_file else Path(".")
-        processed_files: Set[str] = set()
+        processed_files: set[str] = set()
         self._tag_source_file(nodes, source_file)
 
         self._process_file_imports(
@@ -76,11 +76,11 @@ class ImportResolver:
 
     def _process_file_imports(
         self,
-        file_nodes: List[A.ASTNode],
+        file_nodes: list[A.ASTNode],
         file_base_dir: Path,
-        result: List[A.ASTNode],
-        imported_funcs: Set[str],
-        processed_files: Set[str],
+        result: list[A.ASTNode],
+        imported_funcs: set[str],
+        processed_files: set[str],
     ) -> None:
         """Recursively splice in each Import/FromImport/CImport target."""
         current_os = os_from_platform()
@@ -116,15 +116,13 @@ class ImportResolver:
                 processed_files,
             )
             # Then splice in this file's definitions.
-            filter_names: Optional[Set[str]] = None
+            filter_names: set[str] | None = None
             if isinstance(node, A.FromImport):
                 filter_names = set(node.names)
             for imp_node in imported_nodes:
                 self._add_imported_node(imp_node, result, imported_funcs, filter_names)
 
-    def _resolve_cimport_path(
-        self, raw_path: str, file_base_dir: Path
-    ) -> Optional[Path]:
+    def _resolve_cimport_path(self, raw_path: str, file_base_dir: Path) -> Path | None:
         """Resolve a filesystem path from a #cimport directive.
 
         Supports quoted paths, optional suffix inference, and parent-tree
@@ -193,7 +191,7 @@ class ImportResolver:
 
     def _resolve_module_path(
         self, module_path: str, file_base_dir: Path
-    ) -> Optional[Path]:
+    ) -> Path | None:
         """Resolve `module.path` -> filesystem `module/path.ail`.
 
         Tries source-relative first, then walks up the tree to find an
@@ -231,9 +229,9 @@ class ImportResolver:
     def _add_imported_node(
         self,
         imp_node: A.ASTNode,
-        result: List[A.ASTNode],
-        imported_funcs: Set[str],
-        filter_names: Optional[Set[str]] = None,
+        result: list[A.ASTNode],
+        imported_funcs: set[str],
+        filter_names: set[str] | None = None,
     ) -> None:
         """Splice one node from an imported module into ``result`` if it
         isn't already there and isn't filtered out by a `from` clause.
@@ -288,7 +286,7 @@ class ImportResolver:
         elif isinstance(imp_node, (A.CInclude, A.LinkDirective, A.TemplateBlock)):
             result.append(imp_node)
 
-    def _parse_import_file(self, filepath: str) -> List[A.ASTNode]:
+    def _parse_import_file(self, filepath: str) -> list[A.ASTNode]:
         """Parse one imported `.ail` file.
 
         Existing-but-invalid imports must fail at the import boundary. Returning
@@ -310,7 +308,7 @@ class ImportResolver:
         except OSError as exc:
             raise OSError(f"{filepath}: failed to read imported module: {exc}") from exc
 
-    def _parse_probe_import_file(self, filepath: str) -> List[A.ASTNode]:
+    def _parse_probe_import_file(self, filepath: str) -> list[A.ASTNode]:
         """Parse one imported cbind JSON file.
 
         Accepts generated `.probe.json` payloads and raw binding specs. Raw specs
@@ -444,7 +442,7 @@ class ImportResolver:
         return rows
 
     @staticmethod
-    def _normalize_probe_header(header: object) -> tuple[Optional[str], bool]:
+    def _normalize_probe_header(header: object) -> tuple[str | None, bool]:
         """Return ``(path, is_system)`` from cbind probe header descriptor."""
         if isinstance(header, str):
             text = header.strip()
@@ -469,7 +467,7 @@ class ImportResolver:
         row: object,
         *,
         c_header_declared: bool = False,
-    ) -> Optional[A.VarDecl]:
+    ) -> A.VarDecl | None:
         if not isinstance(row, dict):
             return None
         name = str(row.get("name", "")).strip()
@@ -495,11 +493,11 @@ class ImportResolver:
             is_const=True,
         )
         if c_header_declared:
-            setattr(node, "c_header_declared", True)
+            node.c_header_declared = True
         return node
 
     @staticmethod
-    def _probe_enum_node(row: object) -> Optional[A.EnumDef]:
+    def _probe_enum_node(row: object) -> A.EnumDef | None:
         if not isinstance(row, dict):
             return None
         name = str(row.get("name", "")).strip()
@@ -544,7 +542,7 @@ class ImportResolver:
         return str(key)
 
     @staticmethod
-    def _probe_record_node(row: object) -> Optional[A.ExternRecordDef]:
+    def _probe_record_node(row: object) -> A.ExternRecordDef | None:
         if not isinstance(row, dict):
             return None
         name = str(row.get("name", "")).strip()
@@ -689,7 +687,7 @@ class ImportResolver:
         *,
         function_name: str | None = None,
         header_declared: bool = False,
-    ) -> Optional[A.ExternFn]:
+    ) -> A.ExternFn | None:
         if not isinstance(row, dict):
             return None
         name = function_name or str(row.get("name", "")).strip()
@@ -720,13 +718,13 @@ class ImportResolver:
         return fn
 
     @staticmethod
-    def _tag_source_file(nodes: List[A.ASTNode], filepath: str) -> None:
+    def _tag_source_file(nodes: list[A.ASTNode], filepath: str) -> None:
         """Attach source path metadata to parsed nodes for diagnostics/reports."""
         if not filepath:
             return
         for node in nodes:
             if not hasattr(node, "_source_file"):
-                setattr(node, "_source_file", filepath)
+                node._source_file = filepath
 
     @staticmethod
     def _sort_key(node: A.ASTNode) -> int:

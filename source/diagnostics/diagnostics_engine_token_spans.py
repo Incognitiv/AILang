@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import List, Tuple
-
 from token_access import token_text_at, token_type_at
 
 _UI_BLOCK_TAGS: set[str] = {
@@ -16,7 +14,7 @@ _UI_BLOCK_TAGS: set[str] = {
 }
 
 
-def ignored_declarative_token_indices(tokens: List[Tuple]) -> set[int]:
+def ignored_declarative_token_indices(tokens: list[tuple]) -> set[int]:
     """Return token indices that are checked by parsers, not name diagnostics."""
     return (
         _ui_dsl_token_indices(tokens)
@@ -25,7 +23,7 @@ def ignored_declarative_token_indices(tokens: List[Tuple]) -> set[int]:
     )
 
 
-def _looks_like_ui_block(tokens: List[Tuple], index: int) -> bool:
+def _looks_like_ui_block(tokens: list[tuple], index: int) -> bool:
     """Return true for canonical UI DSL blocks such as `window name:`."""
     token_type, token_text, _token_line, _token_col = tokens[index]
     if token_type != "IDENT" or str(token_text).lower() not in _UI_BLOCK_TAGS:
@@ -42,7 +40,7 @@ def _looks_like_ui_block(tokens: List[Tuple], index: int) -> bool:
     return False
 
 
-def _looks_like_ui_include(tokens: List[Tuple], index: int) -> bool:
+def _looks_like_ui_include(tokens: list[tuple], index: int) -> bool:
     """Return true for canonical UI DSL include lines: `include "file.ail"`."""
     return (
         token_type_at(tokens, index) in ("IDENT", "UI_INCLUDE")
@@ -52,7 +50,7 @@ def _looks_like_ui_include(tokens: List[Tuple], index: int) -> bool:
     )
 
 
-def _ui_dsl_token_indices(tokens: List[Tuple]) -> set[int]:
+def _ui_dsl_token_indices(tokens: list[tuple]) -> set[int]:
     """Find tokens belonging to top-level UI DSL syntax."""
     ignored: set[int] = set()
     i = 0
@@ -86,7 +84,7 @@ def _ui_dsl_token_indices(tokens: List[Tuple]) -> set[int]:
     return ignored
 
 
-def _cabi_header_token_indices(tokens: List[Tuple]) -> set[int]:
+def _cabi_header_token_indices(tokens: list[tuple]) -> set[int]:
     """Find tokens belonging to ``abi header`` declarations."""
     ignored: set[int] = set()
     i = 0
@@ -125,7 +123,7 @@ def _cabi_header_token_indices(tokens: List[Tuple]) -> set[int]:
     return ignored
 
 
-def _decorator_argument_token_indices(tokens: List[Tuple]) -> set[int]:
+def _decorator_argument_token_indices(tokens: list[tuple]) -> set[int]:
     """Ignore declarative decorator names/arguments in identifier diagnostics."""
     ignored: set[int] = set()
     i = 0

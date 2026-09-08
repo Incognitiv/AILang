@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from parser import ast as A
-from typing import Any, Callable, Dict, Iterable, Optional, Set, Tuple, TypeGuard
+from typing import Any, TypeGuard
 
 from ast_access import arg_at, body_at
 
@@ -20,10 +21,10 @@ from .range_facts_types import Interval, StringInfo, string_info_from_format_cal
 def while_true_break_guard_bounds(
     node: A.While,
     *,
-    func_scope: Optional[str],
+    func_scope: str | None,
     facts: Any,
-    scope: Dict[str, Any],
-) -> Tuple[Dict[str, Tuple[int, int]], bool]:
+    scope: dict[str, Any],
+) -> tuple[dict[str, tuple[int, int]], bool]:
     """Derive conservative in-loop bounds from while-true break guards.
 
     Recognized shape:
@@ -91,10 +92,10 @@ def while_true_break_guard_bounds(
 def derive_specialized_while_ranges(
     node: A.While,
     *,
-    func_scope: Optional[str],
+    func_scope: str | None,
     facts: Any,
-    scope: Dict[str, Any],
-) -> Tuple[Dict[str, Tuple[int, int]], Set[str]]:
+    scope: dict[str, Any],
+) -> tuple[dict[str, tuple[int, int]], set[str]]:
     """Derive conservative while-loop refinements for hot fixed-trip patterns.
 
     The specialization is intentionally strict:
@@ -104,8 +105,8 @@ def derive_specialized_while_ranges(
     Returns (refinements, preserve_assigned). Empty outputs when the shape
     is not recognized.
     """
-    refinements: Dict[str, Tuple[int, int]] = {}
-    preserve: Set[str] = set()
+    refinements: dict[str, tuple[int, int]] = {}
+    preserve: set[str] = set()
 
     if isinstance(node.cond, A.Bool) and bool(node.cond.value):
         acc_name, total_budget = _self_reduction_budget(
@@ -191,12 +192,12 @@ def _clamped_accumulator_ranges(
     body: Iterable[A.ASTNode],
     *,
     facts: Any,
-    func_scope: Optional[str],
-    scope: Dict[str, Any],
+    func_scope: str | None,
+    scope: dict[str, Any],
     counter_name: str,
-) -> Dict[str, Tuple[int, int]]:
-    clamp_limits: Dict[str, int] = {}
-    update_exprs: Dict[str, A.ASTNode] = {}
+) -> dict[str, tuple[int, int]]:
+    clamp_limits: dict[str, int] = {}
+    update_exprs: dict[str, A.ASTNode] = {}
     for stmt in body:
         clamp = _clamp_if_pattern(stmt)
         if clamp is not None:
@@ -211,7 +212,7 @@ def _clamped_accumulator_ranges(
     if not clamp_limits or set(clamp_limits) != set(update_exprs):
         return {}
 
-    refined: Dict[str, Tuple[int, int]] = {}
+    refined: dict[str, tuple[int, int]] = {}
     trial_scope = dict(scope)
     for var_name, limit in clamp_limits.items():
         current = scope.get(var_name)
@@ -243,10 +244,10 @@ def _scalar_reduction_budget(
     body: Iterable[A.ASTNode],
     *,
     facts: Any,
-    func_scope: Optional[str],
-    scope: Dict[str, Any],
+    func_scope: str | None,
+    scope: dict[str, Any],
     counter_name: str,
-) -> Tuple[Optional[str], Optional[int]]:
+) -> tuple[str | None, int | None]:
     """Return max per-iteration growth for `acc = acc + expr` loops.
 
     This is deliberately narrower than a general recurrence solver. It accepts
@@ -256,10 +257,10 @@ def _scalar_reduction_budget(
     """
     if _assignment_count_for_var(body, counter_name) != 1:
         return None, None
-    acc_name: Optional[str] = None
+    acc_name: str | None = None
     budget = 0
     found_growth = False
-    transient_strings: Dict[str, StringInfo] = {}
+    transient_strings: dict[str, StringInfo] = {}
     dict_state = dict_state_from_facts(facts, func_scope)
     local_scope = dict(scope)
     for stmt in body:
@@ -343,9 +344,9 @@ def _string_info_from_assignment(
     expr: A.ASTNode,
     *,
     facts: Any,
-    func_scope: Optional[str],
-    scope: Dict[str, Any],
-) -> Optional[StringInfo]:
+    func_scope: str | None,
+    scope: dict[str, Any],
+) -> StringInfo | None:
     if isinstance(expr, A.StringLit):
         from .range_facts_types import string_info_from_literal
 
@@ -366,10 +367,10 @@ def _expr_interval_with_transient_strings(
     expr: A.ASTNode,
     *,
     facts: Any,
-    func_scope: Optional[str],
-    scope: Dict[str, Any],
-    transient_strings: Dict[str, StringInfo],
-) -> Optional[Interval]:
+    func_scope: str | None,
+    scope: dict[str, Any],
+    transient_strings: dict[str, StringInfo],
+) -> Interval | None:
     if isinstance(expr, A.Call) and expr.name in {"len", "strlen"}:
         if len(expr.args or []) != 1:
             return None
@@ -431,8 +432,8 @@ def _is_self_accumulator_write(node: A.Assign) -> bool:
 
 
 def _symbolic_step_one_counter_range(
-    node: A.While, scope: Dict[str, Any]
-) -> Optional[Tuple[str, int, int]]:
+    node: A.While, scope: dict[str, Any]
+) -> tuple[str, int, int] | None:
     """Refine `while i < bound; i = i + 1` even when bound is symbolic.
 
     The `<` guard itself proves the in-loop value of `i` is at most
@@ -468,9 +469,9 @@ def _symbolic_step_one_counter_range(
 def _while_counter_bound(
     node: A.While,
     facts: Any,
-    func_scope: Optional[str],
-    scope: Dict[str, Any],
-) -> Tuple[Optional[str], Optional[int], int]:
+    func_scope: str | None,
+    scope: dict[str, Any],
+) -> tuple[str | None, int | None, int]:
     if not isinstance(node.cond, A.BinaryOp):
         return None, None, 0
     if node.cond.op not in {"<", "<="}:
@@ -520,7 +521,7 @@ def _iter_ast_children(node: A.ASTNode) -> Iterable[A.ASTNode]:
 
 def _top_level_counter_step(body: Iterable[A.ASTNode], var_name: str) -> int:
     delta = _top_level_counter_delta(body, var_name)
-    return delta if delta > 0 else 0
+    return max(0, delta)
 
 
 def _top_level_counter_delta(body: Iterable[A.ASTNode], var_name: str) -> int:
@@ -554,10 +555,10 @@ def _nested_reduction_budget(
     body: Iterable[A.ASTNode],
     *,
     facts: Any,
-    func_scope: Optional[str],
-    scope: Dict[str, Any],
-) -> Tuple[Optional[str], Optional[int]]:
-    range_bounds: Dict[str, Tuple[int, int]] = {}
+    func_scope: str | None,
+    scope: dict[str, Any],
+) -> tuple[str | None, int | None]:
+    range_bounds: dict[str, tuple[int, int]] = {}
     for stmt in body:
         if not isinstance(stmt, A.RangeVarDecl):
             continue
@@ -696,9 +697,9 @@ def _self_reduction_budget(
     body: Iterable[A.ASTNode],
     *,
     facts: Any,
-    func_scope: Optional[str],
-    scope: Dict[str, Any],
-) -> Tuple[Optional[str], Optional[int]]:
+    func_scope: str | None,
+    scope: dict[str, Any],
+) -> tuple[str | None, int | None]:
     body_list = list(body)
     if len(body_list) != 3:
         return None, None

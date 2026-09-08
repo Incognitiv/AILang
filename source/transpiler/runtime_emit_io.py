@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__all__ = ["emit_runtime_sqlite", "emit_runtime_fileops"]
+__all__ = ["emit_runtime_fileops", "emit_runtime_sqlite"]
 
 
 def emit_runtime_sqlite(self) -> None:

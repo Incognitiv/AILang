@@ -5,10 +5,12 @@ statement-only local-assignment checks.  This module selects a runtime helper
 that preserves the *numeric value* across signedness/width changes and traps
 when the destination iN/uN cannot represent it.
 """
+
 from __future__ import annotations
 
 from parser import ast as A
 from parser.ast import parsed_type_to_str
+
 from transpiler.fixed_int_types import info_for_c_fixed, info_for_fixed_int
 
 

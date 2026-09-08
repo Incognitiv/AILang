@@ -19,7 +19,6 @@ emit. Effectively a stateless service over ``TypeInfo``.
 from __future__ import annotations
 
 from parser import ast as A
-from typing import Dict, List, Optional, Set, Tuple
 
 from ast_access import arg_at
 from transpiler.type_info import TypeInfo
@@ -37,7 +36,7 @@ class OwnershipAnalyzer:
     # A user fn with one of these return types and only-primitive-or-string
     # params is treated as non-capturing for tracked-var args -- like the
     # known non-capturing builtin set.
-    _NON_CAPTURING_RETURN_TYPES: "frozenset[str]" = frozenset(
+    _NON_CAPTURING_RETURN_TYPES: frozenset[str] = frozenset(
         {
             "int",
             "int64_t",
@@ -57,7 +56,7 @@ class OwnershipAnalyzer:
             "void",
         }
     )
-    _NON_CAPTURING_PARAM_TYPES: "frozenset[str]" = frozenset(
+    _NON_CAPTURING_PARAM_TYPES: frozenset[str] = frozenset(
         {
             "int",
             "int64_t",
@@ -84,8 +83,8 @@ class OwnershipAnalyzer:
     def __init__(
         self,
         type_info: TypeInfo,
-        owning_calls: "frozenset[str]",
-        non_capturing_calls: "frozenset[str]",
+        owning_calls: frozenset[str],
+        non_capturing_calls: frozenset[str],
     ) -> None:
         self._type_info = type_info
         self._owning_calls = owning_calls
@@ -94,7 +93,7 @@ class OwnershipAnalyzer:
     # ==================== ownership queries ====================
 
     def is_owned_string_alloc(
-        self, expr: A.ASTNode, current_function: Optional[str] = None
+        self, expr: A.ASTNode, current_function: str | None = None
     ) -> bool:
         """Does ``expr`` necessarily produce a fresh malloc'd string?
 
@@ -156,16 +155,16 @@ class OwnershipAnalyzer:
     # ==================== local collectors ====================
 
     def collect_string_locals(
-        self, body: List[A.ASTNode], current_function: Optional[str] = None
-    ) -> List[str]:
+        self, body: list[A.ASTNode], current_function: str | None = None
+    ) -> list[str]:
         """Vars where every assignment is an owned-string-alloc.
         Eligible for free-before-reassign + scope-exit auto-free."""
         owned, _mixed = self._scan_string_assigns(body, current_function)
         return owned
 
     def collect_mixed_ownership_string_locals(
-        self, body: List[A.ASTNode], current_function: Optional[str] = None
-    ) -> List[str]:
+        self, body: list[A.ASTNode], current_function: str | None = None
+    ) -> list[str]:
         """Vars with SOME owned and SOME non-owning string assigns.
         These need a runtime ``__var_owned`` flag -- set/cleared per
         assign, conditional free at scope exit."""
@@ -173,14 +172,14 @@ class OwnershipAnalyzer:
         return mixed
 
     def _scan_string_assigns(
-        self, body: List[A.ASTNode], current_function: Optional[str]
-    ) -> Tuple[List[str], List[str]]:
+        self, body: list[A.ASTNode], current_function: str | None
+    ) -> tuple[list[str], list[str]]:
         """Split string-assigned vars into pure-owned and mixed-ownership.
         Vars assigned only non-owning strings (literals, borrowed
         pointers) are in neither group -- those need no cleanup."""
-        owned_seen: Set[str] = set()
-        non_owning_seen: Set[str] = set()
-        order: List[str] = []
+        owned_seen: set[str] = set()
+        non_owning_seen: set[str] = set()
+        order: list[str] = []
 
         def walk(node: A.ASTNode) -> None:
             if node is None:
@@ -230,17 +229,17 @@ class OwnershipAnalyzer:
         mixed = [v for v in order if v in owned_seen and v in non_owning_seen]
         return owned_only, mixed
 
-    def collect_array_locals(self, body: List[A.ASTNode], call_name: str) -> List[str]:
+    def collect_array_locals(self, body: list[A.ASTNode], call_name: str) -> list[str]:
         """Vars where every assign is ``var = call_name(...)``. Used
         for split() / split_ints() collection-tracking."""
         return self.collect_with_owning(body, {call_name}, set())
 
     def collect_with_owning(
         self,
-        body: List[A.ASTNode],
-        owning_calls: Set[str],
-        self_mutating_calls: Set[str],
-    ) -> List[str]:
+        body: list[A.ASTNode],
+        owning_calls: set[str],
+        self_mutating_calls: set[str],
+    ) -> list[str]:
         """Generic owned-local collector.
 
         Track a var iff every Assign to it is either:
@@ -252,9 +251,9 @@ class OwnershipAnalyzer:
 
         Any other assignment excludes the var (conservative: leak
         rather than free a borrowed value)."""
-        owned_seen: Set[str] = set()
-        non_owning_seen: Set[str] = set()
-        order: List[str] = []
+        owned_seen: set[str] = set()
+        non_owning_seen: set[str] = set()
+        order: list[str] = []
 
         def preserves_ownership(value: A.ASTNode, var_name: str) -> bool:
             if not isinstance(value, A.Call):
@@ -305,12 +304,12 @@ class OwnershipAnalyzer:
             walk(stmt)
         return [v for v in order if v not in non_owning_seen]
 
-    def collect_class_locals(self, body: List[A.ASTNode]) -> List[Tuple[str, str]]:
+    def collect_class_locals(self, body: list[A.ASTNode]) -> list[tuple[str, str]]:
         """Vars where every assign is ``new ClassName(...)``. Mixed
         class types are excluded for safety."""
-        owned_class: Dict[str, str] = {}
-        non_owning_seen: Set[str] = set()
-        order: List[str] = []
+        owned_class: dict[str, str] = {}
+        non_owning_seen: set[str] = set()
+        order: list[str] = []
 
         def walk(node: A.ASTNode) -> None:
             if node is None:
@@ -371,8 +370,8 @@ class OwnershipAnalyzer:
         return [(v, owned_class[v]) for v in order if v not in non_owning_seen]
 
     def class_locals_constructed_by_new(
-        self, body: List[A.ASTNode], class_locals: List[Tuple[str, str]]
-    ) -> Set[str]:
+        self, body: list[A.ASTNode], class_locals: list[tuple[str, str]]
+    ) -> set[str]:
         """Tracked class locals whose assignments are direct constructors.
 
         A class-returning call transfers heap ownership to the caller and must
@@ -382,8 +381,8 @@ class OwnershipAnalyzer:
         expected = dict(class_locals)
         if not expected:
             return set()
-        constructed: Set[str] = set()
-        blocked: Set[str] = set()
+        constructed: set[str] = set()
+        blocked: set[str] = set()
 
         def walk(node: A.ASTNode) -> None:
             if node is None:
@@ -421,10 +420,10 @@ class OwnershipAnalyzer:
 
     def detect_escaping_class_locals(
         self,
-        body: List[A.ASTNode],
-        class_locals: List[Tuple[str, str]],
-        current_function: Optional[str] = None,
-    ) -> Set[str]:
+        body: list[A.ASTNode],
+        class_locals: list[tuple[str, str]],
+        current_function: str | None = None,
+    ) -> set[str]:
         """Compatibility wrapper for the legacy callers; delegates to
         the generic ``detect_escaping_locals``."""
         return self.detect_escaping_locals(
@@ -435,16 +434,16 @@ class OwnershipAnalyzer:
 
     def detect_escaping_locals(
         self,
-        body: List[A.ASTNode],
-        var_names: Set[str],
-        current_function: Optional[str] = None,
-    ) -> Set[str]:
+        body: list[A.ASTNode],
+        var_names: set[str],
+        current_function: str | None = None,
+    ) -> set[str]:
         """Subset of ``var_names`` that escape via return / field-store /
         capturing call / method receiver. Generic over class-typed and
         string-typed locals."""
         if not var_names:
             return set()
-        escaping: Set[str] = set()
+        escaping: set[str] = set()
 
         def mark_uses_in(expr: A.ASTNode) -> None:
             if expr is None:

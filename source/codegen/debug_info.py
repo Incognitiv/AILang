@@ -20,7 +20,7 @@ state moves, only methods.
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from llvmlite import ir
 
@@ -114,7 +114,7 @@ class DebugInfoEmitter:
         func_name: str,
         source_path: str,
         line: int,
-    ) -> Optional[ir.DIValue]:
+    ) -> ir.DIValue | None:
         """Attach a ``!DISubprogram`` to ``func``, creating CU / file
         lazily. Returns the DISubprogram (or None when DI is off /
         source location is unknown).
@@ -168,7 +168,7 @@ class DebugInfoEmitter:
             },
         )
 
-    def di_location_for_line(self, line: int) -> Optional[ir.DIValue]:
+    def di_location_for_line(self, line: int) -> ir.DIValue | None:
         """Return a memoized ``!DILocation`` for the current function
         at ``line``. None when DI is off or no subprogram is in scope.
 

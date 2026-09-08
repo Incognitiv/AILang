@@ -9,7 +9,7 @@ import os
 import re
 import shutil
 import sys
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, cast
 
 from .common import validate_filepath
 
@@ -39,7 +39,7 @@ def _is_frozen() -> bool:
 
 
 def _run_subprocess(
-    cmd: List[str], timeout: int = 30, env: Optional[Dict[str, str]] = None
+    cmd: list[str], timeout: int = 30, env: dict[str, str] | None = None
 ) -> tuple:
     """Run subprocess and return (stdout, stderr, returncode) or error dict.
 
@@ -65,7 +65,7 @@ def _run_subprocess(
         return None, None, {"error": f"{cmd[0]} not installed"}
     except subprocess.TimeoutExpired:
         return None, None, {"error": f"{cmd[0]} timed out"}
-    except (OSError, IOError) as exc:
+    except OSError as exc:
         return None, None, {"error": str(exc)}
 
 
@@ -74,7 +74,7 @@ def _run_subprocess(
 # =============================================================================
 
 
-def _run_pyflakes_api(filepath: str, actual_name: str) -> Dict[str, Any]:
+def _run_pyflakes_api(filepath: str, actual_name: str) -> dict[str, Any]:
     """Run pyflakes using Python API."""
     try:
         pyflakes_api = cast(Any, importlib.import_module("pyflakes.api"))
@@ -97,13 +97,13 @@ def _run_pyflakes_api(filepath: str, actual_name: str) -> Dict[str, Any]:
             "issues": issues[:100],
             "passed": not issues,
         }
-    except (OSError, IOError) as exc:
+    except OSError as exc:
         return {"error": str(exc)}
 
 
 def _run_pylint_api(
     filepath: str, actual_name: str, check_imports: bool = False
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Run pylint using Python API."""
     del actual_name
     try:
@@ -149,7 +149,7 @@ def _run_pylint_api(
                     score = float(line.split("rated at ")[1].split("/")[0])
                 except (IndexError, ValueError):
                     pass
-        issues: List[str] = []
+        issues: list[str] = []
         for line in all_out.split("\n"):
             if filepath not in line:
                 continue
@@ -162,7 +162,7 @@ def _run_pylint_api(
             "issues": issues[:100],
             "passed": score >= 8.0,
         }
-    except (OSError, IOError) as exc:
+    except OSError as exc:
         return {"error": str(exc)}
 
 
@@ -170,7 +170,7 @@ INCOMPLETE_STUB_MODULES = {"black", "isort", "mypy"}
 FILTERED_MYPY_ERRORS = {"import-untyped", "import-not-found"}
 
 
-def _mypy_env_for(filepath: str) -> Dict[str, str]:
+def _mypy_env_for(filepath: str) -> dict[str, str]:
     """Build a mypy environment that can resolve repo-local import roots."""
     env = os.environ.copy()
     cwd = os.path.abspath(os.getcwd())
@@ -186,7 +186,7 @@ def _mypy_env_for(filepath: str) -> Dict[str, str]:
         candidate_roots.extend(p for p in existing.split(os.pathsep) if p)
 
     seen: set[str] = set()
-    roots: List[str] = []
+    roots: list[str] = []
     for root in candidate_roots:
         norm = os.path.normcase(os.path.abspath(root))
         if norm in seen or not os.path.isdir(root):
@@ -204,7 +204,7 @@ def _mypy_cache_dir() -> str:
 
 def _run_mypy_api(
     filepath: str, actual_name: str, check_imports: bool = False
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Run mypy using Python API."""
     os.environ["MYPY_USE_MYPYC"] = "0"
     os.environ["MYPY_FORCE_PURE"] = "1"
@@ -241,7 +241,7 @@ def _run_mypy_api(
             else:
                 os.environ["MYPYPATH"] = old_mypy_path
         output = (stdout or "") + (stderr or "")
-        errors: List[str] = []
+        errors: list[str] = []
         for line in output.split("\n"):
             if ":" in line and "error:" in line:
                 if "[attr-defined]" in line:
@@ -260,11 +260,11 @@ def _run_mypy_api(
             "errors": errors[:100],
             "passed": not errors,
         }
-    except (OSError, IOError) as exc:
+    except OSError as exc:
         return {"error": str(exc), "passed": False}
 
 
-def _run_bandit_api(filepath: str, _actual_name: str) -> Dict[str, Any]:
+def _run_bandit_api(filepath: str, _actual_name: str) -> dict[str, Any]:
     """Run bandit using Python API."""
     try:
         bandit_config = cast(Any, importlib.import_module("bandit.core.config"))
@@ -277,7 +277,7 @@ def _run_bandit_api(filepath: str, _actual_name: str) -> Dict[str, Any]:
         mgr.discover_files([filepath])
         mgr.run_tests()
         high, medium, low = 0, 0, 0
-        issues: List[str] = []
+        issues: list[str] = []
         # Skip B105 (hardcoded password) - too many false positives with token names
         skipped_tests = {"B105"}
         for issue in mgr.get_issue_list():
@@ -299,7 +299,7 @@ def _run_bandit_api(filepath: str, _actual_name: str) -> Dict[str, Any]:
             "issues": issues[:100],
             "passed": high == 0,
         }
-    except (OSError, IOError) as exc:
+    except OSError as exc:
         return {"error": str(exc)}
 
 
@@ -308,7 +308,7 @@ def _run_bandit_api(filepath: str, _actual_name: str) -> Dict[str, Any]:
 # =============================================================================
 
 
-def _run_pyflakes_subprocess(filepath: str, actual_name: str) -> Dict[str, Any]:
+def _run_pyflakes_subprocess(filepath: str, actual_name: str) -> dict[str, Any]:
     """Run pyflakes via subprocess."""
     pyflakes_path = shutil.which("pyflakes")
     if not pyflakes_path:
@@ -331,7 +331,7 @@ def _run_pyflakes_subprocess(filepath: str, actual_name: str) -> Dict[str, Any]:
 
 def _run_pylint_subprocess(
     filepath: str, actual_name: str, check_imports: bool = False
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Run pylint via subprocess with JSON output."""
     del actual_name
     pylint_path = shutil.which("pylint")
@@ -359,7 +359,7 @@ def _run_pylint_subprocess(
     stdout, stderr, rc = _run_subprocess(cmd, timeout=60, env=_mypy_env_for(filepath))
     if isinstance(rc, dict):
         return rc
-    issues: List[str] = []
+    issues: list[str] = []
     try:
         if stdout and stdout.strip():
             for item in json.loads(stdout):
@@ -386,7 +386,7 @@ def _run_pylint_subprocess(
 
 def _run_mypy_subprocess(
     filepath: str, actual_name: str, check_imports: bool = False
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Run mypy via subprocess."""
     mypy_path = shutil.which("mypy")
     if not mypy_path:
@@ -409,7 +409,7 @@ def _run_mypy_subprocess(
     if isinstance(rc, dict):
         return rc
     output = (stdout or "") + (stderr or "")
-    errors: List[str] = []
+    errors: list[str] = []
     for line in output.split("\n"):
         if ":" in line and "error:" in line:
             if "[attr-defined]" in line:
@@ -430,7 +430,7 @@ def _run_mypy_subprocess(
     }
 
 
-def _run_bandit_subprocess(filepath: str, _actual_name: str) -> Dict[str, Any]:
+def _run_bandit_subprocess(filepath: str, _actual_name: str) -> dict[str, Any]:
     """Run bandit via subprocess with JSON output."""
     bandit_path = shutil.which("bandit")
     if not bandit_path:
@@ -444,7 +444,7 @@ def _run_bandit_subprocess(filepath: str, _actual_name: str) -> Dict[str, Any]:
     except json.JSONDecodeError:
         return {"error": "Bandit produced invalid JSON", "passed": False}
     high, medium, low = 0, 0, 0
-    issues: List[str] = []
+    issues: list[str] = []
     # Skip common false positives:
     # B105 - hardcoded password (token names like 'DEF', 'IF')
     # B404 - subprocess import (needed for compilers)
@@ -477,7 +477,7 @@ def _run_bandit_subprocess(filepath: str, _actual_name: str) -> Dict[str, Any]:
 # =============================================================================
 
 
-def run_pyflakes(filepath: str, actual_name: str) -> Dict[str, Any]:
+def run_pyflakes(filepath: str, actual_name: str) -> dict[str, Any]:
     """Run pyflakes - uses API in frozen mode, subprocess otherwise."""
     validated_path, err = validate_filepath(filepath)
     if err:
@@ -489,7 +489,7 @@ def run_pyflakes(filepath: str, actual_name: str) -> Dict[str, Any]:
 
 def run_pylint(
     filepath: str, actual_name: str, check_imports: bool = False
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Run pylint - uses API in frozen mode, subprocess otherwise."""
     validated_path, err = validate_filepath(filepath)
     if err:
@@ -501,7 +501,7 @@ def run_pylint(
 
 def run_mypy(
     filepath: str, actual_name: str, check_imports: bool = False
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Run mypy - uses API in frozen mode, subprocess otherwise."""
     validated_path, err = validate_filepath(filepath)
     if err:
@@ -511,7 +511,7 @@ def run_mypy(
     return _run_mypy_subprocess(validated_path, actual_name, check_imports)
 
 
-def run_bandit(filepath: str, actual_name: str) -> Dict[str, Any]:
+def run_bandit(filepath: str, actual_name: str) -> dict[str, Any]:
     """Run bandit - uses API in frozen mode, subprocess otherwise."""
     validated_path, err = validate_filepath(filepath)
     if err:
@@ -521,7 +521,7 @@ def run_bandit(filepath: str, actual_name: str) -> Dict[str, Any]:
     return _run_bandit_subprocess(validated_path, actual_name)
 
 
-def run_ruff(filepath: str, actual_name: str) -> Dict[str, Any]:
+def run_ruff(filepath: str, actual_name: str) -> dict[str, Any]:
     """Run ruff - subprocess only (Rust binary, no Python API)."""
     del actual_name
     validated_path, err = validate_filepath(filepath)
@@ -535,7 +535,7 @@ def run_ruff(filepath: str, actual_name: str) -> Dict[str, Any]:
     stdout, _, rc = _run_subprocess(cmd)
     if isinstance(rc, dict):
         return {"passed": True, "issues_count": 0, "issues": []}
-    issues: List[str] = []
+    issues: list[str] = []
     try:
         if stdout and stdout.strip():
             for item in json.loads(stdout):

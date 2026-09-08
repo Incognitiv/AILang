@@ -5,8 +5,12 @@ from __future__ import annotations
 from parser import ast as A
 
 from ast_access import arg_at
+from transpiler.fixed_int_types import (
+    c_name_for_fixed,
+    info_for_c_fixed,
+    promoted_fixed_info,
+)
 from transpiler.wide_int_types import info_for_c, promoted_info
-from transpiler.fixed_int_types import c_name_for_fixed, info_for_c_fixed, promoted_fixed_info
 
 
 def _infer_vec_call_type(self, node: A.Call) -> str:
@@ -101,10 +105,22 @@ def _infer_type(self, node: A.ASTNode) -> str:
                 return "ailang_dyn_array"
             if lower in {"str_array", "ailang_str_array"}:
                 return "ailang_str_array"
-            if text.endswith("*") or text.startswith("ailang_") or text in {
-                "int64_t", "int32_t", "uint64_t", "uint32_t",
-                "double", "float", "bool", "StringArray", "IntArray"
-            }:
+            if (
+                text.endswith("*")
+                or text.startswith("ailang_")
+                or text
+                in {
+                    "int64_t",
+                    "int32_t",
+                    "uint64_t",
+                    "uint32_t",
+                    "double",
+                    "float",
+                    "bool",
+                    "StringArray",
+                    "IntArray",
+                }
+            ):
                 return text
             if text in self.classes:
                 return f"{text} *"
@@ -405,15 +421,31 @@ def _infer_type(self, node: A.ASTNode) -> str:
         rf = info_for_c_fixed(right_type)
         # Source integer literals are adaptable to the other fixed operand
         # when their mathematical value fits, matching LLVM literal narrowing.
-        if lf is not None and isinstance(node.right, A.Number) and not isinstance(node.right.value, float):
+        if (
+            lf is not None
+            and isinstance(node.right, A.Number)
+            and not isinstance(node.right.value, float)
+        ):
             v = int(node.right.value)
-            if (0 <= v <= (1 << lf.bits) - 1) if lf.unsigned else (-(1 << (lf.bits-1)) <= v <= (1 << (lf.bits-1)) - 1):
+            if (
+                (0 <= v <= (1 << lf.bits) - 1)
+                if lf.unsigned
+                else (-(1 << (lf.bits - 1)) <= v <= (1 << (lf.bits - 1)) - 1)
+            ):
                 pf = lf
             else:
                 pf = promoted_fixed_info(lf, rf)
-        elif rf is not None and isinstance(node.left, A.Number) and not isinstance(node.left.value, float):
+        elif (
+            rf is not None
+            and isinstance(node.left, A.Number)
+            and not isinstance(node.left.value, float)
+        ):
             v = int(node.left.value)
-            if (0 <= v <= (1 << rf.bits) - 1) if rf.unsigned else (-(1 << (rf.bits-1)) <= v <= (1 << (rf.bits-1)) - 1):
+            if (
+                (0 <= v <= (1 << rf.bits) - 1)
+                if rf.unsigned
+                else (-(1 << (rf.bits - 1)) <= v <= (1 << (rf.bits - 1)) - 1)
+            ):
                 pf = rf
             else:
                 pf = promoted_fixed_info(lf, rf)
@@ -423,7 +455,10 @@ def _infer_type(self, node: A.ASTNode) -> str:
             if node.op in ("==", "!=", "<", ">", "<=", ">=", "and", "or"):
                 return "bool"
             # Shift/power result follows the left/base type.
-            if node.op in ("<<", "shl", ">>", "shr", "ushr", "**", "^") and lf is not None:
+            if (
+                node.op in ("<<", "shl", ">>", "shr", "ushr", "**", "^")
+                and lf is not None
+            ):
                 pf = lf
             return c_name_for_fixed(pf)
     if isinstance(node, A.TernaryOp):

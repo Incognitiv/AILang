@@ -21,7 +21,6 @@ from parser.ast import (
     StringLit,
     ThisExpr,
     Variable,
-    parsed_type_to_str,
 )
 from typing import Any
 
@@ -30,13 +29,16 @@ from callback_types import callback_parts, resolve_callback_alias
 from calling_conventions import llvm_calling_convention
 from llvmlite import ir
 from transpiler.expr_common import ExprGenError
-from transpiler.llvm_fixed_int_casts import cast_to_declared_int, fixed_int_info_for_spec
 from transpiler.llvm_bigint import (
     bigint_from_decimal_literal,
     clone_if_borrowed,
     fixed_to_bigint,
     is_bigint_value,
     is_unbounded_spec,
+)
+from transpiler.llvm_fixed_int_casts import (
+    cast_to_declared_int,
+    fixed_int_info_for_spec,
 )
 from transpiler.pure_eval import stable_literal_bindings, try_eval_call
 
@@ -267,7 +269,9 @@ class ExprCallEmitter:
                 # language/native representation.
                 if isinstance(arg_value.type, ir.FloatType):
                     arg_value = self.builder.fpext(arg_value, ir.DoubleType())
-                elif isinstance(arg_value.type, ir.IntType) and arg_value.type.width < 32:
+                elif (
+                    isinstance(arg_value.type, ir.IntType) and arg_value.type.width < 32
+                ):
                     target = ir.IntType(32)
                     if self.codegen.is_unsigned_value(arg_value):
                         arg_value = self.builder.zext(arg_value, target)

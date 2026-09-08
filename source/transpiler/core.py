@@ -17,7 +17,7 @@ Usage:
 import sys
 from parser.parser import Parser
 from pathlib import Path
-from typing import Any, ClassVar, Dict, List, Optional, Set, Tuple
+from typing import Any, ClassVar
 
 from lexer.scan import tokenize
 from transpiler.expr_gen import CExprEmitter
@@ -31,8 +31,8 @@ from .core_type_lowering import _CTranspilerTypeLoweringMixin
 from .core_type_state import _CTranspilerTypeStateMixin
 
 # Type aliases for clarity
-ClassField = Tuple[str, str, str]  # (visibility, field_name, field_type)
-RecordField = Tuple[str, str]  # (field_name, field_type)
+ClassField = tuple[str, str, str]  # (visibility, field_name, field_type)
+RecordField = tuple[str, str]  # (field_name, field_type)
 
 
 class CTranspiler(
@@ -57,7 +57,7 @@ class CTranspiler(
     # C keywords and standard library names that conflict with generated C.
     # AILang keeps these usable as identifiers where the grammar allows it;
     # the C backend gives them safe storage names instead.
-    C_RESERVED_NAMES: ClassVar[Set[str]] = {
+    C_RESERVED_NAMES: ClassVar[set[str]] = {
         "alignas",
         "alignof",
         "auto",
@@ -157,10 +157,10 @@ class CTranspiler(
     }
 
     def __init__(self) -> None:
-        self.output: List[str] = []
+        self.output: list[str] = []
         self.indent: int = 0
-        self.declared_vars: Set[str] = set()
-        self._function_c_symbols: Dict[str, str] = {}
+        self.declared_vars: set[str] = set()
+        self._function_c_symbols: dict[str, str] = {}
         # --profile: when set, the C backend instruments every user
         # function with rdtsc-based entry/exit hooks and emits an
         # atexit report ranking functions by accumulated cycles.
@@ -169,7 +169,7 @@ class CTranspiler(
         self.profile_enabled: bool = False
         # Per-function index assigned at function emission. Used by
         # the profile hooks to pick which counter slot to bump.
-        self._profile_func_index: Dict[str, int] = {}
+        self._profile_func_index: dict[str, int] = {}
         # ``type_info`` is the new explicit container for static type
         # information (records, unions, enums, classes, function
         # signatures, plus per-function variable typing). Legacy
@@ -191,8 +191,8 @@ class CTranspiler(
             self._STRING_OWNING_CALLS,
             self._NON_CAPTURING_CALLS,
         )
-        self.current_function: Optional[str] = None
-        self.user_defined_funcs: Set[str] = set()  # Track user-defined functions
+        self.current_function: str | None = None
+        self.user_defined_funcs: set[str] = set()  # Track user-defined functions
         self._source_file: str = ""  # Source file for import resolution
         # Track which runtime helpers are actually used. ``runtime_needs``
         # is the new explicit data container; ``used_helpers``,
@@ -207,18 +207,18 @@ class CTranspiler(
         self.runtime_needs: RuntimeNeeds = RuntimeNeeds()
         # Per-function dict-typed locals that need cleanup at scope exit;
         # populated by visit_Function for each function it processes.
-        self._dict_locals_for_cleanup: List[str] = []
-        self._bigint_locals_for_cleanup: List[str] = []
-        self._bigint_params_for_cleanup: List[str] = []
-        self._fixed_dict_literal_slots: Dict[str, Dict[str, int]] = {}
-        self._fixed_dict_scalar_values: Dict[str, Dict[str, str]] = {}
-        self._fixed_dict_value_ranges: Dict[str, Dict[str, Tuple[int, int]]] = {}
-        self._codegen_int_ranges: Dict[str, Tuple[int, int]] = {}
-        self._codegen_field_int_ranges: Dict[Tuple[str, str], Tuple[int, int]] = {}
+        self._dict_locals_for_cleanup: list[str] = []
+        self._bigint_locals_for_cleanup: list[str] = []
+        self._bigint_params_for_cleanup: list[str] = []
+        self._fixed_dict_literal_slots: dict[str, dict[str, int]] = {}
+        self._fixed_dict_scalar_values: dict[str, dict[str, str]] = {}
+        self._fixed_dict_value_ranges: dict[str, dict[str, tuple[int, int]]] = {}
+        self._codegen_int_ranges: dict[str, tuple[int, int]] = {}
+        self._codegen_field_int_ranges: dict[tuple[str, str], tuple[int, int]] = {}
         # Variable typing fields (``_dict_vars`` etc.) and ``classes`` now
         # live in ``self.type_info``; properties at class scope route
         # legacy attribute access through it.
-        self._current_class: Optional[str] = None  # Track current class for 'this'
+        self._current_class: str | None = None  # Track current class for 'this'
         # Recursion-depth guard: True only when the current function is in
         # a call cycle. ``_recursive_funcs`` lives in self.type_info now;
         # ``_guard_active`` is per-function emit state.
@@ -227,30 +227,30 @@ class CTranspiler(
         # pairs that should be freed at scope exit. Set per-function in
         # visit_Function / _generate_class_method, consumed by visit_Return
         # and the implicit-return paths.
-        self._class_locals_for_cleanup: List[Tuple[str, str]] = []
-        self._string_locals_for_cleanup: List[str] = []
+        self._class_locals_for_cleanup: list[tuple[str, str]] = []
+        self._string_locals_for_cleanup: list[str] = []
         # StringArray and IntArray locals from split() / split_ints().
         # Same liveness discipline: track non-escaping ones, free at exit.
-        self._str_array_locals_for_cleanup: List[str] = []
-        self._int_array_locals_for_cleanup: List[str] = []
+        self._str_array_locals_for_cleanup: list[str] = []
+        self._int_array_locals_for_cleanup: list[str] = []
         # ailang_dyn_array (from array_new) and ailang_str_array
         # (from str_array_new) — track for scope-exit cleanup of the
         # backing heap buffer.
-        self._dyn_array_locals_for_cleanup: List[str] = []
-        self._lc_str_array_locals_for_cleanup: List[str] = []
+        self._dyn_array_locals_for_cleanup: list[str] = []
+        self._lc_str_array_locals_for_cleanup: list[str] = []
         # Tracked owned locals — used for FREE-BEFORE-REASSIGN. A var is
         # tracked when EVERY assignment to it is an owned allocation
         # (`new ClassName(...)` for classes, an owned-string-alloc for
         # strings). On reassignment we free the previous value to avoid
         # the loop-overwrite leak. Non-escaping ones additionally get
         # final-free at scope exit (separate cleanup_for lists above).
-        self._tracked_owned_string_locals: Set[str] = set()
-        self._tracked_owned_class_locals: Dict[str, str] = {}
-        self._stack_owned_class_locals: Dict[str, str] = {}
-        self._stack_array_field_values: Dict[Tuple[str, str], Tuple[str, ...]] = {}
-        self._inline_this_expr: Optional[str] = None
-        self._inline_this_stack_var: Optional[str] = None
-        self._owned_value_local_kinds: Dict[str, Tuple[str, Any]] = {}
+        self._tracked_owned_string_locals: set[str] = set()
+        self._tracked_owned_class_locals: dict[str, str] = {}
+        self._stack_owned_class_locals: dict[str, str] = {}
+        self._stack_array_field_values: dict[tuple[str, str], tuple[str, ...]] = {}
+        self._inline_this_expr: str | None = None
+        self._inline_this_stack_var: str | None = None
+        self._owned_value_local_kinds: dict[str, tuple[str, Any]] = {}
         # Owned-string locals that are read EXACTLY ONCE in the function
         # body. These are eligible to be CONSUMED by the next operation:
         # in `d = c + str(42)`, if c is single-use and owned, we can pass
@@ -265,15 +265,15 @@ class CTranspiler(
         # conditional free at scope exit and before reassignment. Lets
         # us track patterns like `s = ""; if cond: s = "x" + str(y)`
         # without leaking the owned alloc on the cond-true path.
-        self._mixed_ownership_string_locals: Set[str] = set()
-        self._owned_string_param_flags: Dict[str, str] = {}
-        self._owned_param_flags: Dict[str, Tuple[str, str, Any]] = {}
-        self._virtual_string_length_only_fields: Set[Tuple[str, str]] = set()
-        self._virtual_string_elidable_params: Set[Tuple[str, str, int]] = set()
+        self._mixed_ownership_string_locals: set[str] = set()
+        self._owned_string_param_flags: dict[str, str] = {}
+        self._owned_param_flags: dict[str, tuple[str, str, Any]] = {}
+        self._virtual_string_length_only_fields: set[tuple[str, str]] = set()
+        self._virtual_string_elidable_params: set[tuple[str, str, int]] = set()
         # Order-preserving list for the cleanup emitter so the per-
         # function `__var_owned = 0;` initializers can be issued at
         # function scope alongside the variable's NULL init.
-        self._mixed_ownership_cleanup: List[str] = []
+        self._mixed_ownership_cleanup: list[str] = []
         # Loop depth tracking for I/O optimization
         self._loop_depth: int = 0
         self._bound_counter: int = 0  # Unique counter for bounded loop variables
@@ -282,17 +282,17 @@ class CTranspiler(
         self._unchecked_mode: bool = False
         self._scanning_unchecked: bool = False  # Track during helper scanning
         # @synchronized decorator state (per-function mutex name)
-        self._synchronized_mutex_name: Optional[str] = None
+        self._synchronized_mutex_name: str | None = None
         # Track current function's C return type for visit_Return
         self._current_ret_type: str = "int64_t"
         # Range type tracking for Ada-style range constraints
-        self._range_vars: Dict[str, tuple] = {}
-        self._type_aliases: Dict[str, Any] = {}  # A.RangeType
+        self._range_vars: dict[str, tuple] = {}
+        self._type_aliases: dict[str, Any] = {}  # A.RangeType
         # Generics support
         from codegen.monomorphize import Monomorphizer
 
         self._monomorphizer = Monomorphizer()
-        self._generic_funcs_emitted: Set[str] = set()  # Track emitted specializations
+        self._generic_funcs_emitted: set[str] = set()  # Track emitted specializations
         # Global name tracking (populated in transpile())
         self._globally_used_names: set[str] = set()
         self._const_global_names: set[str] = set()
@@ -309,12 +309,12 @@ class CTranspiler(
         self._optimizer_decisions: list[dict[str, object]] = []
         self._optimizer_summary: dict[str, int] = {}
         # Compile-time array length hints for bounds-proof hooks.
-        self._array_len_hints: dict[tuple[Optional[str], str], int] = {}
+        self._array_len_hints: dict[tuple[str | None, str], int] = {}
         self._array_literal_value_hints: dict[
-            tuple[Optional[str], str], tuple[int, ...]
+            tuple[str | None, str], tuple[int, ...]
         ] = {}
         # Lazy-initialized collections (populated by collection passes)
-        self.extern_vars: Dict[str, str] = {}
+        self.extern_vars: dict[str, str] = {}
         # ``unions`` and ``_type_decorators`` are property aliases of
         # ``self.type_info.unions`` / ``self.type_info.type_decorators``.
         # Statement + expression emit services. Each is a proxy class
@@ -511,7 +511,7 @@ class CTranspiler(
 
 def transpile_file(
     input_path: str,
-    output_path: Optional[str] = None,
+    output_path: str | None = None,
     profile_enabled: bool = False,
 ) -> str:
     """Transpile an AILang file to C.

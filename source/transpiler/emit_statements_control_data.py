@@ -40,7 +40,10 @@ from transpiler.control_loop_utils import (
     setup_loop_bound,
 )
 from transpiler.llvm_fixed_dicts import try_fixed_dict_assign
-from transpiler.llvm_fixed_int_casts import cast_to_declared_int, fixed_int_info_for_spec
+from transpiler.llvm_fixed_int_casts import (
+    cast_to_declared_int,
+    fixed_int_info_for_spec,
+)
 from transpiler.local_constant_flow import (
     branch_assigned_names,
     clear_local_constants,
@@ -260,16 +263,11 @@ def visit_FieldAssign(self, node: FieldAssign):
     value = self.codegen.generate_expr(node.value)
     if isinstance(value, tuple) and len(value) == 3:
         value = value[0]
-    if (
-        value.type != field_type
-        or (
-            isinstance(value.type, ir.IntType)
-            and fixed_int_info_for_spec(self.codegen, field_type_str) is not None
-        )
+    if value.type != field_type or (
+        isinstance(value.type, ir.IntType)
+        and fixed_int_info_for_spec(self.codegen, field_type_str) is not None
     ):
-        value = cast_to_declared_int(
-            self.codegen, value, field_type, field_type_str
-        )
+        value = cast_to_declared_int(self.codegen, value, field_type, field_type_str)
     self.builder.store(value, field_ptr)
     remember_field_assign_range(
         self.codegen, node.object_expr, node.field_name, node.value
@@ -318,9 +316,8 @@ def visit_DictAssign(self, node: DictAssign):
     fixed_elem_spec = None
     if isinstance(node.dict_expr, Variable):
         local_slot = self.codegen.locals.get(node.dict_expr.name)
-        if (
-            isinstance(getattr(local_slot, "type", None), ir.PointerType)
-            and isinstance(local_slot.type.pointee, ir.ArrayType)
+        if isinstance(getattr(local_slot, "type", None), ir.PointerType) and isinstance(
+            local_slot.type.pointee, ir.ArrayType
         ):
             dict_result = local_slot
             declared = self.codegen.local_decl_types.get(node.dict_expr.name)
@@ -328,9 +325,18 @@ def visit_DictAssign(self, node: DictAssign):
                 resolved = self.codegen._resolve_type_alias_spec(declared)
             except Exception:
                 resolved = declared
-            if isinstance(resolved, tuple) and len(resolved) >= 2 and resolved[0] == "fixed_array":
+            if (
+                isinstance(resolved, tuple)
+                and len(resolved) >= 2
+                and resolved[0] == "fixed_array"
+            ):
                 fixed_elem_spec = resolved[1]
-            elif isinstance(resolved, str) and resolved.startswith("[") and resolved.endswith("]") and ";" in resolved:
+            elif (
+                isinstance(resolved, str)
+                and resolved.startswith("[")
+                and resolved.endswith("]")
+                and ";" in resolved
+            ):
                 fixed_elem_spec = resolved[1:-1].rsplit(";", 1)[0].strip()
     # Handle global arrays which return (ptr, len, elem_type) tuple
     if isinstance(dict_result, tuple) and len(dict_result) == 3:

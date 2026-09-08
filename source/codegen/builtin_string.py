@@ -580,7 +580,9 @@ class BuiltinStringEmitter:
             raw = self.current_builder.call(
                 self._get_bigint_to_decimal(), [value], name="bigint_decimal_raw"
             )
-            raw_len = self.current_builder.call(self.get_strlen(), [raw], name="bigint_decimal_len")
+            raw_len = self.current_builder.call(
+                self.get_strlen(), [raw], name="bigint_decimal_len"
+            )
             size = self.current_builder.add(raw_len, ir.Constant(ir.IntType(64), 1))
             buf = self.string_alloc(size, "bigint_str_buf")
             self.current_builder.call(self.get_memcpy(), [buf, raw, size])
@@ -680,7 +682,6 @@ class BuiltinStringEmitter:
         phi.add_incoming(true_val, ok_end)
         return phi
 
-
     def builtin_str_escape_json(self, args: list[ASTNode]) -> ir.Value:
         """Escape a string for JSON with one allocation and no per-byte strings."""
         if len(args) != 1:
@@ -715,7 +716,9 @@ class BuiltinStringEmitter:
 
         self.current_builder.position_at_end(header)
         in_i = self.current_builder.load(in_slot, name="jsonesc_i")
-        more = self.current_builder.icmp_unsigned("<", in_i, length, name="jsonesc_more")
+        more = self.current_builder.icmp_unsigned(
+            "<", in_i, length, name="jsonesc_more"
+        )
         self.current_builder.cbranch(more, body, done)
 
         self.current_builder.position_at_end(body)

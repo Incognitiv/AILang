@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 from token_access import token_type_at
 
 from .ast import (
@@ -18,7 +16,7 @@ from .ast import (
 )
 
 
-def _parse_import_statement(self, token_type: Optional[str]) -> Optional[list[ASTNode]]:
+def _parse_import_statement(self, token_type: str | None) -> list[ASTNode] | None:
     """Parse a single import/use statement at the top of the file.
     Returns list of statements if parsed, None if not an import statement.
     """
@@ -121,7 +119,7 @@ def _skip_ui_block(self) -> None:
         self.consume()
 
 
-def _parse_definition(self, token_type: Optional[str]) -> Optional[ASTNode]:
+def _parse_definition(self, token_type: str | None) -> ASTNode | None:
     """Parse a single top-level definition (function, class, record, etc).
     Returns the parsed AST node, or None if not a definition token.
     """
@@ -331,7 +329,10 @@ def _parse_program_impl(self) -> list[ASTNode]:
             )
         statements.append(node)
         self.skip_newlines()
-    from .return_type_inference import infer_unannotated_return_types, validate_return_contracts
+    from .return_type_inference import (
+        infer_unannotated_return_types,
+        validate_return_contracts,
+    )
 
     infer_unannotated_return_types(statements)
     validate_return_contracts(statements)
@@ -377,7 +378,10 @@ def _parse_global_var(self) -> VarDecl:
     # C backend rejected them, which is worse than a deliberate fail-closed rule.
     type_text = parsed_type_to_str(var_type).lower()
     import re
-    match = re.fullmatch(r"([iu])(8|16|32|64|128|256|512|1024|2048|4096|8192)", type_text)
+
+    match = re.fullmatch(
+        r"([iu])(8|16|32|64|128|256|512|1024|2048|4096|8192)", type_text
+    )
     if match is not None:
         literal_value = None
         if isinstance(init_value, Number) and not init_value.is_float:
@@ -411,7 +415,7 @@ def _parse_global_var(self) -> VarDecl:
     )
 
 
-def _parse_bare_global_const(self) -> Optional[VarDecl]:
+def _parse_bare_global_const(self) -> VarDecl | None:
     """Parse a bare top-level constant: MY_CONST = 42
 
     This allows Python/Ruby style constants without explicit type.

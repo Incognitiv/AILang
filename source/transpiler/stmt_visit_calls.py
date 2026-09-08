@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 from parser import ast as A
-from typing import List, Optional
-from transpiler.wide_int_types import info_for_c
 
 from ast_access import arg_at, body_at
+from transpiler.c_bigint import expr_is_unbounded, expression_is_borrowed_bigint
 from transpiler.class_field_ownership import is_auto_owned_param, is_string_type
 from transpiler.fixed_int_cast_codegen import checked_fixed_int_conversion_expr
 from transpiler.fixed_int_types import info_for_c_fixed
-from transpiler.c_bigint import expr_is_unbounded, expression_is_borrowed_bigint
+from transpiler.wide_int_types import info_for_c
 
 
 def _escape_c_string_fragment(text: str) -> str:
@@ -26,7 +25,7 @@ def _escape_c_string_fragment(text: str) -> str:
 
 def _build_interpolation_writer_plan(
     self, node: A.InterpolatedString
-) -> Optional[list[dict[str, object]]]:
+) -> list[dict[str, object]] | None:
     """Build direct-writer chunks for one interpolated-string argument.
 
     Returns None when the interpolation contains an unsupported shape
@@ -80,7 +79,9 @@ def _build_interpolation_writer_plan(
             return None
         fixed = info_for_c_fixed(inferred)
         if fixed is not None and fixed.bits > 64:
-            chunks.append({"kind": "fixed", "expr": self.expr(part), "suffix": fixed.canonical})
+            chunks.append(
+                {"kind": "fixed", "expr": self.expr(part), "suffix": fixed.canonical}
+            )
             continue
         if inferred in unsigned_int_types:
             chunks.append({"kind": "u64", "expr": self.expr(part)})
@@ -195,7 +196,7 @@ def _get_printf_spec(self, arg_node: A.ASTNode) -> str:
     return "%lld"
 
 
-def _baseconv_writer_kind(arg_node: A.ASTNode) -> Optional[str]:
+def _baseconv_writer_kind(arg_node: A.ASTNode) -> str | None:
     """Return base-conversion writer kind for direct print fast path."""
     if isinstance(arg_node, A.Call) and len(arg_node.args) == 1:
         name = arg_node.name.lower()
@@ -245,8 +246,8 @@ def _emit_print_call(self, node: A.Call) -> None:
         )
         return
 
-    interpolation_plans: list[Optional[list[dict[str, object]]]] = []
-    baseconv_kinds: list[Optional[str]] = []
+    interpolation_plans: list[list[dict[str, object]] | None] = []
+    baseconv_kinds: list[str | None] = []
     interpolation_direct_supported = True
     for arg in node.args:
         if isinstance(arg, A.InterpolatedString):
@@ -259,8 +260,8 @@ def _emit_print_call(self, node: A.Call) -> None:
             interpolation_plans.append(None)
             baseconv_kinds.append(_baseconv_writer_kind(arg))
 
-    expr_args: List[str] = []
-    specs: List[str] = []
+    expr_args: list[str] = []
+    specs: list[str] = []
     for i, arg in enumerate(node.args):
         plan = interpolation_plans[i]
         if plan is not None:
@@ -273,9 +274,9 @@ def _emit_print_call(self, node: A.Call) -> None:
         spec == "%s" and self._is_owned_string_alloc(arg)
         for spec, arg in zip(specs, node.args, strict=False)
     ]
-    fmt_parts: List[str] = []
-    c_args: List[str] = []
-    temp_names: List[str] = []
+    fmt_parts: list[str] = []
+    c_args: list[str] = []
+    temp_names: list[str] = []
     for i, (spec, c_expr, arg_node) in enumerate(
         zip(specs, expr_args, node.args, strict=False)
     ):
@@ -293,7 +294,9 @@ def _emit_print_call(self, node: A.Call) -> None:
     fmt_str = "".join(fmt_parts) + "\\n"
     args_str = ", ".join(c_args)
     direct_supported = all(
-        spec in ("%s", "%lld", "@bool", "@bigint") or spec.startswith("@wide:") or spec.startswith("@fixed:")
+        spec in ("%s", "%lld", "@bool", "@bigint")
+        or spec.startswith("@wide:")
+        or spec.startswith("@fixed:")
         for spec in specs
     )
     self.emit("#ifndef AILANG_FREESTANDING")
@@ -335,7 +338,9 @@ def _emit_print_call(self, node: A.Call) -> None:
             if spec == "%s":
                 self.emit(f"        ailang_write_str(stdout, {c_args[i]});")
             elif spec == "@bool":
-                self.emit(f"        ailang_write_bool(stdout, (int64_t)({expr_args[i]}));")
+                self.emit(
+                    f"        ailang_write_bool(stdout, (int64_t)({expr_args[i]}));"
+                )
             elif spec == "%g":
                 self.emit(f'        fprintf(stdout, "%g", (double)({expr_args[i]}));')
             elif spec == "@bigint":
@@ -355,7 +360,9 @@ def _emit_print_call(self, node: A.Call) -> None:
                 if bits <= 64:
                     writer = "u64" if suffix.startswith("u") else "i64"
                     cast = "uint64_t" if suffix.startswith("u") else "int64_t"
-                    self.emit(f"        ailang_write_{writer}(stdout, ({cast})({expr_args[i]}));")
+                    self.emit(
+                        f"        ailang_write_{writer}(stdout, ({cast})({expr_args[i]}));"
+                    )
                 else:
                     self.emit(f"        ailang_write_{suffix}(stdout, {expr_args[i]});")
             else:
@@ -505,7 +512,7 @@ def visit_Call(self, node: A.Call) -> None:
         self.emit(f"(void)({call_expr});")
 
 
-def _resolve_method_class(self, node: A.MethodCall) -> Optional[str]:
+def _resolve_method_class(self, node: A.MethodCall) -> str | None:
     """Pick the class that owns `node.method_name` for this call site."""
     cls = self._class_ptr_type(node.object_expr)
     if cls is not None:
@@ -583,8 +590,8 @@ def _try_inline_stack_method_return_expr(
     self,
     node: A.MethodCall,
     cls: str,
-    method: Optional[A.Function],
-) -> Optional[str]:
+    method: A.Function | None,
+) -> str | None:
     """Inline trivial stack-local method calls as expressions.
 
     This is deliberately narrow: only no-arg methods with a single return

@@ -55,7 +55,7 @@ def main() -> int:
 
     cmd = [
         gcc,
-        "-std=gnu23",
+        "-std=gnu2x",
         "-O2",
         str(generated_c),
         str(BACKEND_SOURCE),

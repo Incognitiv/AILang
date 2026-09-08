@@ -1,10 +1,11 @@
 """C-backend value-semantics helpers for AILang ``unbounded`` integers."""
+
 from __future__ import annotations
 
 from parser import ast as A
 from parser.ast import parsed_type_to_str
+
 from transpiler.fixed_int_types import info_for_fixed_int
-from transpiler.wide_int_types import info_for_c
 
 
 def is_unbounded_spec(transpiler, spec: object) -> bool:
@@ -27,7 +28,9 @@ def expr_is_unbounded(transpiler, node: A.ASTNode) -> bool:
         # 0/1 as a pointer (e.g. 0x1) and crash.
         if node.op in ("==", "!=", "<", ">", "<=", ">="):
             return False
-        return expr_is_unbounded(transpiler, node.left) or expr_is_unbounded(transpiler, node.right)
+        return expr_is_unbounded(transpiler, node.left) or expr_is_unbounded(
+            transpiler, node.right
+        )
     if isinstance(node, A.UnaryOp):
         return expr_is_unbounded(transpiler, node.operand)
     if isinstance(node, A.FieldAccess):
@@ -51,6 +54,7 @@ def _source_fixed_info(transpiler, node: A.ASTNode):
             return info
     c_type = transpiler._infer_type(node)
     from transpiler.fixed_int_types import info_for_c_fixed
+
     return info_for_c_fixed(c_type)
 
 
@@ -77,8 +81,12 @@ def owned_bigint_expr(transpiler, node: A.ASTNode, code: str | None = None) -> s
     return fixed_expr_to_bigint(transpiler, node, code)
 
 
-def bigint_to_fixed_expr(transpiler, node: A.ASTNode, code: str, target_spec: object) -> str:
+def bigint_to_fixed_expr(
+    transpiler, node: A.ASTNode, code: str, target_spec: object
+) -> str:
     info = info_for_fixed_int(parsed_type_to_str(target_spec))
     if info is None:
-        raise ValueError(f"unbounded conversion target is not a fixed integer: {target_spec}")
+        raise ValueError(
+            f"unbounded conversion target is not a fixed integer: {target_spec}"
+        )
     return f"ailang_bigint_to_{info.canonical}_value({code})"

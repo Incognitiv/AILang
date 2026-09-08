@@ -116,7 +116,7 @@ def _compile_c(source_file: Path, tmp: Path, compiler: str) -> tuple[Path | None
     proc = _run(
         [
             compiler,
-            "-std=gnu23",
+            "-std=gnu2x",
             "-O0",
             "-g",
             "-fno-omit-frame-pointer",
@@ -179,7 +179,7 @@ def _generated_sources(
     compiler: str,
 ) -> list[ValgrindResult | Path]:
     sources: list[ValgrindResult | Path] = []
-    helper_flags = ("-std=gnu23", "-O0", "-g", "-fno-omit-frame-pointer")
+    helper_flags = ("-std=gnu2x", "-O0", "-g", "-fno-omit-frame-pointer")
     for case in generated_cases(count, seed):
         try:
             sources.append(

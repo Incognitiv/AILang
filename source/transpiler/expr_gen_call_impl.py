@@ -9,12 +9,11 @@ from callback_types import callback_parts, resolve_callback_alias
 from runtime.modes import CompilationContext
 from target_info import os_from_platform
 from transpiler.arithmetic_literal_proofs import int_literal_value
+from transpiler.c_bigint import expr_is_unbounded, is_unbounded_spec, owned_bigint_expr
 from transpiler.codegen_int_ranges import expr_int_range, range_fits_int64
 from transpiler.expr_gen_call_builtin_map import c_builtin_mappings
 from transpiler.fixed_int_cast_codegen import checked_fixed_int_conversion_expr
 from transpiler.fixed_int_types import info_for_c_fixed
-from transpiler.wide_int_types import info_for_c
-from transpiler.c_bigint import expr_is_unbounded, is_unbounded_spec, owned_bigint_expr
 
 _NARROW_INT_LIMITS = {
     "int32_t": (-(1 << 31), (1 << 31) - 1),
@@ -300,10 +299,14 @@ def _generate_call(self, node: A.Call) -> str:
             return f"((int64_t)(unsigned char)({string_expr})[{index_expr}])"
 
     call_arg_nodes = list(node.args)
-    expected_param_specs = self.functions[node.name][0] if node.name in self.functions else []
+    expected_param_specs = (
+        self.functions[node.name][0] if node.name in self.functions else []
+    )
     call_args = []
     for idx, arg in enumerate(call_arg_nodes):
-        if idx < len(expected_param_specs) and is_unbounded_spec(self, expected_param_specs[idx]):
+        if idx < len(expected_param_specs) and is_unbounded_spec(
+            self, expected_param_specs[idx]
+        ):
             call_args.append(owned_bigint_expr(self, arg))
         else:
             call_args.append(self.expr(arg))
@@ -431,7 +434,10 @@ def _generate_call(self, node: A.Call) -> str:
             source_type = getattr(self, "_current_local_c_types", {}).get(
                 source_arg.name, self._var_types.get(source_arg.name)
             )
-            if isinstance(source_type, str) and source_type.strip().lower() == "stringarray":
+            if (
+                isinstance(source_type, str)
+                and source_type.strip().lower() == "stringarray"
+            ):
                 return f"ailang_str_array_free(&{call_args[0]})"
         return f"ailang_str_array_free_v2(&{call_args[0]})"
 
@@ -526,7 +532,11 @@ def _generate_call(self, node: A.Call) -> str:
             for param_idx, default_val in defaults:
                 if param_idx >= len(call_args):
                     call_arg_nodes.append(default_val)
-                    if param_idx < len(self.functions[node.name][0]) and is_unbounded_spec(self, self.functions[node.name][0][param_idx]):
+                    if param_idx < len(
+                        self.functions[node.name][0]
+                    ) and is_unbounded_spec(
+                        self, self.functions[node.name][0][param_idx]
+                    ):
                         call_args.append(owned_bigint_expr(self, default_val))
                     else:
                         call_args.append(self.expr(default_val))

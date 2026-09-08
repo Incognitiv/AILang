@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
 
 from .stmt_visit_calls import _emit_dealloc_arg as _m_emit_dealloc_arg
 from .stmt_visit_calls import _emit_method_call_text as _m_emit_method_call_text
@@ -79,30 +79,30 @@ from .stmt_visit_list_comprehension import (
 class CStmtEmitter:
     """Statement-emit service with transpiler back-reference."""
 
-    output: List[str]
+    output: list[str]
     indent: int
-    declared_vars: Set[str]
-    current_function: Optional[str]
+    declared_vars: set[str]
+    current_function: str | None
     profile_enabled: bool
-    user_defined_funcs: Set[str]
-    _current_class: Optional[str]
+    user_defined_funcs: set[str]
+    _current_class: str | None
     _current_ret_type: str
-    _synchronized_mutex_name: Optional[str]
+    _synchronized_mutex_name: str | None
     _guard_active: bool
     _loop_depth: int
     _bound_counter: int
     _current_bound_var: str
     _unchecked_mode: bool
-    _profile_func_index: Dict[str, int]
-    _class_locals_for_cleanup: List[Tuple[str, str]]
-    _string_locals_for_cleanup: List[str]
-    _str_array_locals_for_cleanup: List[str]
-    _int_array_locals_for_cleanup: List[str]
-    _dyn_array_locals_for_cleanup: List[str]
-    _lc_str_array_locals_for_cleanup: List[str]
-    _dict_locals_for_cleanup: List[str]
-    _mixed_ownership_cleanup: List[str]
-    _local_cleanup_lines: List[str]
+    _profile_func_index: dict[str, int]
+    _class_locals_for_cleanup: list[tuple[str, str]]
+    _string_locals_for_cleanup: list[str]
+    _str_array_locals_for_cleanup: list[str]
+    _int_array_locals_for_cleanup: list[str]
+    _dyn_array_locals_for_cleanup: list[str]
+    _lc_str_array_locals_for_cleanup: list[str]
+    _dict_locals_for_cleanup: list[str]
+    _mixed_ownership_cleanup: list[str]
+    _local_cleanup_lines: list[str]
     _needs_stream_cleanup: bool
 
     def __init__(self, transpiler: object) -> None:

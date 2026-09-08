@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from parser import ast as A
-from typing import Any, Iterable
+from typing import Any
 
 from ast_access import arg_at
 from codegen.strlen_fact_cache import lookup_strlen_fact

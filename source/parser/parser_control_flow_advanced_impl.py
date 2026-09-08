@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 from token_access import token_type_at
 
 from .ast import ASTNode, InlineAsm, Match, MatchPattern, Throw, TryExcept
@@ -105,7 +103,7 @@ def parse_try(self) -> ASTNode:
             try_body.append(stmt)
         self.skip_newlines()
 
-    catch_blocks: list[tuple[str, Optional[str], list[ASTNode]]] = []
+    catch_blocks: list[tuple[str, str | None, list[ASTNode]]] = []
     while self.peek_type() == "CATCH":
         self.consume("CATCH")
         error_type = self.consume("IDENT")

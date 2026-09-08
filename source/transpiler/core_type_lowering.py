@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from parser import ast as A
 from parser.ast import parsed_type_to_str
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
 
 from callback_types import resolve_callback_alias
 from transpiler.fixed_array_types import parse_fixed_array_type_spec
 from transpiler.strlen_assign_cache import collect_strlen_cache_var
 
-ClassField = Tuple[str, str, str]
-RecordField = Tuple[str, str]
+ClassField = tuple[str, str, str]
+RecordField = tuple[str, str]
 
 
 class _CTranspilerTypeLoweringMixin:
@@ -26,7 +26,7 @@ class _CTranspilerTypeLoweringMixin:
         aliases = getattr(self, "_type_aliases", None)
         if not isinstance(aliases, dict):
             return spec
-        seen: Set[str] = set()
+        seen: set[str] = set()
         current = spec
         while isinstance(current, str) and current in aliases and current not in seen:
             seen.add(current)
@@ -60,9 +60,7 @@ class _CTranspilerTypeLoweringMixin:
             return True
         return spec in {"void", "bool", "char", "float", "double", "long double"}
 
-    def _parse_fixed_array_type_spec(
-        self: Any, atype: str
-    ) -> Optional[Tuple[str, int]]:
+    def _parse_fixed_array_type_spec(self: Any, atype: str) -> tuple[str, int] | None:
         """Parse canonical fixed-array type string: ``[elem;N]``."""
         return parse_fixed_array_type_spec(atype)
 
@@ -245,7 +243,7 @@ class _CTranspilerTypeLoweringMixin:
             f"C backend: no executable representation for AILang type {spec!r}"
         )
 
-    def _function_body_has_value_return(self: Any, body: List[A.ASTNode]) -> bool:
+    def _function_body_has_value_return(self: Any, body: list[A.ASTNode]) -> bool:
         """Check if any Return node in the body (recursively) has a value."""
         for node in body:
             if isinstance(node, A.Return) and node.value is not None:
@@ -310,7 +308,7 @@ class _CTranspilerTypeLoweringMixin:
         return "int64_t"
 
     def _format_params(
-        self: Any, params: Optional[List], use_restrict: bool = False
+        self: Any, params: list | None, use_restrict: bool = False
     ) -> str:
         """Format function parameters for C.
         Args:
@@ -334,7 +332,7 @@ class _CTranspilerTypeLoweringMixin:
             )
         return ", ".join(c_params)
 
-    def visit(self: Any, node: A.ASTNode) -> Optional[str]:
+    def visit(self: Any, node: A.ASTNode) -> str | None:
         """Visit an AST node and generate C code. Dispatches to the
         statement-emit service. The ``visit_X`` methods used to live
         on a mixin spliced into this class's MRO; they now live on
@@ -364,7 +362,7 @@ class _CTranspilerTypeLoweringMixin:
         return self._infer_type(value)
 
     def _collect_var_in_stmt(
-        self: Any, stmt: A.ASTNode, vars_found: Dict[str, str]
+        self: Any, stmt: A.ASTNode, vars_found: dict[str, str]
     ) -> None:
         """Collect variables from a single statement."""
         if isinstance(stmt, A.Assign):
@@ -455,18 +453,18 @@ class _CTranspilerTypeLoweringMixin:
             return
 
     def _collect_vars_in_body(
-        self, body: List[A.ASTNode], vars_found: Dict[str, str]
+        self, body: list[A.ASTNode], vars_found: dict[str, str]
     ) -> None:
         """Recursively collect all variables assigned in a function body."""
         for stmt in body:
             self._collect_var_in_stmt(stmt, vars_found)
 
-    def _collect_globally_used_names(self: Any, nodes: List[A.ASTNode]) -> Set[str]:
+    def _collect_globally_used_names(self: Any, nodes: list[A.ASTNode]) -> set[str]:
         """Collect all names referenced across the entire module.
         Used to detect unused global constants and tag them with
         AILANG_UNUSED to prevent -Wunused-const-variable warnings.
         """
-        used: Set[str] = set()
+        used: set[str] = set()
         for node in nodes:
             if isinstance(node, A.Function):
                 # Scan function body for references
@@ -488,20 +486,20 @@ class _CTranspilerTypeLoweringMixin:
                 pass  # Can't reliably parse C for AILang names
         return used
 
-    def _collect_used_names_in_body(self: Any, body: List[A.ASTNode]) -> Set[str]:
+    def _collect_used_names_in_body(self: Any, body: list[A.ASTNode]) -> set[str]:
         """Collect all variable/parameter names used in a function body."""
-        used: Set[str] = set()
+        used: set[str] = set()
         self._collect_used_names_in_nodes(body, used)
         return used
 
     def _collect_used_names_in_nodes(
-        self, nodes: List[A.ASTNode], used: Set[str]
+        self, nodes: list[A.ASTNode], used: set[str]
     ) -> None:
         """Recursively collect used names from AST nodes."""
         for node in nodes:
             self._collect_used_names_in_node(node, used)
 
-    def _collect_used_names_in_node(self: Any, node: A.ASTNode, used: Set[str]) -> None:
+    def _collect_used_names_in_node(self: Any, node: A.ASTNode, used: set[str]) -> None:
         """Collect used names from a single AST node."""
         if node is None:
             return

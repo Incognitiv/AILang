@@ -7,11 +7,11 @@ from transpiler.runtime_emit_string_writers import emit_typed_writer_helpers
 from .runtime_emit_baseconv import emit_base_conversion_helpers
 
 __all__ = [
-    "emit_runtime_string",
-    "emit_split_ints_helper",
-    "emit_split_helper",
-    "emit_parse_int_helper",
     "emit_base_conversion_helpers",
+    "emit_parse_int_helper",
+    "emit_runtime_string",
+    "emit_split_helper",
+    "emit_split_ints_helper",
 ]
 
 
@@ -294,10 +294,16 @@ def emit_runtime_string(self) -> None:
 
     if self._needs.helpers.intersection({"int_to_str", "base_conv"}):
         self._output.append("#if defined(__SIZEOF_INT128__)")
-        self._output.append("AILANG_UNUSED static char *ailang_str_u128(unsigned __int128 v) {")
+        self._output.append(
+            "AILANG_UNUSED static char *ailang_str_u128(unsigned __int128 v) {"
+        )
         self._output.append("#ifndef AILANG_FREESTANDING")
-        self._output.append("    char *out=(char*)ailang_request_alloc(48); if (!out) return NULL; char tmp[48]; size_t i=0,j=0;")
-        self._output.append("    do { unsigned d=(unsigned)(v % 10); tmp[i++]=(char)('0'+d); v/=10; } while (v!=0);")
+        self._output.append(
+            "    char *out=(char*)ailang_request_alloc(48); if (!out) return NULL; char tmp[48]; size_t i=0,j=0;"
+        )
+        self._output.append(
+            "    do { unsigned d=(unsigned)(v % 10); tmp[i++]=(char)('0'+d); v/=10; } while (v!=0);"
+        )
         self._output.append("    while(i) out[j++]=tmp[--i]; out[j]='\\0'; return out;")
         self._output.append("#else")
         self._output.append("    (void)v; return NULL;")
@@ -305,43 +311,75 @@ def emit_runtime_string(self) -> None:
         self._output.append("}")
         self._output.append("AILANG_UNUSED static char *ailang_str_i128(__int128 v) {")
         self._output.append("#ifndef AILANG_FREESTANDING")
-        self._output.append("    unsigned __int128 mag; int neg=v<0; if(neg){ mag=(unsigned __int128)(-(v+1)); mag+=1; } else mag=(unsigned __int128)v;")
-        self._output.append("    char *out=(char*)ailang_request_alloc(48); if (!out) return NULL; char tmp[48]; size_t i=0,j=0;")
-        self._output.append("    do { unsigned d=(unsigned)(mag % 10); tmp[i++]=(char)('0'+d); mag/=10; } while (mag!=0);")
-        self._output.append("    if(neg) out[j++]='-'; while(i) out[j++]=tmp[--i]; out[j]='\\0'; return out;")
+        self._output.append(
+            "    unsigned __int128 mag; int neg=v<0; if(neg){ mag=(unsigned __int128)(-(v+1)); mag+=1; } else mag=(unsigned __int128)v;"
+        )
+        self._output.append(
+            "    char *out=(char*)ailang_request_alloc(48); if (!out) return NULL; char tmp[48]; size_t i=0,j=0;"
+        )
+        self._output.append(
+            "    do { unsigned d=(unsigned)(mag % 10); tmp[i++]=(char)('0'+d); mag/=10; } while (mag!=0);"
+        )
+        self._output.append(
+            "    if(neg) out[j++]='-'; while(i) out[j++]=tmp[--i]; out[j]='\\0'; return out;"
+        )
         self._output.append("#else")
         self._output.append("    (void)v; return NULL;")
         self._output.append("#endif")
         self._output.append("}")
         for prefix, ctype in (("i128", "__int128"), ("u128", "unsigned __int128")):
-            self._output.append(f"AILANG_UNUSED static char *ailang_hex_{prefix}({ctype} input) {{")
+            self._output.append(
+                f"AILANG_UNUSED static char *ailang_hex_{prefix}({ctype} input) {{"
+            )
             self._output.append("#ifndef AILANG_FREESTANDING")
-            self._output.append("    unsigned __int128 v=(unsigned __int128)input; static const char hd[]=\"0123456789ABCDEF\"; char *out=(char*)ailang_request_alloc(35); if(!out) return NULL; char tmp[33]; size_t i=0,j=0;")
-            self._output.append("    do { tmp[i++]=hd[(unsigned)(v & 15)]; v>>=4; } while(v); out[j++]='0'; out[j++]='x'; while(i) out[j++]=tmp[--i]; out[j]='\\0'; return out;")
+            self._output.append(
+                '    unsigned __int128 v=(unsigned __int128)input; static const char hd[]="0123456789ABCDEF"; char *out=(char*)ailang_request_alloc(35); if(!out) return NULL; char tmp[33]; size_t i=0,j=0;'
+            )
+            self._output.append(
+                "    do { tmp[i++]=hd[(unsigned)(v & 15)]; v>>=4; } while(v); out[j++]='0'; out[j++]='x'; while(i) out[j++]=tmp[--i]; out[j]='\\0'; return out;"
+            )
             self._output.append("#else")
             self._output.append("    (void)input; return NULL;")
             self._output.append("#endif")
             self._output.append("}")
-            self._output.append(f"AILANG_UNUSED static char *ailang_bin_{prefix}({ctype} input) {{")
+            self._output.append(
+                f"AILANG_UNUSED static char *ailang_bin_{prefix}({ctype} input) {{"
+            )
             self._output.append("#ifndef AILANG_FREESTANDING")
-            self._output.append("    unsigned __int128 v=(unsigned __int128)input; char *out=(char*)ailang_request_alloc(131); if(!out) return NULL; char tmp[129]; size_t i=0,j=0;")
-            self._output.append("    do { tmp[i++]=(char)('0'+(unsigned)(v&1)); v>>=1; } while(v); out[j++]='0'; out[j++]='b'; while(i) out[j++]=tmp[--i]; out[j]='\\0'; return out;")
+            self._output.append(
+                "    unsigned __int128 v=(unsigned __int128)input; char *out=(char*)ailang_request_alloc(131); if(!out) return NULL; char tmp[129]; size_t i=0,j=0;"
+            )
+            self._output.append(
+                "    do { tmp[i++]=(char)('0'+(unsigned)(v&1)); v>>=1; } while(v); out[j++]='0'; out[j++]='b'; while(i) out[j++]=tmp[--i]; out[j]='\\0'; return out;"
+            )
             self._output.append("#else")
             self._output.append("    (void)input; return NULL;")
             self._output.append("#endif")
             self._output.append("}")
-            self._output.append(f"AILANG_UNUSED static char *ailang_oct_{prefix}({ctype} input) {{")
+            self._output.append(
+                f"AILANG_UNUSED static char *ailang_oct_{prefix}({ctype} input) {{"
+            )
             self._output.append("#ifndef AILANG_FREESTANDING")
-            self._output.append("    unsigned __int128 v=(unsigned __int128)input; char *out=(char*)ailang_request_alloc(47); if(!out) return NULL; char tmp[44]; size_t i=0,j=0;")
-            self._output.append("    do { tmp[i++]=(char)('0'+(unsigned)(v&7)); v>>=3; } while(v); out[j++]='0'; out[j++]='o'; while(i) out[j++]=tmp[--i]; out[j]='\\0'; return out;")
+            self._output.append(
+                "    unsigned __int128 v=(unsigned __int128)input; char *out=(char*)ailang_request_alloc(47); if(!out) return NULL; char tmp[44]; size_t i=0,j=0;"
+            )
+            self._output.append(
+                "    do { tmp[i++]=(char)('0'+(unsigned)(v&7)); v>>=3; } while(v); out[j++]='0'; out[j++]='o'; while(i) out[j++]=tmp[--i]; out[j]='\\0'; return out;"
+            )
             self._output.append("#else")
             self._output.append("    (void)input; return NULL;")
             self._output.append("#endif")
             self._output.append("}")
             self._output.append("#ifndef AILANG_FREESTANDING")
-            self._output.append(f"AILANG_UNUSED static void ailang_write_hex_{prefix}(FILE *f, {ctype} v) {{ char *s=ailang_hex_{prefix}(v); if(s){{ fputs(s,f); ailang_safe_free(s); }} }}")
-            self._output.append(f"AILANG_UNUSED static void ailang_write_bin_{prefix}(FILE *f, {ctype} v) {{ char *s=ailang_bin_{prefix}(v); if(s){{ fputs(s,f); ailang_safe_free(s); }} }}")
-            self._output.append(f"AILANG_UNUSED static void ailang_write_oct_{prefix}(FILE *f, {ctype} v) {{ char *s=ailang_oct_{prefix}(v); if(s){{ fputs(s,f); ailang_safe_free(s); }} }}")
+            self._output.append(
+                f"AILANG_UNUSED static void ailang_write_hex_{prefix}(FILE *f, {ctype} v) {{ char *s=ailang_hex_{prefix}(v); if(s){{ fputs(s,f); ailang_safe_free(s); }} }}"
+            )
+            self._output.append(
+                f"AILANG_UNUSED static void ailang_write_bin_{prefix}(FILE *f, {ctype} v) {{ char *s=ailang_bin_{prefix}(v); if(s){{ fputs(s,f); ailang_safe_free(s); }} }}"
+            )
+            self._output.append(
+                f"AILANG_UNUSED static void ailang_write_oct_{prefix}(FILE *f, {ctype} v) {{ char *s=ailang_oct_{prefix}(v); if(s){{ fputs(s,f); ailang_safe_free(s); }} }}"
+            )
             self._output.append("#endif")
         self._output.append("#endif")
         self._output.append("")
@@ -534,14 +572,15 @@ def emit_runtime_string(self) -> None:
         self._output.append("}")
         self._output.append("")
 
-
     # JSON escaping: one allocation, no per-character temporary strings.
     if "str_escape_json" in self._needs.helpers:
         self._output.append("static char *ailang_str_escape_json(const char *s) {")
         self._output.append("#ifndef AILANG_FREESTANDING")
-        self._output.append("    if (!s) s = \"\";")
+        self._output.append('    if (!s) s = "";')
         self._output.append("    size_t n = strlen(s);")
-        self._output.append("    char *out = (char *)ailang_request_alloc(n * 2u + 1u);")
+        self._output.append(
+            "    char *out = (char *)ailang_request_alloc(n * 2u + 1u);"
+        )
         self._output.append("    if (!out) return NULL;")
         self._output.append("    char *p = out;")
         self._output.append("    for (size_t i = 0; i < n; i++) {")

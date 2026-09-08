@@ -9,13 +9,11 @@ import ctypes.util
 import json
 import os
 import re
-import shutil
-import subprocess
 import sys
 import tempfile
 import time
 from parser.parser import Parser
-from typing import Any, Optional
+from typing import Any
 
 from lexer.scan import tokenize
 from llvmlite import binding
@@ -33,7 +31,7 @@ binding.initialize_native_asmprinter()
 DEFAULT_JIT_OPT_LEVEL = 3
 
 
-def _normalize_jit_opt(optimize: bool = True, jit_opt: Optional[int] = None) -> int:
+def _normalize_jit_opt(optimize: bool = True, jit_opt: int | None = None) -> int:
     """Resolve legacy optimize=True/False and explicit --jit-opt into 0..3."""
     if jit_opt is None:
         return DEFAULT_JIT_OPT_LEVEL if optimize else 0
@@ -96,7 +94,7 @@ def _flush_c_stdout() -> None:
             continue
 
 
-def _extract_result_int(text: str) -> Optional[int]:
+def _extract_result_int(text: str) -> int | None:
     tokens = re.findall(r"[-+]?\d+", text.replace("\r", "\n"))
     if not tokens:
         return None
@@ -112,7 +110,7 @@ def _run_jit_once(
     sample_hz: int = 0,
     capture_stdout: bool = False,
     trap_crash: bool = True,
-) -> tuple[int, Optional[str]]:
+) -> tuple[int, str | None]:
     """Execute one JIT `main()` call.
 
     When capture_stdout is True, all program output is captured and returned.
@@ -159,17 +157,16 @@ def _run_jit_once(
             os.close(saved_stdout)
 
 
-
 def _build_jit_callable(
     source_code: str,
     optimize: bool = True,
-    jit_opt: Optional[int] = None,
+    jit_opt: int | None = None,
     source_file: str = "",
     profile: bool = False,
     flame_path: str = "",
     sample_hz: int = 0,
     dump_ir_path: str = "",
-) -> tuple[Optional[Any], Optional[Any], str]:
+) -> tuple[Any | None, Any | None, str]:
     """Build a JIT-compiled `main` callable and return it with the LLJIT tracker."""
     if flame_path or sample_hz > 0:
         profile = True
@@ -313,7 +310,7 @@ def _build_jit_callable(
 def fast_jit_compile(
     source_code: str,
     optimize: bool = True,
-    jit_opt: Optional[int] = None,
+    jit_opt: int | None = None,
     source_file: str = "",
     profile: bool = False,
     flame_path: str = "",
@@ -419,7 +416,7 @@ def fast_jit_repeat_file(
     run_count: int,
     warmup_count: int = 0,
     optimize: bool = True,
-    jit_opt: Optional[int] = None,
+    jit_opt: int | None = None,
     profile: bool = False,
     flame_path: str = "",
     sample_hz: int = 0,
@@ -460,7 +457,7 @@ def _fast_jit_repeat_file_inprocess(
     run_count: int,
     warmup_count: int = 0,
     optimize: bool = True,
-    jit_opt: Optional[int] = None,
+    jit_opt: int | None = None,
     profile: bool = False,
     flame_path: str = "",
     sample_hz: int = 0,
@@ -630,7 +627,7 @@ def jit_worker_cli(argv: list[str] | None = None) -> int:
 def fast_jit_file(
     filename: str,
     optimize: bool = True,
-    jit_opt: Optional[int] = None,
+    jit_opt: int | None = None,
     profile: bool = False,
     flame_path: str = "",
     sample_hz: int = 0,

@@ -16,8 +16,7 @@ def _block_each(self, array_obj: ir.Value, block: Block) -> None:
     # This is a simplified implementation
     # Get the variable name to look up metadata
     var_name = getattr(array_obj, "name", "").replace("_val", "")
-    if var_name.endswith("_slot"):
-        var_name = var_name[:-5]
+    var_name = var_name.removesuffix("_slot")
     meta = self.codegen.array_metadata.get(var_name)
     if not meta:
         raise StmtGenError("Cannot iterate: unknown array size")

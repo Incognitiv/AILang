@@ -21,9 +21,12 @@ def _scan_literal_dict_locals(body: list[Any]) -> set[str]:
     names: set[str] = set()
 
     def walk(node: Any) -> None:
-        if isinstance(node, A.Assign) and isinstance(node.value, A.DictLit):
-            names.add(node.var_name)
-        elif isinstance(node, A.VarDecl) and isinstance(node.init_value, A.DictLit):
+        if (
+            isinstance(node, A.Assign)
+            and isinstance(node.value, A.DictLit)
+            or isinstance(node, A.VarDecl)
+            and isinstance(node.init_value, A.DictLit)
+        ):
             names.add(node.var_name)
         for value in vars(node).values() if hasattr(node, "__dict__") else ():
             if isinstance(value, A.ASTNode):

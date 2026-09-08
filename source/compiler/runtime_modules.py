@@ -4,12 +4,13 @@ These are AILang modules, not foreign/native runtimes.  Backends may lower
 primitive operations (allocation, raw memory, syscalls), but language-level
 semantics such as arbitrary-precision arithmetic live in `.ail`.
 """
+
 from __future__ import annotations
 
-from typing import Any, Iterable
-
+from collections.abc import Iterable
 from parser import ast as A
 from parser.ast import parsed_type_to_str
+from typing import Any
 
 _BIGINT_MODULES = ("stdlib.core.bigint", "stdlib.core.bigint_pow")
 

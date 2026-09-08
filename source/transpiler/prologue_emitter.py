@@ -17,9 +17,10 @@ prologue.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from parser import ast as A
 from parser.ast import parsed_type_to_str
-from typing import Any, Callable, List, Tuple
+from typing import Any
 
 from abi_symbols import explicit_c_abi_parts
 from callback_types import callback_parts, is_callback_type
@@ -51,12 +52,12 @@ class PrologueEmitter:
         type_info: TypeInfo,
         runtime_needs: RuntimeNeeds,
         user_defined_funcs: set,
-        output: List[str],
+        output: list[str],
         ailang_type_to_c: Callable[[str], str],
         mangle_name: Callable[[str], str],
         get_return_type: Callable[[Any], str],
         format_params: Callable[..., str],
-        class_new_signature: Callable[[A.ClassDef], Tuple[str, List[str]]],
+        class_new_signature: Callable[[A.ClassDef], tuple[str, list[str]]],
         format_declaration: Callable[[str, str], str] | None = None,
     ) -> None:
         self._type_info = type_info
@@ -70,7 +71,7 @@ class PrologueEmitter:
         self._class_new_signature = class_new_signature
         self._format_declaration = format_declaration
 
-    def _parse_fixed_array_type_spec(self, atype: str) -> Tuple[str, int] | None:
+    def _parse_fixed_array_type_spec(self, atype: str) -> tuple[str, int] | None:
         return parse_fixed_array_type_spec(parsed_type_to_str(atype))
 
     def _format_decl(self, atype: str, name: str) -> str:
@@ -258,6 +259,17 @@ class PrologueEmitter:
         self._output.append("    #ifndef SIZE_MAX")
         self._output.append("        #define SIZE_MAX ((size_t)-1)")
         self._output.append("    #endif")
+        self._output.append("    #ifndef offsetof")
+        self._output.append("        #if defined(__GNUC__) || defined(__clang__)")
+        self._output.append(
+            "            #define offsetof(type, member) __builtin_offsetof(type, member)"
+        )
+        self._output.append("        #else")
+        self._output.append(
+            "            #define offsetof(type, member) ((size_t)&(((type *)0)->member))"
+        )
+        self._output.append("        #endif")
+        self._output.append("    #endif")
         self._output.append("    #if defined(__UINTPTR_TYPE__)")
         self._output.append("        typedef __UINTPTR_TYPE__ uintptr_t;")
         self._output.append("    #else")
@@ -297,8 +309,12 @@ class PrologueEmitter:
         # Fixed-width 256..8192-bit integer ladder for the C backend.
         if self._needs.wide_ints:
             self._output.append("/* AILang wide integers: C23 _BitInt backend */")
-            self._output.append("#if !defined(__BITINT_MAXWIDTH__) || __BITINT_MAXWIDTH__ < 8192")
-            self._output.append('#error "AILang wide/colos C backend requires C23 _BitInt with >=8192 bits"')
+            self._output.append(
+                "#if !defined(__BITINT_MAXWIDTH__) || __BITINT_MAXWIDTH__ < 8192"
+            )
+            self._output.append(
+                '#error "AILang wide/colos C backend requires C23 _BitInt with >=8192 bits"'
+            )
             self._output.append("#endif")
             for bits in (256, 512, 1024, 2048, 4096, 8192):
                 self._output.append(f"typedef _BitInt({bits}) ailang_i{bits};")
@@ -503,7 +519,7 @@ class PrologueEmitter:
                 f"static void {node.name}_destructor({node.name} *self);"
             )
 
-    def _emit_forward_declarations(self, nodes: List[A.ASTNode]) -> None:
+    def _emit_forward_declarations(self, nodes: list[A.ASTNode]) -> None:
         """Emit forward declarations for user functions, extern fn, and template-defined functions."""
         has_funcs = False
         # Emit extern var declarations first
@@ -605,8 +621,8 @@ class PrologueEmitter:
         self._output.append("")
 
     def _extract_template_function_signatures(
-        self, nodes: List[A.ASTNode]
-    ) -> List[str]:
+        self, nodes: list[A.ASTNode]
+    ) -> list[str]:
         """Scan template blocks for C function definitions and return forward declarations.
 
         This enables AILang code to call functions defined in template blocks
@@ -614,7 +630,7 @@ class PrologueEmitter:
         """
         import re
 
-        decls: List[str] = []
+        decls: list[str] = []
         seen_names: set = set()
         # Pattern matches function definitions at the start of a line (not inside #if/#else)
         # Handles: void func(...) {, int64_t func(...) {, static inline int func(...) {
@@ -671,7 +687,7 @@ class PrologueEmitter:
                         self._type_info.functions[name] = (param_types, ail_ret)
         return decls
 
-    def _emit_template_blocks(self, nodes: List[A.ASTNode]) -> None:
+    def _emit_template_blocks(self, nodes: list[A.ASTNode]) -> None:
         """Emit template blocks (raw C code)."""
         has_templates = False
         for node in nodes:
@@ -692,7 +708,7 @@ class PrologueEmitter:
         if has_templates:
             self._output.append("")
 
-    def _emit_cinclude_directives(self, nodes: List[A.ASTNode]) -> None:
+    def _emit_cinclude_directives(self, nodes: list[A.ASTNode]) -> None:
         """Emit #include directives from #cinclude statements."""
         has_includes = False
         current_os = os_from_platform()
@@ -715,7 +731,7 @@ class PrologueEmitter:
         if has_includes:
             self._output.append("")
 
-    def _emit_link_directives(self, nodes: List[A.ASTNode]) -> None:
+    def _emit_link_directives(self, nodes: list[A.ASTNode]) -> None:
         """Emit #link directives as comments for build tools."""
         current_os = os_from_platform()
         for node in nodes:

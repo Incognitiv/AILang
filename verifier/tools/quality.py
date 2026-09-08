@@ -6,12 +6,12 @@ import ast
 import importlib
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, cast
 
 from .common import read_file, validate_filepath
 
 
-def run_todo_check(filepath: str, actual_name: str) -> Dict[str, Any]:
+def run_todo_check(filepath: str, actual_name: str) -> dict[str, Any]:
     """Check for TODO, FIXME, HACK, XXX, and similar markers in code.
 
     These markers indicate incomplete implementations or technical debt
@@ -32,11 +32,11 @@ def run_todo_check(filepath: str, actual_name: str) -> Dict[str, Any]:
 
     try:
         code = read_file(validated_path)
-    except (OSError, IOError) as exc:
+    except OSError as exc:
         return {"error": str(exc)}
 
     lines = code.split("\n")
-    issues: List[str] = []
+    issues: list[str] = []
 
     # Patterns to look for (case-insensitive)
     patterns = {
@@ -51,7 +51,7 @@ def run_todo_check(filepath: str, actual_name: str) -> Dict[str, Any]:
         "STUB": re.compile(r"#\s*STUB\b[:\s]*(.*)", re.IGNORECASE),
     }
 
-    counts: Dict[str, int] = {key: 0 for key in patterns}
+    counts: dict[str, int] = {key: 0 for key in patterns}
 
     for lineno, line in enumerate(lines, start=1):
         for marker, pattern in patterns.items():
@@ -80,7 +80,7 @@ def run_todo_check(filepath: str, actual_name: str) -> Dict[str, Any]:
     }
 
 
-def run_vulture(filepath: str, actual_name: str) -> Dict[str, Any]:
+def run_vulture(filepath: str, actual_name: str) -> dict[str, Any]:
     """Run vulture using its Python API."""
     try:
         vulture_mod = cast(Any, importlib.import_module("vulture"))
@@ -101,13 +101,13 @@ def run_vulture(filepath: str, actual_name: str) -> Dict[str, Any]:
                 f"{actual_name}:{item.first_lineno}: unused {item.typ} '{item.name}'"
             )
         return {"dead_code_count": count, "issues": issues[:100], "passed": count == 0}
-    except (OSError, IOError) as exc:
+    except OSError as exc:
         return {"error": str(exc)}
 
 
 def run_vulture_project(
-    filepath: str, _actual_name: str, related_files: Optional[List[str]] = None
-) -> Dict[str, Any]:
+    filepath: str, _actual_name: str, related_files: list[str] | None = None
+) -> dict[str, Any]:
     """Run vulture across multiple related files to detect cross-module dead code.
 
     This is critical for detecting functions that exist but are never called
@@ -129,7 +129,7 @@ def run_vulture_project(
 
     try:
         vult = vulture_mod.Vulture()
-        scanned_files: List[str] = []
+        scanned_files: list[str] = []
 
         # Scan the primary file
         code = read_file(validated_path)
@@ -148,7 +148,7 @@ def run_vulture_project(
                 rel_code = read_file(rel_file)
                 vult.scan(rel_code, filename=rel_file)
                 scanned_files.append(rel_file)
-            except (OSError, IOError):
+            except OSError:
                 continue  # Skip files we can't read
 
         # Collect issues - only report those from the primary file
@@ -174,11 +174,11 @@ def run_vulture_project(
             "files_scanned": len(scanned_files),
             "note": "Cross-module analysis enabled",
         }
-    except (OSError, IOError) as exc:
+    except OSError as exc:
         return {"error": str(exc)}
 
 
-def _find_related_python_files(filepath: str) -> List[str]:
+def _find_related_python_files(filepath: str) -> list[str]:
     """Find Python files related to the given file.
 
     Looks in:
@@ -186,7 +186,7 @@ def _find_related_python_files(filepath: str) -> List[str]:
     2. Parent directory
     3. Subdirectories (packages)
     """
-    related: List[str] = []
+    related: list[str] = []
     file_path = Path(filepath).resolve()
     base_dir = file_path.parent
 
@@ -303,7 +303,7 @@ def _source_or_fallback(code: str, node: ast.AST) -> str:
     return ast.dump(node, include_attributes=False)
 
 
-def run_magic_index_check(filepath: str, actual_name: str) -> Dict[str, Any]:
+def run_magic_index_check(filepath: str, actual_name: str) -> dict[str, Any]:
     """
     Detect magic indexing patterns that should use named fields/constants.
 
@@ -394,7 +394,7 @@ def run_magic_index_check(filepath: str, actual_name: str) -> Dict[str, Any]:
     }
 
 
-def run_positional_access_audit(filepath: str, actual_name: str) -> Dict[str, Any]:
+def run_positional_access_audit(filepath: str, actual_name: str) -> dict[str, Any]:
     """Audit broad positional access on structured values.
 
     This intentionally reports more than the hard magic-index gate:
@@ -481,7 +481,7 @@ def run_positional_access_audit(filepath: str, actual_name: str) -> Dict[str, An
     }
 
 
-def run_consistency_check(filepath: str, actual_name: str) -> Dict[str, Any]:
+def run_consistency_check(filepath: str, actual_name: str) -> dict[str, Any]:
     """
     Check code consistency patterns.
 

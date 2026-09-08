@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 
 from .common import read_file, validate_filepath
 
 
-def run_black(filepath: str, _actual_name: str) -> Dict[str, Any]:
+def run_black(filepath: str, _actual_name: str) -> dict[str, Any]:
     """Run black using its Python API."""
     try:
         import black
@@ -25,11 +25,11 @@ def run_black(filepath: str, _actual_name: str) -> Dict[str, Any]:
         except black.NothingChanged:
             passed = True
         return {"passed": passed, "issues": [] if passed else ["Formatting required"]}
-    except (OSError, IOError) as exc:
+    except OSError as exc:
         return {"error": str(exc)}
 
 
-def run_isort(filepath: str, _actual_name: str) -> Dict[str, Any]:
+def run_isort(filepath: str, _actual_name: str) -> dict[str, Any]:
     """Run isort using its Python API."""
     try:
         import isort

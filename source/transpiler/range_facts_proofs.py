@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from parser import ast as A
-from typing import Dict, List, Optional, Set, Tuple
 
 from ast_access import arg_at
 
@@ -9,81 +8,77 @@ from .range_facts_types import Interval, StringInfo
 
 
 class RangeFactsProofMixin:
-    call_hint_params: Dict[str, Set[str]]
-    array_infos: Dict[Optional[str], Dict[str, Tuple[Interval, int]]]
-    dict_value_infos: Dict[Optional[str], Dict[str, Dict[str, Interval]]]
-    function_return_ranges: Dict[str, Interval]
-    scope_relations: Dict[Optional[str], Set[Tuple[str, str, str]]]
-    unknown_reasons: Dict[Tuple[Optional[str], str], str]
+    call_hint_params: dict[str, set[str]]
+    array_infos: dict[str | None, dict[str, tuple[Interval, int]]]
+    dict_value_infos: dict[str | None, dict[str, dict[str, Interval]]]
+    function_return_ranges: dict[str, Interval]
+    scope_relations: dict[str | None, set[tuple[str, str, str]]]
+    unknown_reasons: dict[tuple[str | None, str], str]
 
     def _expr_scope_snapshot(
-        self, expr: A.ASTNode, func_scope: Optional[str]
-    ) -> Optional[Dict[str, Interval]]:
+        self, expr: A.ASTNode, func_scope: str | None
+    ) -> dict[str, Interval] | None:
         raise NotImplementedError
 
     def _expr_unknown_snapshot(
-        self, expr: A.ASTNode, func_scope: Optional[str]
-    ) -> Optional[Dict[str, str]]:
+        self, expr: A.ASTNode, func_scope: str | None
+    ) -> dict[str, str] | None:
         raise NotImplementedError
 
     def _expr_array_snapshot(
-        self, expr: A.ASTNode, func_scope: Optional[str]
-    ) -> Optional[Dict[str, Tuple[Interval, int]]]:
+        self, expr: A.ASTNode, func_scope: str | None
+    ) -> dict[str, tuple[Interval, int]] | None:
         raise NotImplementedError
 
     def _expr_dict_value_snapshot(
-        self, expr: A.ASTNode, func_scope: Optional[str]
-    ) -> Optional[Dict[str, Dict[str, Interval]]]:
+        self, expr: A.ASTNode, func_scope: str | None
+    ) -> dict[str, dict[str, Interval]] | None:
         raise NotImplementedError
 
     def _expr_string_snapshot(
-        self, expr: A.ASTNode, func_scope: Optional[str]
-    ) -> Optional[Dict[str, StringInfo]]:
+        self, expr: A.ASTNode, func_scope: str | None
+    ) -> dict[str, StringInfo] | None:
         raise NotImplementedError
 
     def _expr_loop_reason_snapshot(
-        self, expr: A.ASTNode, func_scope: Optional[str]
-    ) -> Optional[Dict[str, str]]:
+        self, expr: A.ASTNode, func_scope: str | None
+    ) -> dict[str, str] | None:
         raise NotImplementedError
 
     def _expr_relation_snapshot(
-        self, expr: A.ASTNode, func_scope: Optional[str]
-    ) -> Optional[Set[Tuple[str, str, str]]]:
+        self, expr: A.ASTNode, func_scope: str | None
+    ) -> set[tuple[str, str, str]] | None:
         raise NotImplementedError
 
     def _range_from_scope(
-        self, _var_name: str, _scope: Optional[Dict[str, Interval]]
-    ) -> Optional[Interval]:
+        self, _var_name: str, _scope: dict[str, Interval] | None
+    ) -> Interval | None:
         raise NotImplementedError
 
     def _unknown_from_scope(
-        self, _var_name: str, _scope: Optional[Dict[str, str]]
-    ) -> Optional[str]:
+        self, _var_name: str, _scope: dict[str, str] | None
+    ) -> str | None:
         raise NotImplementedError
 
-    def get_var_range(
-        self, _var_name: str, _func_scope: Optional[str]
-    ) -> Optional[Interval]:
+    def get_var_range(self, _var_name: str, _func_scope: str | None) -> Interval | None:
         raise NotImplementedError
 
     def get_array_info(
-        self, _var_name: str, _func_scope: Optional[str]
-    ) -> Optional[Tuple[Interval, int]]:
+        self, _var_name: str, _func_scope: str | None
+    ) -> tuple[Interval, int] | None:
         raise NotImplementedError
 
     def get_dict_value_info(
-        self, _var_name: str, _key: str, _func_scope: Optional[str]
-    ) -> Optional[Interval]:
+        self, _var_name: str, _key: str, _func_scope: str | None
+    ) -> Interval | None:
         raise NotImplementedError
 
     def get_string_info(
-        self, _func_scope: Optional[str], _var_name: str
-    ) -> Optional[StringInfo]:
+        self, _func_scope: str | None, _var_name: str
+    ) -> StringInfo | None:
         raise NotImplementedError
 
-    def can_prove_no_overflow(
-        self, node: A.BinaryOp, func_scope: Optional[str]
-    ) -> bool:
+    def can_prove_no_overflow(self, node: A.BinaryOp, func_scope: str | None) -> bool:
         """Return True when + / - / * is provably in int64 range."""
         proven, _reason = self.explain_no_overflow_for_int(
             node, func_scope, bit_width=64, is_unsigned=False
@@ -93,7 +88,7 @@ class RangeFactsProofMixin:
     def can_prove_no_overflow_for_int(
         self,
         node: A.BinaryOp,
-        func_scope: Optional[str],
+        func_scope: str | None,
         bit_width: int,
         is_unsigned: bool,
     ) -> bool:
@@ -109,7 +104,7 @@ class RangeFactsProofMixin:
     def can_prove_safe_modulo(
         self,
         node: A.BinaryOp,
-        func_scope: Optional[str],
+        func_scope: str | None,
         *,
         bit_width: int,
         is_unsigned: bool,
@@ -123,7 +118,7 @@ class RangeFactsProofMixin:
     def can_prove_safe_division(
         self,
         node: A.BinaryOp,
-        func_scope: Optional[str],
+        func_scope: str | None,
         *,
         bit_width: int,
         is_unsigned: bool,
@@ -134,9 +129,7 @@ class RangeFactsProofMixin:
         # A positive signed divisor excludes both divide-by-zero and INT_MIN / -1.
         return self._can_prove_positive_rhs(node, func_scope)
 
-    def _can_prove_positive_rhs(
-        self, node: A.BinaryOp, func_scope: Optional[str]
-    ) -> bool:
+    def _can_prove_positive_rhs(self, node: A.BinaryOp, func_scope: str | None) -> bool:
         """Return True when the right-hand operand interval is strictly positive."""
         snapshot = self._expr_scope_snapshot(node, func_scope)
         if snapshot is None:
@@ -153,8 +146,8 @@ class RangeFactsProofMixin:
         return right.low > 0
 
     def explain_no_overflow(
-        self, node: A.BinaryOp, func_scope: Optional[str]
-    ) -> Tuple[bool, str]:
+        self, node: A.BinaryOp, func_scope: str | None
+    ) -> tuple[bool, str]:
         return self.explain_no_overflow_for_int(
             node, func_scope, bit_width=64, is_unsigned=False
         )
@@ -162,10 +155,10 @@ class RangeFactsProofMixin:
     def explain_no_overflow_for_int(
         self,
         node: A.BinaryOp,
-        func_scope: Optional[str],
+        func_scope: str | None,
         bit_width: int,
         is_unsigned: bool,
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """Return (proven, reason_code) for + / - / * overflow checks."""
         if node.op not in {"+", "-", "*"}:
             return False, "op_unsupported"
@@ -216,10 +209,10 @@ class RangeFactsProofMixin:
         self,
         *,
         node: A.BinaryOp,
-        func_scope: Optional[str],
+        func_scope: str | None,
         left_reason: str,
         right_reason: str,
-        loop_reasons: Optional[Dict[str, str]],
+        loop_reasons: dict[str, str] | None,
     ) -> str:
         """Best-effort reason code for why a proven overflow check was elided."""
         preferred = (
@@ -253,9 +246,9 @@ class RangeFactsProofMixin:
     def _overflow_unknown_taint(
         self,
         expr: A.ASTNode,
-        unknowns: Optional[Dict[str, str]],
-        loop_reasons: Optional[Dict[str, str]],
-    ) -> Optional[str]:
+        unknowns: dict[str, str] | None,
+        loop_reasons: dict[str, str] | None,
+    ) -> str | None:
         """Reject no-wrap proofs when a local refinement masks unsafe provenance."""
         if not unknowns:
             return None
@@ -301,7 +294,7 @@ class RangeFactsProofMixin:
             return
 
     def can_prove_index_in_bounds(
-        self, array_len: int, index_expr: A.ASTNode, func_scope: Optional[str]
+        self, array_len: int, index_expr: A.ASTNode, func_scope: str | None
     ) -> bool:
         proven, _reason = self.explain_index_in_bounds(
             array_len, index_expr, func_scope
@@ -309,8 +302,8 @@ class RangeFactsProofMixin:
         return proven
 
     def explain_index_in_bounds(
-        self, array_len: int, index_expr: A.ASTNode, func_scope: Optional[str]
-    ) -> Tuple[bool, str]:
+        self, array_len: int, index_expr: A.ASTNode, func_scope: str | None
+    ) -> tuple[bool, str]:
         if array_len <= 0:
             return False, "array_len_invalid"
         snapshot = self._expr_scope_snapshot(index_expr, func_scope)
@@ -333,7 +326,7 @@ class RangeFactsProofMixin:
         self,
         value_expr: A.ASTNode,
         target_range: tuple[int, int, bool],
-        func_scope: Optional[str],
+        func_scope: str | None,
     ) -> bool:
         """Prove value fits declared range.
 
@@ -350,9 +343,9 @@ class RangeFactsProofMixin:
     def _expr_interval(
         self,
         expr: A.ASTNode,
-        func_scope: Optional[str],
-        expr_scope: Optional[Dict[str, Interval]] = None,
-    ) -> Optional[Interval]:
+        func_scope: str | None,
+        expr_scope: dict[str, Interval] | None = None,
+    ) -> Interval | None:
         relations = (
             self._expr_relation_snapshot(expr, func_scope)
             if expr_scope is not None
@@ -366,13 +359,13 @@ class RangeFactsProofMixin:
     def _expr_interval_with_reason(
         self,
         expr: A.ASTNode,
-        func_scope: Optional[str],
-        expr_scope: Optional[Dict[str, Interval]] = None,
-        unknown_scope: Optional[Dict[str, str]] = None,
-        array_scope: Optional[Dict[str, Tuple[Interval, int]]] = None,
-        loop_scope: Optional[Dict[str, str]] = None,
-        relation_scope: Optional[Set[Tuple[str, str, str]]] = None,
-    ) -> Tuple[Optional[Interval], str]:
+        func_scope: str | None,
+        expr_scope: dict[str, Interval] | None = None,
+        unknown_scope: dict[str, str] | None = None,
+        array_scope: dict[str, tuple[Interval, int]] | None = None,
+        loop_scope: dict[str, str] | None = None,
+        relation_scope: set[tuple[str, str, str]] | None = None,
+    ) -> tuple[Interval | None, str]:
         if relation_scope is None and expr_scope is not None:
             relation_scope = self.scope_relations.get(func_scope)
         if isinstance(expr, A.Number) and isinstance(expr.value, int):
@@ -545,7 +538,7 @@ class RangeFactsProofMixin:
             )
             if idx is None:
                 return None, idx_reason if idx_reason != "ok" else "range_unknown"
-            arr_meta: Optional[Tuple[Interval, int]]
+            arr_meta: tuple[Interval, int] | None
             if array_scope is not None:
                 arr_meta = array_scope.get(expr.array.name)
                 if arr_meta is None:
@@ -611,9 +604,7 @@ class RangeFactsProofMixin:
         return None, "expr_unsupported"
 
     @staticmethod
-    def _binary_interval(
-        op: str, left: Interval, right: Interval
-    ) -> Optional[Interval]:
+    def _binary_interval(op: str, left: Interval, right: Interval) -> Interval | None:
         if op == "+":
             return Interval(left.low + right.low, left.high + right.high)
         if op == "-":
@@ -630,7 +621,7 @@ class RangeFactsProofMixin:
 
     @staticmethod
     def _relation_proves_ge(
-        left: str, right: str, relations: Optional[Set[Tuple[str, str, str]]]
+        left: str, right: str, relations: set[tuple[str, str, str]] | None
     ) -> bool:
         if left == right:
             return True
@@ -648,12 +639,12 @@ class RangeFactsProofMixin:
     def _additive_nonnegative_by_relation(
         self,
         expr: A.ASTNode,
-        func_scope: Optional[str],
-        expr_scope: Optional[Dict[str, Interval]],
-        unknown_scope: Optional[Dict[str, str]],
-        array_scope: Optional[Dict[str, Tuple[Interval, int]]],
-        loop_scope: Optional[Dict[str, str]],
-        relation_scope: Optional[Set[Tuple[str, str, str]]],
+        func_scope: str | None,
+        expr_scope: dict[str, Interval] | None,
+        unknown_scope: dict[str, str] | None,
+        array_scope: dict[str, tuple[Interval, int]] | None,
+        loop_scope: dict[str, str] | None,
+        relation_scope: set[tuple[str, str, str]] | None,
     ) -> bool:
         positives, negatives = self._linear_terms(expr)
         if not negatives:
@@ -662,7 +653,7 @@ class RangeFactsProofMixin:
         for neg in negatives:
             if not isinstance(neg, A.Variable):
                 return False
-            match_index: Optional[int] = None
+            match_index: int | None = None
             for idx, pos in enumerate(unmatched):
                 if isinstance(pos, A.Variable) and self._relation_proves_ge(
                     pos.name, neg.name, relation_scope
@@ -691,7 +682,7 @@ class RangeFactsProofMixin:
         return True
 
     @classmethod
-    def _linear_terms(cls, expr: A.ASTNode) -> Tuple[List[A.ASTNode], List[A.ASTNode]]:
+    def _linear_terms(cls, expr: A.ASTNode) -> tuple[list[A.ASTNode], list[A.ASTNode]]:
         if isinstance(expr, A.BinaryOp) and expr.op == "+":
             left_pos, left_neg = cls._linear_terms(expr.left)
             right_pos, right_neg = cls._linear_terms(expr.right)

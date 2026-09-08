@@ -112,7 +112,7 @@ def _compile_and_run(source_file: Path, tmp: Path, compiler: str) -> SmokeResult
     include_dirs = collect_cinclude_include_dirs(str(source_file))
     cmd = [
         compiler,
-        "-std=gnu23",
+        "-std=gnu2x",
         "-O1",
         "-g",
         "-fno-omit-frame-pointer",
@@ -155,7 +155,7 @@ def _generated_sources(
 ) -> list[SmokeResult | Path]:
     sources: list[SmokeResult | Path] = []
     helper_flags = (
-        "-std=gnu23",
+        "-std=gnu2x",
         "-O1",
         "-g",
         "-fno-omit-frame-pointer",

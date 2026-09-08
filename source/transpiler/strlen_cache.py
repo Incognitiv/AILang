@@ -32,7 +32,7 @@ def enter_strlen_cache_control(owner: Any) -> None:
     stack = getattr(owner, "_strlen_cache_control_stack", None)
     if stack is None:
         stack = []
-        setattr(owner, "_strlen_cache_control_stack", stack)
+        owner._strlen_cache_control_stack = stack
     snapshot: dict[str, dict[Any, Any]] = {}
     for name in ("_strlen_cache", "_c_strlen_cache"):
         value = getattr(owner, name, None)

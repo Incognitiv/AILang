@@ -17,7 +17,7 @@ tree.
 from __future__ import annotations
 
 import ast
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 from .common import read_file, validate_filepath
 
@@ -54,14 +54,14 @@ def _collect_init_attrs(class_node: ast.ClassDef) -> set[str]:
     return init_attrs
 
 
-def _self_targets(node: ast.AST) -> List[ast.Attribute]:
+def _self_targets(node: ast.AST) -> list[ast.Attribute]:
     """Return ``self.X`` Attribute targets if ``node`` assigns to any."""
     targets: list[ast.expr] = []
     if isinstance(node, ast.Assign):
         targets.extend(node.targets)
     elif isinstance(node, (ast.AugAssign, ast.AnnAssign)):
         targets.append(node.target)
-    out: List[ast.Attribute] = []
+    out: list[ast.Attribute] = []
     for t in targets:
         if (
             isinstance(t, ast.Attribute)
@@ -127,9 +127,9 @@ def _is_mixin_or_protocol(class_node: ast.ClassDef) -> bool:
 
 def _check_attribute_defined_outside_init(
     tree: ast.AST,
-) -> List[Tuple[int, str]]:
+) -> list[tuple[int, str]]:
     """W0201: ``self.X`` set outside ``__init__`` for X never set in ``__init__``."""
-    issues: List[Tuple[int, str]] = []
+    issues: list[tuple[int, str]] = []
     for class_node in ast.walk(tree):
         if not isinstance(class_node, ast.ClassDef):
             continue
@@ -159,13 +159,13 @@ def _check_attribute_defined_outside_init(
     return issues
 
 
-def _function_params_in_module(tree: ast.AST) -> Dict[str, List[str]]:
+def _function_params_in_module(tree: ast.AST) -> dict[str, list[str]]:
     """Map function/method names -> list of positional parameter names.
 
     For methods, the leading ``self``/``cls`` is dropped so call-site
     comparisons line up with the actual call signature.
     """
-    params: Dict[str, List[str]] = {}
+    params: dict[str, list[str]] = {}
     for node in ast.walk(tree):
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
@@ -177,10 +177,10 @@ def _function_params_in_module(tree: ast.AST) -> Dict[str, List[str]]:
     return params
 
 
-def _check_arguments_out_of_order(tree: ast.AST) -> List[Tuple[int, str]]:
+def _check_arguments_out_of_order(tree: ast.AST) -> list[tuple[int, str]]:
     """W1114: positional args whose names match params but in wrong positions."""
     func_params = _function_params_in_module(tree)
-    issues: List[Tuple[int, str]] = []
+    issues: list[tuple[int, str]] = []
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
@@ -196,7 +196,7 @@ def _check_arguments_out_of_order(tree: ast.AST) -> List[Tuple[int, str]]:
         # Only consider positional args that are simple Names.
         if len(node.args) < 2:
             continue
-        positional: List[ast.Name] = []
+        positional: list[ast.Name] = []
         for a in node.args:
             if not isinstance(a, ast.Name):
                 positional = []
@@ -237,7 +237,7 @@ def _check_arguments_out_of_order(tree: ast.AST) -> List[Tuple[int, str]]:
     return issues
 
 
-def run_strict_extras(filepath: str, _actual_name: str) -> Dict[str, Any]:
+def run_strict_extras(filepath: str, _actual_name: str) -> dict[str, Any]:
     """Verifier-shaped tool runner: returns ``{passed, issues}`` over W0201 + W1114."""
     validated_path, err = validate_filepath(filepath)
     if err:
@@ -251,7 +251,7 @@ def run_strict_extras(filepath: str, _actual_name: str) -> Dict[str, Any]:
     except SyntaxError as exc:
         return {"error": f"syntax: {exc.msg}", "passed": False}
 
-    issues: List[str] = []
+    issues: list[str] = []
     for line, msg in _check_attribute_defined_outside_init(tree):
         issues.append(f"Line {line}: W0201: {msg}")
     for line, msg in _check_arguments_out_of_order(tree):

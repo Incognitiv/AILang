@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from .ast_base import ASTNode
 
@@ -13,12 +13,12 @@ class Import(ASTNode):
     def __init__(
         self,
         module_path: str,
-        alias: Optional[str] = None,
-        target_os: Optional[str] = None,
+        alias: str | None = None,
+        target_os: str | None = None,
     ) -> None:
         self.module_path: str = module_path  # e.g., "bitwise" or "utils.helpers"
-        self.alias: Optional[str] = alias  # e.g., "bits" in "import bitwise as bits"
-        self.target_os: Optional[str] = target_os
+        self.alias: str | None = alias  # e.g., "bits" in "import bitwise as bits"
+        self.target_os: str | None = target_os
 
 
 class FromImport(ASTNode):
@@ -32,11 +32,11 @@ class FromImport(ASTNode):
 class Use(ASTNode):
     """Use statement for standard library: use std.io, use std.math"""
 
-    def __init__(self, module_path: str, names: Optional[list[str]] = None) -> None:
+    def __init__(self, module_path: str, names: list[str] | None = None) -> None:
         self.module_path: str = (
             module_path  # e.g., "std.io", "std.math", "freestanding"
         )
-        self.names: Optional[list[str]] = names  # Specific items, or None for all
+        self.names: list[str] | None = names  # Specific items, or None for all
 
 
 class Library(ASTNode):
@@ -82,8 +82,6 @@ class Bool(ASTNode):
 
 class Null(ASTNode):
     """Represents null/nil literal value."""
-
-    ...
 
 
 class StringLit(ASTNode):
@@ -141,12 +139,12 @@ class ListComprehension(ASTNode):
         expr: Any,
         var_name: str,
         iterable: Any,
-        condition: Optional[Any] = None,
+        condition: Any | None = None,
     ) -> None:
         self.expr: Any = expr  # Expression to evaluate for each element
         self.var_name: str = var_name  # Loop variable name
         self.iterable: Any = iterable  # Range or array to iterate over
-        self.condition: Optional[Any] = condition  # Optional filter condition
+        self.condition: Any | None = condition  # Optional filter condition
 
 
 class Range(ASTNode):
@@ -218,7 +216,7 @@ class Call(ASTNode):
         self.name: str = name
         self.args: list[ASTNode] = args
         self.unsafe: bool = unsafe  # If True, bypasses safety checks with user consent
-        self.generic_base: Optional[str] = None
+        self.generic_base: str | None = None
         self.generic_type_args: list[str] = []
 
 
@@ -238,11 +236,11 @@ class StringSlice(ASTNode):
     """
 
     def __init__(
-        self, target: ASTNode, start: ASTNode, end: Optional[ASTNode] = None
+        self, target: ASTNode, start: ASTNode, end: ASTNode | None = None
     ) -> None:
         self.target: ASTNode = target
         self.start: ASTNode = start
-        self.end: Optional[ASTNode] = end
+        self.end: ASTNode | None = end
 
 
 # ============================================================================

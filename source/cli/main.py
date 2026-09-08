@@ -31,6 +31,7 @@ Diagnostics:
   --no-prepass       Skip prepass diagnostics (faster, less safe)
   -W                 Treat warnings as errors
 """
+
 import sys
 from pathlib import Path
 
@@ -341,9 +342,9 @@ def main():
     # Check for --emit-llvm option (save LLVM IR to file)
     if "--emit-llvm" in sys.argv:
         # Lazy parser/lexer import: only needed for direct LLVM IR emission.
+        # Lazy: codegen drags in llvmlite; only load when --emit-llvm is selected.
         from parser.parser import Parser
 
-        # Lazy: codegen drags in llvmlite; only load when --emit-llvm is selected.
         from codegen.codegen import CodeGen
         from lexer.scan import tokenize
 

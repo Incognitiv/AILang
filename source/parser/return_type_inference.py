@@ -4,6 +4,7 @@ The rule is intentionally conservative: inference must preserve values, never
 pick a type merely because a backend can cast to it.  Explicit type-prefix or
 postfix annotations remain contracts and are not changed here.
 """
+
 from __future__ import annotations
 
 import re
@@ -16,15 +17,39 @@ _INT_RE = re.compile(r"^([iu])(8|16|32|64|128|256|512|1024|2048|4096|8192)$")
 _INT_WIDTHS = (8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192)
 
 _BUILTIN_RETURNS = {
-    "strlen": "i64", "len": "i64", "ord": "i64", "char_at": "i64",
-    "unsafe_char_at": "i64", "argc": "i64", "time_ns": "i64", "clock_ns": "i64",
-    "int": "i64", "abs": "i64", "min": "i64", "max": "i64", "popcount": "i64",
-    "startswith": "bool", "endswith": "bool", "file_exists": "i64",
-    "str": "string", "hex": "string", "bin": "string", "oct": "string",
-    "chr": "string", "substr": "string", "concat": "string", "read_file": "string",
-    "read_stdin": "string", "input": "string", "argv": "string", "getenv": "string",
-    "float": "f64", "sqrt": "f64", "pow": "f64",
-    "ptr_add": "ptr", "ptr_sub": "ptr",
+    "strlen": "i64",
+    "len": "i64",
+    "ord": "i64",
+    "char_at": "i64",
+    "unsafe_char_at": "i64",
+    "argc": "i64",
+    "time_ns": "i64",
+    "clock_ns": "i64",
+    "int": "i64",
+    "abs": "i64",
+    "min": "i64",
+    "max": "i64",
+    "popcount": "i64",
+    "startswith": "bool",
+    "endswith": "bool",
+    "file_exists": "i64",
+    "str": "string",
+    "hex": "string",
+    "bin": "string",
+    "oct": "string",
+    "chr": "string",
+    "substr": "string",
+    "concat": "string",
+    "read_file": "string",
+    "read_stdin": "string",
+    "input": "string",
+    "argv": "string",
+    "getenv": "string",
+    "float": "f64",
+    "sqrt": "f64",
+    "pow": "f64",
+    "ptr_add": "ptr",
+    "ptr_sub": "ptr",
 }
 
 
@@ -32,7 +57,14 @@ def _canon(t: Any) -> str:
     if t is None:
         return ""
     s = parsed_type_to_str(t) if not isinstance(t, str) else t
-    aliases = {"int": "i64", "uint": "u64", "float": "f32", "double": "f64", "quad": "f128", "pointer": "ptr"}
+    aliases = {
+        "int": "i64",
+        "uint": "u64",
+        "float": "f32",
+        "double": "f64",
+        "quad": "f128",
+        "pointer": "ptr",
+    }
     return aliases.get(s.lower(), s)
 
 
@@ -68,7 +100,8 @@ def _join(a: str, b: str) -> str | None:
     # Mixed integer/float inference is allowed only when every value in the
     # integer type is exactly representable by that float type.
     if a in floats and _INT_RE.match(b):
-        m = _INT_RE.match(b); assert m
+        m = _INT_RE.match(b)
+        assert m
         bits = int(m.group(2)) - (1 if m.group(1) == "i" else 0)
         return a if bits <= floats[a] else None
     if b in floats and _INT_RE.match(a):
@@ -113,7 +146,11 @@ def _collect_env(fn: A.Function, class_name: str | None) -> dict[str, str]:
             value = node.value
             inferred = None
             if isinstance(value, A.Number):
-                inferred = "i64" if not value.is_float else {"f": "f32", "q": "f128"}.get(value.precision, "f64")
+                inferred = (
+                    "i64"
+                    if not value.is_float
+                    else {"f": "f32", "q": "f128"}.get(value.precision, "f64")
+                )
             elif isinstance(value, A.Bool):
                 inferred = "bool"
             elif isinstance(value, (A.StringLit, A.InterpolatedString, A.StringSlice)):
@@ -130,57 +167,108 @@ def _collect_env(fn: A.Function, class_name: str | None) -> dict[str, str]:
     return env
 
 
-def _expr_type(expr: A.ASTNode, env: dict[str, str], fn_returns: dict[str, str],
-               class_fields: dict[str, dict[str, str]], class_methods: dict[tuple[str, str], str],
-               current_class: str | None) -> str | None:
+def _expr_type(
+    expr: A.ASTNode,
+    env: dict[str, str],
+    fn_returns: dict[str, str],
+    class_fields: dict[str, dict[str, str]],
+    class_methods: dict[tuple[str, str], str],
+    current_class: str | None,
+) -> str | None:
     if isinstance(expr, A.Number):
         if not expr.is_float:
             return "i64"
         return {"f": "f32", "q": "f128"}.get(expr.precision, "f64")
-    if isinstance(expr, A.Bool): return "bool"
-    if isinstance(expr, (A.StringLit, A.InterpolatedString, A.StringSlice)): return "string"
-    if isinstance(expr, A.Null): return "ptr"
-    if isinstance(expr, A.Variable): return env.get(expr.name)
-    if isinstance(expr, A.ThisExpr): return current_class
-    if isinstance(expr, (A.Cast, A.ReinterpretCast)): return _canon(expr.target_type)
-    if isinstance(expr, A.NewExpr): return expr.type_name
+    if isinstance(expr, A.Bool):
+        return "bool"
+    if isinstance(expr, (A.StringLit, A.InterpolatedString, A.StringSlice)):
+        return "string"
+    if isinstance(expr, A.Null):
+        return "ptr"
+    if isinstance(expr, A.Variable):
+        return env.get(expr.name)
+    if isinstance(expr, A.ThisExpr):
+        return current_class
+    if isinstance(expr, (A.Cast, A.ReinterpretCast)):
+        return _canon(expr.target_type)
+    if isinstance(expr, A.NewExpr):
+        return expr.type_name
     if isinstance(expr, A.UnaryOp):
-        if expr.op in ("not", "!"): return "bool"
-        return _expr_type(expr.operand, env, fn_returns, class_fields, class_methods, current_class)
+        if expr.op in ("not", "!"):
+            return "bool"
+        return _expr_type(
+            expr.operand, env, fn_returns, class_fields, class_methods, current_class
+        )
     if isinstance(expr, A.BinaryOp):
         if expr.op in ("==", "!=", "<", ">", "<=", ">=", "and", "or", "&&", "||"):
             return "bool"
-        lt = _expr_type(expr.left, env, fn_returns, class_fields, class_methods, current_class)
-        rt = _expr_type(expr.right, env, fn_returns, class_fields, class_methods, current_class)
+        lt = _expr_type(
+            expr.left, env, fn_returns, class_fields, class_methods, current_class
+        )
+        rt = _expr_type(
+            expr.right, env, fn_returns, class_fields, class_methods, current_class
+        )
         if expr.op == "+" and (lt == "string" or rt == "string"):
             return "string"
         return _join(lt or "", rt or "")
     if isinstance(expr, A.TernaryOp):
         return _join(
-            _expr_type(expr.true_expr, env, fn_returns, class_fields, class_methods, current_class) or "",
-            _expr_type(expr.false_expr, env, fn_returns, class_fields, class_methods, current_class) or "",
+            _expr_type(
+                expr.true_expr,
+                env,
+                fn_returns,
+                class_fields,
+                class_methods,
+                current_class,
+            )
+            or "",
+            _expr_type(
+                expr.false_expr,
+                env,
+                fn_returns,
+                class_fields,
+                class_methods,
+                current_class,
+            )
+            or "",
         )
     if isinstance(expr, A.Call):
         return fn_returns.get(expr.name) or _BUILTIN_RETURNS.get(expr.name)
     if isinstance(expr, A.FieldAccess):
-        ot = _expr_type(expr.object_expr, env, fn_returns, class_fields, class_methods, current_class)
+        ot = _expr_type(
+            expr.object_expr,
+            env,
+            fn_returns,
+            class_fields,
+            class_methods,
+            current_class,
+        )
         if ot in class_fields:
             return class_fields[ot].get(expr.field_name)
     if isinstance(expr, A.MethodCall):
-        ot = _expr_type(expr.object_expr, env, fn_returns, class_fields, class_methods, current_class)
+        ot = _expr_type(
+            expr.object_expr,
+            env,
+            fn_returns,
+            class_fields,
+            class_methods,
+            current_class,
+        )
         if ot:
             return class_methods.get((ot, expr.method_name))
     if isinstance(expr, A.ArrayAccess):
-        at = _expr_type(expr.array, env, fn_returns, class_fields, class_methods, current_class)
+        at = _expr_type(
+            expr.array, env, fn_returns, class_fields, class_methods, current_class
+        )
         # textual fallback for parser-level aliases is intentionally conservative.
         m = re.match(r"^(?:slice|view)\[(.+)\]$", at or "")
-        if m: return _canon(m.group(1))
+        if m:
+            return _canon(m.group(1))
     return None
 
 
 def _returns(fn: A.Function) -> list[A.Return]:
     return [n for n in _walk_nodes(fn.body) if isinstance(n, A.Return)]
-
 
 
 def _stmt_terminates_with_value_or_throw(stmt: A.ASTNode) -> bool:
@@ -189,18 +277,34 @@ def _stmt_terminates_with_value_or_throw(stmt: A.ASTNode) -> bool:
     if isinstance(stmt, A.Throw):
         return True
     if isinstance(stmt, (A.If, A.ComptimeIf)):
-        return bool(stmt.else_body) and _body_terminates_with_value_or_throw(stmt.then_body) and _body_terminates_with_value_or_throw(stmt.else_body)
+        return (
+            bool(stmt.else_body)
+            and _body_terminates_with_value_or_throw(stmt.then_body)
+            and _body_terminates_with_value_or_throw(stmt.else_body)
+        )
     if isinstance(stmt, A.Match):
-        return bool(stmt.default_case) and all(_body_terminates_with_value_or_throw(body) for _, body in stmt.cases) and _body_terminates_with_value_or_throw(stmt.default_case or [])
+        return (
+            bool(stmt.default_case)
+            and all(
+                _body_terminates_with_value_or_throw(body) for _, body in stmt.cases
+            )
+            and _body_terminates_with_value_or_throw(stmt.default_case or [])
+        )
     if isinstance(stmt, A.TryExcept):
         # A returning/throwing finally dominates every other path. Otherwise
         # require the try body and every present handler to terminate.
-        if stmt.finally_block and _body_terminates_with_value_or_throw(stmt.finally_block):
+        if stmt.finally_block and _body_terminates_with_value_or_throw(
+            stmt.finally_block
+        ):
             return True
         handlers = [body for _, _, body in stmt.catch_blocks]
         if stmt.except_block is not None:
             handlers.append(stmt.except_block[1])
-        return bool(handlers) and _body_terminates_with_value_or_throw(stmt.try_body) and all(_body_terminates_with_value_or_throw(body) for body in handlers)
+        return (
+            bool(handlers)
+            and _body_terminates_with_value_or_throw(stmt.try_body)
+            and all(_body_terminates_with_value_or_throw(body) for body in handlers)
+        )
     return False
 
 
@@ -219,6 +323,7 @@ def body_terminates_with_value_or_throw(body: list[A.ASTNode]) -> bool:
     """
     return _body_terminates_with_value_or_throw(body)
 
+
 def infer_unannotated_return_types(program: list[A.ASTNode]) -> None:
     """Resolve unannotated ``def`` return types in place; raise on ambiguity."""
     functions: list[tuple[A.Function, str | None]] = []
@@ -236,10 +341,16 @@ def infer_unannotated_return_types(program: list[A.ASTNode]) -> None:
     class_methods: dict[tuple[str, str], str] = {}
     for fn, cls in functions:
         if getattr(fn, "return_type_explicit", True):
-            if cls: class_methods[(cls, fn.name)] = _canon(fn.return_type)
-            else: fn_returns[fn.name] = _canon(fn.return_type)
+            if cls:
+                class_methods[(cls, fn.name)] = _canon(fn.return_type)
+            else:
+                fn_returns[fn.name] = _canon(fn.return_type)
 
-    pending = [(fn, cls) for fn, cls in functions if not getattr(fn, "return_type_explicit", True)]
+    pending = [
+        (fn, cls)
+        for fn, cls in functions
+        if not getattr(fn, "return_type_explicit", True)
+    ]
     for _ in range(max(1, len(pending) + 1)):
         changed = False
         for fn, cls in list(pending):
@@ -260,13 +371,17 @@ def infer_unannotated_return_types(program: list[A.ASTNode]) -> None:
                 unresolved = False
                 for ret in valued:
                     assert ret.value is not None
-                    rt = _expr_type(ret.value, env, fn_returns, class_fields, class_methods, cls)
+                    rt = _expr_type(
+                        ret.value, env, fn_returns, class_fields, class_methods, cls
+                    )
                     if not rt:
                         unresolved = True
                         continue
                     joined = _join(inferred, rt)
                     if joined is None:
-                        raise SyntaxError(f"Cannot infer one lossless return type for function '{fn.name}' from '{inferred}' and '{rt}'; add an explicit type prefix")
+                        raise SyntaxError(
+                            f"Cannot infer one lossless return type for function '{fn.name}' from '{inferred}' and '{rt}'; add an explicit type prefix"
+                        )
                     inferred = joined
                 if unresolved:
                     # Publish a lossless provisional type when at least one
@@ -288,14 +403,19 @@ def infer_unannotated_return_types(program: list[A.ASTNode]) -> None:
                 )
             fn.return_type = inferred
             fn.return_type_inferred = True
-            if cls: class_methods[(cls, fn.name)] = inferred
-            else: fn_returns[fn.name] = inferred
-            pending.remove((fn, cls)); changed = True
+            if cls:
+                class_methods[(cls, fn.name)] = inferred
+            else:
+                fn_returns[fn.name] = inferred
+            pending.remove((fn, cls))
+            changed = True
         if not pending or not changed:
             break
     if pending:
         names = ", ".join(f"{cls + '.' if cls else ''}{fn.name}" for fn, cls in pending)
-        raise SyntaxError(f"Cannot infer return type for: {names}; add an explicit type prefix")
+        raise SyntaxError(
+            f"Cannot infer return type for: {names}; add an explicit type prefix"
+        )
 
 
 def validate_return_contracts(program: list[A.ASTNode]) -> None:

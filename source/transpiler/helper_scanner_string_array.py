@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from parser import ast as A
-from typing import Optional
 
 from ast_access import arg_at
 from transpiler.arithmetic_literal_proofs import int_literal_in_range, int_literal_value
@@ -79,7 +78,7 @@ def _is_integer_type_name(self, type_name: str) -> bool:
     return lowered.startswith("uint") and lowered[4:].isdigit()
 
 
-def _known_array_len_hint(self, array_expr: A.ASTNode) -> Optional[int]:
+def _known_array_len_hint(self, array_expr: A.ASTNode) -> int | None:
     if not isinstance(array_expr, A.Variable):
         return None
     scoped_key = (self._func_scope, array_expr.name)
@@ -226,7 +225,7 @@ def _str_arg_is_known_integer(self, node: A.ASTNode) -> bool:
     return False
 
 
-def _virtual_concat_numeric_arg(self, arg: A.ASTNode) -> Optional[A.ASTNode]:
+def _virtual_concat_numeric_arg(self, arg: A.ASTNode) -> A.ASTNode | None:
     if not isinstance(arg, A.BinaryOp) or arg.op not in ("+", "plus"):
         return None
     if not isinstance(arg.left, A.StringLit):
@@ -241,7 +240,7 @@ def _virtual_concat_numeric_arg(self, arg: A.ASTNode) -> Optional[A.ASTNode]:
     return value_arg
 
 
-def _virtual_strlen_numeric_arg(self, node: A.Call) -> Optional[A.ASTNode]:
+def _virtual_strlen_numeric_arg(self, node: A.Call) -> A.ASTNode | None:
     if node.name not in ("strlen", "len") or len(node.args) != 1:
         return None
     return self._virtual_concat_numeric_arg(arg_at(node, 0))

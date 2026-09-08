@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from parser.ast import Function
-from typing import Any, Optional
+from typing import Any
 
 from ast_access import arg_at
 from llvmlite import ir
@@ -18,23 +18,23 @@ def _string_len_name(name: str) -> str:
 
 
 class _CodeGenClassRecordMixin:
-    current_class: Optional[str]
+    current_class: str | None
 
     def __init__(self: Any) -> None:
         # Linter-only declarations for attributes reassigned while generating
         # class methods. CodeGen.__init__ owns the actual runtime state.
         self.current_class = None
         self.current_this: Any = None
-        self.func: Optional[ir.Function] = None
+        self.func: ir.Function | None = None
         self.locals: dict[str, Any] = {}
         self.local_decl_types: dict[str, Any] = {}
         self.var_signedness: dict[str, bool] = {}
         self.value_signedness: dict[str, bool] = {}
-        self.builder: Optional[ir.IRBuilder] = None
-        self._current_function_name: Optional[str] = None
+        self.builder: ir.IRBuilder | None = None
+        self._current_function_name: str | None = None
         self._current_function_body: Any = None
         self._unchecked_mode: bool = False
-        self._inline_this_stack_var: Optional[str] = None
+        self._inline_this_stack_var: str | None = None
 
     def generate_record(self: Any, node: Any) -> None:
         """Generate LLVM struct type for record definition"""

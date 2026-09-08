@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from parser import ast as A
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any
 
 from ast_access import arg_at
 
@@ -14,12 +15,12 @@ from .range_facts_utils import (
 
 
 def _decimal_accumulator_target(
-    body: List[A.ASTNode],
+    body: list[A.ASTNode],
     *,
     string_name: str,
     index_name: str,
-) -> Optional[str]:
-    digit_var: Optional[str] = None
+) -> str | None:
+    digit_var: str | None = None
     saw_low_guard = False
     saw_high_guard = False
     for stmt in body:
@@ -86,7 +87,7 @@ def _is_break_guard_for(stmt: A.ASTNode, var_name: str, op: str, value: int) -> 
     )
 
 
-def _positive_modulus(expr: A.ASTNode) -> Optional[int]:
+def _positive_modulus(expr: A.ASTNode) -> int | None:
     if not isinstance(expr, A.BinaryOp) or expr.op not in {"%", "mod"}:
         return None
     right = expr.right
@@ -98,11 +99,11 @@ def _positive_modulus(expr: A.ASTNode) -> Optional[int]:
 
 def _collect_assignments_by_var(
     analyzer: Any, nodes: Iterable[A.ASTNode]
-) -> Dict[str, List[Tuple[A.Assign, Set[Tuple[str, str, str]]]]]:
-    out: Dict[str, List[Tuple[A.Assign, Set[Tuple[str, str, str]]]]] = {}
+) -> dict[str, list[tuple[A.Assign, set[tuple[str, str, str]]]]]:
+    out: dict[str, list[tuple[A.Assign, set[tuple[str, str, str]]]]] = {}
 
     def collect(
-        items: Iterable[A.ASTNode], relations: Set[Tuple[str, str, str]]
+        items: Iterable[A.ASTNode], relations: set[tuple[str, str, str]]
     ) -> None:
         for stmt in items:
             if isinstance(stmt, A.Assign):
@@ -130,10 +131,10 @@ def _expr_is_nonnegative(
     expr: A.ASTNode,
     *,
     facts: Any,
-    func_scope: Optional[str],
-    scope: Dict[str, Any],
-    protocol_nonnegative: Set[str],
-    relation_scope: Optional[Set[Tuple[str, str, str]]] = None,
+    func_scope: str | None,
+    scope: dict[str, Any],
+    protocol_nonnegative: set[str],
+    relation_scope: set[tuple[str, str, str]] | None = None,
 ) -> bool:
     interval, _reason = facts._expr_interval_with_reason(
         expr, func_scope, scope, relation_scope=relation_scope
@@ -191,8 +192,8 @@ def _decimal_accumulator_targets(
     *,
     string_name: str,
     index_name: str,
-) -> Set[str]:
-    targets: Set[str] = set()
+) -> set[str]:
+    targets: set[str] = set()
     direct = _decimal_accumulator_target(
         list(nodes), string_name=string_name, index_name=index_name
     )
@@ -213,14 +214,14 @@ def _decimal_accumulator_targets(
 def _derive_modulo_assignment_ranges(
     analyzer: Any,
     nodes: Iterable[A.ASTNode],
-    func_scope: Optional[str],
+    func_scope: str | None,
     facts: Any,
-    scope: Dict[str, Any],
+    scope: dict[str, Any],
     *,
-    protocol_nonnegative: Optional[Set[str]] = None,
-) -> Tuple[Dict[str, Tuple[int, int]], Set[str]]:
-    refinements: Dict[str, Tuple[int, int]] = {}
-    preserve: Set[str] = set()
+    protocol_nonnegative: set[str] | None = None,
+) -> tuple[dict[str, tuple[int, int]], set[str]]:
+    refinements: dict[str, tuple[int, int]] = {}
+    preserve: set[str] = set()
     nonnegative = protocol_nonnegative or set()
     assignments = _collect_assignments_by_var(analyzer, nodes)
     for var_name, writes in assignments.items():
@@ -263,12 +264,12 @@ def _derive_modulo_assignment_ranges(
 def _derive_protocol_loop_ranges(
     analyzer: Any,
     node: A.While,
-    func_scope: Optional[str],
+    func_scope: str | None,
     facts: Any,
-    scope: Dict[str, Any],
-) -> Tuple[Dict[str, Tuple[int, int]], Set[str]]:
-    refinements: Dict[str, Tuple[int, int]] = {}
-    preserve: Set[str] = set()
+    scope: dict[str, Any],
+) -> tuple[dict[str, tuple[int, int]], set[str]]:
+    refinements: dict[str, tuple[int, int]] = {}
+    preserve: set[str] = set()
     if not isinstance(node.cond, A.BinaryOp) or node.cond.op != "<":
         return refinements, preserve
     if not isinstance(node.cond.left, A.Variable) or not isinstance(
@@ -283,7 +284,7 @@ def _derive_protocol_loop_ranges(
     info = facts.get_string_info(func_scope, string_name)
     if info is None:
         return refinements, preserve
-    protocol_nonnegative: Set[str] = set()
+    protocol_nonnegative: set[str] = set()
 
     current = scope.get(index_name)
     if (
@@ -324,10 +325,10 @@ def _derive_protocol_loop_ranges(
 
 def _mark_symbolic_guarded_char_at_calls(
     analyzer: Any,
-    body: List[A.ASTNode],
-    func_scope: Optional[str],
+    body: list[A.ASTNode],
+    func_scope: str | None,
     facts: Any,
-    scope: Dict[str, Any],
+    scope: dict[str, Any],
     cond: A.ASTNode,
 ) -> None:
     if not isinstance(cond, A.BinaryOp) or cond.op != "<":

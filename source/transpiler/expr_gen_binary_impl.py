@@ -8,19 +8,19 @@ from transpiler.arithmetic_literal_proofs import (
     positive_int_literal,
     shift_amount_literal_in_range,
 )
+from transpiler.c_bigint import expr_is_unbounded, owned_bigint_expr
 from transpiler.codegen_int_ranges import (
     expr_int_range,
     range_fits_int64,
     range_fits_signed_width,
     range_is_positive,
 )
-from transpiler.wide_int_types import info_for_c, promoted_info
-from transpiler.c_bigint import expr_is_unbounded, owned_bigint_expr
 from transpiler.fixed_int_types import (
     c_name_for_fixed,
     info_for_c_fixed,
     promoted_fixed_info,
 )
+from transpiler.wide_int_types import info_for_c, promoted_info
 
 
 def _literal_fits_fixed(node: A.ASTNode, info) -> bool:
@@ -97,7 +97,7 @@ def _fixed_binary_expr(self, node: A.BinaryOp, left: str, right: str):
     if op == "or":
         return f"(({l}) || ({r}))"
     if op in ("AND", "OR", "XOR", "NAND", "NOR", "XNOR", "&", "|", "bxor"):
-        mapped = {"AND":"&", "OR":"|", "XOR":"^", "&":"&", "|":"|", "bxor":"^"}
+        mapped = {"AND": "&", "OR": "|", "XOR": "^", "&": "&", "|": "|", "bxor": "^"}
         c_op = mapped.get(op)
         if c_op is not None:
             return f"({l} {c_op} {r})"
@@ -106,24 +106,56 @@ def _fixed_binary_expr(self, node: A.BinaryOp, left: str, right: str):
     if op in ("==", "!=", "<", ">", "<=", ">="):
         return f"({l} {op} {r})"
     if op in ("<<", "shl"):
-        return f"({l} << (int64_t)({right}))" if self._unchecked_mode else f"ailang_safe_shl_{suffix}({l}, (int64_t)({right}))"
+        return (
+            f"({l} << (int64_t)({right}))"
+            if self._unchecked_mode
+            else f"ailang_safe_shl_{suffix}({l}, (int64_t)({right}))"
+        )
     if op in (">>", "shr", "ushr"):
         if op == "ushr" and not info.unsigned:
             uctype = c_name_for_fixed(type(info)(info.bits, True, f"u{info.bits}"))
-            shifted = f"(({uctype})({l}) >> (int64_t)({right}))" if self._unchecked_mode else f"ailang_safe_shr_u{info.bits}(({uctype})({l}), (int64_t)({right}))"
+            shifted = (
+                f"(({uctype})({l}) >> (int64_t)({right}))"
+                if self._unchecked_mode
+                else f"ailang_safe_shr_u{info.bits}(({uctype})({l}), (int64_t)({right}))"
+            )
             return f"(({ctype})({shifted}))"
-        return f"({l} >> (int64_t)({right}))" if self._unchecked_mode else f"ailang_safe_shr_{suffix}({l}, (int64_t)({right}))"
+        return (
+            f"({l} >> (int64_t)({right}))"
+            if self._unchecked_mode
+            else f"ailang_safe_shr_{suffix}({l}, (int64_t)({right}))"
+        )
     fixed_proven = _fixed_arithmetic_is_proven(self, node, info)
     if op in ("+", "plus"):
-        return f"({l} + {r})" if self._unchecked_mode or fixed_proven else f"ailang_safe_add_{suffix}({l}, {r})"
+        return (
+            f"({l} + {r})"
+            if self._unchecked_mode or fixed_proven
+            else f"ailang_safe_add_{suffix}({l}, {r})"
+        )
     if op in ("-", "minus"):
-        return f"({l} - {r})" if self._unchecked_mode or fixed_proven else f"ailang_safe_sub_{suffix}({l}, {r})"
+        return (
+            f"({l} - {r})"
+            if self._unchecked_mode or fixed_proven
+            else f"ailang_safe_sub_{suffix}({l}, {r})"
+        )
     if op in ("*", "star"):
-        return f"({l} * {r})" if self._unchecked_mode or fixed_proven else f"ailang_safe_mul_{suffix}({l}, {r})"
+        return (
+            f"({l} * {r})"
+            if self._unchecked_mode or fixed_proven
+            else f"ailang_safe_mul_{suffix}({l}, {r})"
+        )
     if op in ("/", "//"):
-        return f"({l} / {r})" if self._unchecked_mode else f"ailang_safe_div_{suffix}({l}, {r})"
+        return (
+            f"({l} / {r})"
+            if self._unchecked_mode
+            else f"ailang_safe_div_{suffix}({l}, {r})"
+        )
     if op == "%":
-        return f"({l} % {r})" if self._unchecked_mode else f"ailang_safe_mod_{suffix}({l}, {r})"
+        return (
+            f"({l} % {r})"
+            if self._unchecked_mode
+            else f"ailang_safe_mod_{suffix}({l}, {r})"
+        )
     if op in ("**", "^"):
         return f"ailang_safe_pow_{suffix}({l}, (int64_t)({right}))"
     return None
@@ -147,7 +179,7 @@ def _wide_binary_expr(self, node: A.BinaryOp, left: str, right: str):
     if op == "or":
         return f"(({l}) || ({r}))"
     if op in ("AND", "OR", "XOR", "NAND", "NOR", "XNOR"):
-        c_op = {"AND":"&", "OR":"|", "XOR":"^"}.get(op)
+        c_op = {"AND": "&", "OR": "|", "XOR": "^"}.get(op)
         if c_op is not None:
             return f"({l} {c_op} {r})"
         inner = "&" if op == "NAND" else ("|" if op == "NOR" else "^")
@@ -172,15 +204,35 @@ def _wide_binary_expr(self, node: A.BinaryOp, left: str, right: str):
             return f"({l} >> ({right}))"
         return f"ailang_safe_shr_{suffix}({l}, (int64_t)({right}))"
     if op in ("+", "plus"):
-        return f"({l} + {r})" if self._unchecked_mode else f"ailang_safe_add_{suffix}({l}, {r})"
+        return (
+            f"({l} + {r})"
+            if self._unchecked_mode
+            else f"ailang_safe_add_{suffix}({l}, {r})"
+        )
     if op in ("-", "minus"):
-        return f"({l} - {r})" if self._unchecked_mode else f"ailang_safe_sub_{suffix}({l}, {r})"
+        return (
+            f"({l} - {r})"
+            if self._unchecked_mode
+            else f"ailang_safe_sub_{suffix}({l}, {r})"
+        )
     if op in ("*", "star"):
-        return f"({l} * {r})" if self._unchecked_mode else f"ailang_safe_mul_{suffix}({l}, {r})"
+        return (
+            f"({l} * {r})"
+            if self._unchecked_mode
+            else f"ailang_safe_mul_{suffix}({l}, {r})"
+        )
     if op in ("/", "//"):
-        return f"({l} / {r})" if self._unchecked_mode else f"ailang_safe_div_{suffix}({l}, {r})"
+        return (
+            f"({l} / {r})"
+            if self._unchecked_mode
+            else f"ailang_safe_div_{suffix}({l}, {r})"
+        )
     if op == "%":
-        return f"({l} % {r})" if self._unchecked_mode else f"ailang_safe_mod_{suffix}({l}, {r})"
+        return (
+            f"({l} % {r})"
+            if self._unchecked_mode
+            else f"ailang_safe_mod_{suffix}({l}, {r})"
+        )
     if op in ("**", "^"):
         if self._unchecked_mode:
             return f"ailang_safe_pow_{suffix}({l}, (int64_t)({right}))"
@@ -191,7 +243,9 @@ def _wide_binary_expr(self, node: A.BinaryOp, left: str, right: str):
 def _bigint_binary_expr(self, node: A.BinaryOp) -> str:
     op = node.op
     if op == "ushr":
-        raise ValueError("logical right shift 'ushr' is undefined for unbounded integers; use >>")
+        raise ValueError(
+            "logical right shift 'ushr' is undefined for unbounded integers; use >>"
+        )
     left = owned_bigint_expr(self, node.left)
     if op in ("**", "^"):
         exponent = owned_bigint_expr(self, node.right)
@@ -204,18 +258,38 @@ def _bigint_binary_expr(self, node: A.BinaryOp) -> str:
         return f"ailang_bigint_{fn}_take({left}, {count})"
     right = owned_bigint_expr(self, node.right)
     if op in ("+", "plus", "-", "minus", "*", "star", "/", "//", "%"):
-        fn = {"+":"add", "plus":"add", "-":"sub", "minus":"sub", "*":"mul", "star":"mul", "/":"div", "//":"div", "%":"mod"}[op]
+        fn = {
+            "+": "add",
+            "plus": "add",
+            "-": "sub",
+            "minus": "sub",
+            "*": "mul",
+            "star": "mul",
+            "/": "div",
+            "//": "div",
+            "%": "mod",
+        }[op]
         return f"ailang_bigint_{fn}_take({left}, {right})"
     if op in ("AND", "&", "band", "OR", "|", "bor", "XOR", "bxor"):
-        fn = {"AND":"and", "&":"and", "band":"and", "OR":"or", "|":"or", "bor":"or", "XOR":"xor", "bxor":"xor"}[op]
+        fn = {
+            "AND": "and",
+            "&": "and",
+            "band": "and",
+            "OR": "or",
+            "|": "or",
+            "bor": "or",
+            "XOR": "xor",
+            "bxor": "xor",
+        }[op]
         return f"ailang_bigint_{fn}_take({left}, {right})"
     if op in ("NAND", "NOR", "XNOR"):
-        fn = {"NAND":"and", "NOR":"or", "XNOR":"xor"}[op]
+        fn = {"NAND": "and", "NOR": "or", "XNOR": "xor"}[op]
         return f"ailang_bigint_not_take(ailang_bigint_{fn}_take({left}, {right}))"
     if op in ("==", "!=", "<", ">", "<=", ">="):
         cmp = f"ailang_bigint_cmp_take({left}, {right})"
         return f"({cmp} {op} 0)"
     raise ValueError(f"operator {op!r} is not supported for unbounded integers")
+
 
 def _expr_binary_op(self, node: A.BinaryOp) -> str:
     """Generate C code for binary operations."""

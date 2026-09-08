@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-from typing import Dict, List, Optional, Tuple
 
 from token_access import token_col_at, token_line_at, token_text_at, token_type_at
 
@@ -60,7 +59,7 @@ RETURN_CONTINUATION_TOKENS = CONTINUATION_OPERATORS - {
 } | {"RPAREN", "RBRACKET", "RBRACE"}
 
 
-def _check_unknown_identifiers(self, tokens: List[Tuple]) -> None:
+def _check_unknown_identifiers(self, tokens: list[tuple]) -> None:
     """Check for unknown identifiers and suggest corrections."""
     ignored_tokens = ignored_declarative_token_indices(tokens)
 
@@ -168,7 +167,7 @@ def _check_unknown_identifiers(self, tokens: List[Tuple]) -> None:
             )
 
 
-def _check_patterns(self, tokens: List[Tuple]) -> None:
+def _check_patterns(self, tokens: list[tuple]) -> None:
     """Check for known problematic patterns."""
     type_seq = [t[0] for t in tokens]
 
@@ -193,7 +192,7 @@ def _check_patterns(self, tokens: List[Tuple]) -> None:
     check_increment_decrement_statement_only(self, tokens)
 
 
-def _check_token_hints(self, tokens: List[Tuple]) -> None:
+def _check_token_hints(self, tokens: list[tuple]) -> None:
     """Check individual tokens for common mistakes."""
     for i, (ttype, tval, tline, tcol) in enumerate(tokens):
         if tval not in TOKEN_HINTS:
@@ -227,7 +226,7 @@ def _check_token_hints(self, tokens: List[Tuple]) -> None:
             )
 
 
-def _rhs_is_direct_string_literal(tokens: List[Tuple], assign_index: int) -> bool:
+def _rhs_is_direct_string_literal(tokens: list[tuple], assign_index: int) -> bool:
     """Return true for `x = "literal"` without concatenation or calls."""
     rhs_index = assign_index + 1
     while rhs_index < len(tokens) and token_type_at(tokens, rhs_index) in ("NEWLINE",):
@@ -249,7 +248,7 @@ def _rhs_is_direct_string_literal(tokens: List[Tuple], assign_index: int) -> boo
     return True
 
 
-def _check_dealloc_borrowed_strings(self, tokens: List[Tuple]) -> None:
+def _check_dealloc_borrowed_strings(self, tokens: list[tuple]) -> None:
     """Warn on obvious `dealloc` calls against borrowed/static strings.
 
     This intentionally stays conservative. It catches direct literal frees and
@@ -257,7 +256,7 @@ def _check_dealloc_borrowed_strings(self, tokens: List[Tuple]) -> None:
     not try to prove every borrowed string path; deeper ownership analysis lives
     in the C backend.
     """
-    borrowed_literal_vars: Dict[str, Tuple[int, int]] = {}
+    borrowed_literal_vars: dict[str, tuple[int, int]] = {}
 
     for i, (ttype, tval, tline, tcol) in enumerate(tokens):
         if ttype == "DEF":
@@ -345,7 +344,7 @@ def _check_dealloc_borrowed_strings(self, tokens: List[Tuple]) -> None:
             j += 1
 
 
-def _check_division_by_zero(self, tokens: List[Tuple]) -> None:
+def _check_division_by_zero(self, tokens: list[tuple]) -> None:
     """Check for division by literal zero."""
     for i, (ttype, _tval, tline, tcol) in enumerate(tokens):
         if ttype in ("DIV", "MOD", "SLASH", "PERCENT") and i + 1 < len(tokens):
@@ -367,9 +366,9 @@ def _check_division_by_zero(self, tokens: List[Tuple]) -> None:
                 )
 
 
-def _check_unused_variables(self, tokens: List[Tuple]) -> None:
+def _check_unused_variables(self, tokens: list[tuple]) -> None:
     """Check for variables that are assigned but never used."""
-    assigned: Dict[str, Tuple[int, int]] = {}  # name -> (line, col)
+    assigned: dict[str, tuple[int, int]] = {}  # name -> (line, col)
     used: set = set()
 
     func_depth = 0
@@ -412,12 +411,12 @@ def _check_unused_variables(self, tokens: List[Tuple]) -> None:
             )
 
 
-def _check_unused_globals(self, tokens: List[Tuple]) -> None:
+def _check_unused_globals(self, tokens: list[tuple]) -> None:
     """Check for global constants that are declared but never referenced."""
     if any(ttype == "LIBRARY" for ttype, *_rest in tokens):
         return
 
-    global_consts: Dict[str, Tuple[int, int]] = {}  # name -> (line, col)
+    global_consts: dict[str, tuple[int, int]] = {}  # name -> (line, col)
     used_names: set = set()
     ignored_tokens = ignored_declarative_token_indices(tokens)
     in_function = False
@@ -488,11 +487,11 @@ def _check_unused_globals(self, tokens: List[Tuple]) -> None:
             )
 
 
-def _check_dead_code(self, tokens: List[Tuple]) -> None:
+def _check_dead_code(self, tokens: list[tuple]) -> None:
     """Check for code after unconditional return."""
     continuation_via_prev: set[int] = set()
     prev_sig_line: int = -1
-    prev_sig_ttype: Optional[str] = None
+    prev_sig_ttype: str | None = None
     for ttype, _tval, tline, _tcol in tokens:
         if ttype in ("NEWLINE", "COMMENT", "HASH_COMMENT", "SKIP"):
             continue
@@ -553,11 +552,11 @@ def _check_dead_code(self, tokens: List[Tuple]) -> None:
                 "NEWLINE",
                 "COMMENT",
             ):
-                if return_bracket_depth > 0:
-                    continuation_line = tline
-                elif ttype in RETURN_CONTINUATION_TOKENS:
-                    continuation_line = tline
-                elif tline in continuation_via_prev:
+                if (
+                    return_bracket_depth > 0
+                    or ttype in RETURN_CONTINUATION_TOKENS
+                    or tline in continuation_via_prev
+                ):
                     continuation_line = tline
                 elif tline == continuation_line:
                     pass
@@ -575,7 +574,7 @@ def _check_dead_code(self, tokens: List[Tuple]) -> None:
                     seen_return = False  # Only report once per return
 
 
-def _check_infinite_loops(self, tokens: List[Tuple]) -> None:
+def _check_infinite_loops(self, tokens: list[tuple]) -> None:
     """Check for obvious infinite loops."""
     loop_tokens = ("WHILE", "FOR", "FOREACH", "LOOP", "REPEAT")
     block_tokens = ("IF", "MATCH", "TRY")
@@ -648,7 +647,7 @@ def _check_infinite_loops(self, tokens: List[Tuple]) -> None:
                 )
 
 
-def _check_concurrency_hints(self, tokens: List[Tuple]) -> None:
+def _check_concurrency_hints(self, tokens: list[tuple]) -> None:
     """Detect concurrency patterns and suggest --analyze for race detection."""
     spawn_line = 0
     spawn_col = 0

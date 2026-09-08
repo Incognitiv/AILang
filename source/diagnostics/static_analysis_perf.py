@@ -169,8 +169,12 @@ def check_owned_string_into_borrowed_str_array(
     """
     if node is None:
         return
-    if isinstance(node, A.Call) and node.name == "str_array_push" and len(node.args) >= 2:
-        value = node.args[1]
+    if (
+        isinstance(node, A.Call)
+        and node.name == "str_array_push"
+        and len(node.args) >= 2
+    ):
+        _container, value, *_extra_args = node.args
         if _owned_string_expr(value):
             analyzer.warnings.append(
                 AnalysisWarning(

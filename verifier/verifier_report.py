@@ -1,13 +1,12 @@
 """Reporting and formatting for verification results."""
 
 import json
-from typing import Dict, List, Optional
 
 CHECK = "[OK]"
 CROSS = "[X]"
 
 
-def _tool_status(results: Dict, key: str, label: str) -> str:
+def _tool_status(results: dict, key: str, label: str) -> str:
     """Generate standard tool status line."""
     data = results.get(key)
     if not data:
@@ -18,8 +17,8 @@ def _tool_status(results: Dict, key: str, label: str) -> str:
 
 
 def _format_tool(
-    results: Dict, key: str, label: str, count_key: str, unit: str
-) -> List[str]:
+    results: dict, key: str, label: str, count_key: str, unit: str
+) -> list[str]:
     """Format a tool result with count."""
     data = results.get(key)
     if not data:
@@ -30,19 +29,19 @@ def _format_tool(
     return [f"[{label}] {CROSS} {count} {unit} found"]
 
 
-def syntax_lines(results: Dict) -> List[str]:
+def syntax_lines(results: dict) -> list[str]:
     """Format syntax check results."""
     if not results["syntax"]["valid"]:
         return ["[SYNTAX] INVALID - Code has syntax errors"]
     return [f"[SYNTAX] {CHECK} Valid Python syntax"]
 
 
-def pyflakes_lines(results: Dict) -> List[str]:
+def pyflakes_lines(results: dict) -> list[str]:
     """Format pyflakes results."""
     return _format_tool(results, "pyflakes", "PYFLAKES", "issues_count", "issues")
 
 
-def pylint_lines(results: Dict) -> List[str]:
+def pylint_lines(results: dict) -> list[str]:
     """Format the lint slot - prefers strict_extras (W0201 + W1114) over pylint."""
     extras = results.get("strict_extras")
     if extras is not None and "issues_count" in extras:
@@ -58,12 +57,12 @@ def pylint_lines(results: Dict) -> List[str]:
     ]
 
 
-def mypy_lines(results: Dict) -> List[str]:
+def mypy_lines(results: dict) -> list[str]:
     """Format mypy results."""
     return _format_tool(results, "mypy", "MYPY", "errors_count", "type errors")
 
 
-def bandit_lines(results: Dict) -> List[str]:
+def bandit_lines(results: dict) -> list[str]:
     """Format bandit security results."""
     bandit = results.get("bandit")
     if not bandit or "total_issues" not in bandit:
@@ -76,7 +75,7 @@ def bandit_lines(results: Dict) -> List[str]:
     return [f"[SECURITY] {CROSS} {bandit['total_issues']} issues ({h}H, {m}M, {low}L)"]
 
 
-def complexity_lines(results: Dict) -> List[str]:
+def complexity_lines(results: dict) -> list[str]:
     """Format complexity metrics."""
     comp = results.get("radon")
     if not comp or "avg_complexity" not in comp:
@@ -85,14 +84,14 @@ def complexity_lines(results: Dict) -> List[str]:
     return [f"[COMPLEXITY] CC: {cc:.1f}, MI: {mi:.1f}"]
 
 
-def vulture_lines(results: Dict) -> List[str]:
+def vulture_lines(results: dict) -> list[str]:
     """Format vulture dead code results."""
     return _format_tool(
         results, "vulture", "VULTURE", "dead_code_count", "dead code items"
     )
 
 
-def nesting_lines(results: Dict) -> List[str]:
+def nesting_lines(results: dict) -> list[str]:
     """Format nesting depth results."""
     nest = results.get("nesting")
     if not nest:
@@ -103,7 +102,7 @@ def nesting_lines(results: Dict) -> List[str]:
     return [f"[NESTING] {CROSS} Max depth {depth}"]
 
 
-def formatter_lines(results: Dict) -> List[str]:
+def formatter_lines(results: dict) -> list[str]:
     """Format black/isort/ruff results."""
     lines = []
     for key, label in [("black", "BLACK"), ("isort", "ISORT"), ("ruff", "RUFF")]:
@@ -111,7 +110,7 @@ def formatter_lines(results: Dict) -> List[str]:
     return lines
 
 
-def suppression_lines(results: Dict) -> List[str]:
+def suppression_lines(results: dict) -> list[str]:
     """Format suppression detection results."""
     supp = results.get("suppressions")
     if not supp:
@@ -122,7 +121,7 @@ def suppression_lines(results: Dict) -> List[str]:
     return [f"[SUPPRESSIONS] {CROSS} {total} suppression(s) found (technical debt)"]
 
 
-def pip_audit_lines(results: Dict) -> List[str]:
+def pip_audit_lines(results: dict) -> list[str]:
     """Format pip-audit dependency vulnerability results.
 
     If requirements.txt is found, only those deps are checked.
@@ -142,7 +141,7 @@ def pip_audit_lines(results: Dict) -> List[str]:
     return [f"[PIP_AUDIT] (~) {vulns} vulnerable deps (env-wide, not scored)"]
 
 
-def detect_secrets_lines(results: Dict) -> List[str]:
+def detect_secrets_lines(results: dict) -> list[str]:
     """Format detect-secrets results."""
     secrets = results.get("detect_secrets")
     if not secrets:
@@ -153,7 +152,7 @@ def detect_secrets_lines(results: Dict) -> List[str]:
     return [f"[SECRETS] {CROSS} {count} potential secrets found"]
 
 
-def magic_index_lines(results: Dict) -> List[str]:
+def magic_index_lines(results: dict) -> list[str]:
     """Format magic indexing check results."""
     magic = results.get("magic_index")
     if not magic:
@@ -164,7 +163,7 @@ def magic_index_lines(results: Dict) -> List[str]:
     return [f"[MAGIC_INDEX] {CROSS} {count} magic index patterns (use named fields)"]
 
 
-def positional_access_lines(results: Dict) -> List[str]:
+def positional_access_lines(results: dict) -> list[str]:
     """Format broad positional access audit results."""
     access = results.get("positional_access")
     if not access:
@@ -175,7 +174,7 @@ def positional_access_lines(results: Dict) -> List[str]:
     return [f"[POSITIONAL_ACCESS] (~) {count} positional access sites to refactor"]
 
 
-def clone_lines(results: Dict) -> List[str]:
+def clone_lines(results: dict) -> list[str]:
     """Format copy-paste clone check results."""
     clone = results.get("clone")
     if not clone:
@@ -186,7 +185,7 @@ def clone_lines(results: Dict) -> List[str]:
     return [f"[CLONES] (~) {count} structural copy-paste clone patterns"]
 
 
-def consistency_lines(results: Dict) -> List[str]:
+def consistency_lines(results: dict) -> list[str]:
     """Format consistency check results."""
     cons = results.get("consistency")
     if not cons:
@@ -197,7 +196,7 @@ def consistency_lines(results: Dict) -> List[str]:
     return [f"[CONSISTENCY] {CROSS} {count} consistency issues"]
 
 
-def todo_lines(results: Dict) -> List[str]:
+def todo_lines(results: dict) -> list[str]:
     """Format TODO/FIXME check results.
 
     This is informational only - doesn't affect pass/fail.
@@ -219,7 +218,7 @@ def todo_lines(results: Dict) -> List[str]:
     return [f"[TODO] (~) {summary} (informational)"]
 
 
-def generate_summary(results: Dict) -> str:
+def generate_summary(results: dict) -> str:
     """Generate complete human-readable summary."""
     lines = syntax_lines(results)
     if not results["syntax"]["valid"]:
@@ -249,7 +248,7 @@ def generate_summary(results: Dict) -> str:
     return "\n".join(lines)
 
 
-def _print_section(title: str, items: Optional[List]) -> None:
+def _print_section(title: str, items: list | None) -> None:
     """Print a section with items."""
     if not items:
         return
@@ -258,7 +257,7 @@ def _print_section(title: str, items: Optional[List]) -> None:
         print(f"  - {entry}")
 
 
-def _print_suppression_details(suppressions: Optional[Dict]) -> None:
+def _print_suppression_details(suppressions: dict | None) -> None:
     """Print detailed suppression information."""
     if not suppressions or suppressions.get("total", 0) == 0:
         return
@@ -271,7 +270,7 @@ def _print_suppression_details(suppressions: Optional[Dict]) -> None:
         print(f"    {display_line}")
 
 
-def print_report(results: Dict, json_mode: bool = False) -> None:
+def print_report(results: dict, json_mode: bool = False) -> None:
     """Print detailed verification report or JSON."""
     if json_mode:
         print(json.dumps(results, indent=2))

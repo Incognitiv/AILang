@@ -4,9 +4,9 @@ from __future__ import annotations
 
 __all__ = [
     "emit_runtime_simd",
-    "emit_simd_header",
-    "emit_simd_basic_ops",
     "emit_simd_advanced_ops",
+    "emit_simd_basic_ops",
+    "emit_simd_header",
 ]
 
 

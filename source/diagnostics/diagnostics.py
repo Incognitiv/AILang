@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 import sys
-from typing import Dict, List, Tuple
 
 from .diagnostics_engine_checks import (
     CONTINUATION_OPERATORS,
@@ -48,10 +47,10 @@ class DiagnosticEngine:
 
     def __init__(self):
         self.user_symbols: set = set()
-        self.diagnostics: List[Diagnostic] = []
+        self.diagnostics: list[Diagnostic] = []
         self.filepath: str = ""
 
-    def analyze(self, source: str, filepath: str = "") -> List[Diagnostic]:
+    def analyze(self, source: str, filepath: str = "") -> list[Diagnostic]:
         """Analyze source code and return diagnostics."""
         self.diagnostics = []
         self.user_symbols = set()
@@ -67,7 +66,7 @@ class DiagnosticEngine:
             )
             return self.diagnostics
 
-        token_list: List[Tuple[str, str, int, int]] = []
+        token_list: list[tuple[str, str, int, int]] = []
         for raw_tok in tokens:
             parts = tuple(raw_tok)
             if len(parts) >= 4:
@@ -124,7 +123,7 @@ class DiagnosticEngine:
 # -----------------------------------------------------------------------------
 
 
-def apply_fixes(filepath: str, diagnostics: List[Diagnostic]) -> Tuple[int, str]:
+def apply_fixes(filepath: str, diagnostics: list[Diagnostic]) -> tuple[int, str]:
     """
     Apply auto-fixes to a file.
 
@@ -134,7 +133,7 @@ def apply_fixes(filepath: str, diagnostics: List[Diagnostic]) -> Tuple[int, str]
         lines = f.readlines()
 
     # Collect all fixes, grouped by line
-    fixes_by_line: Dict[int, List[Fix]] = {}
+    fixes_by_line: dict[int, list[Fix]] = {}
     for diag in diagnostics:
         if diag.fix:
             line_num = diag.fix.line
@@ -185,7 +184,7 @@ def fix_file(filepath: str) -> int:
 # -----------------------------------------------------------------------------
 
 
-def analyze_file(filepath: str) -> List[Diagnostic]:
+def analyze_file(filepath: str) -> list[Diagnostic]:
     """Analyze a file and return diagnostics."""
     with open(filepath, "r", encoding="utf-8") as f:
         source = f.read()

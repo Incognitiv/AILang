@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from parser import ast as A
-from typing import Dict, List, Optional, Set, Tuple
 
 from .range_facts_proofs import RangeFactsProofMixin
 from .range_facts_scan import scan_function as _scan_function_impl
@@ -37,62 +36,56 @@ from .range_facts_utils import walk_ast as _walk_ast_impl
 class RangeFacts(RangeFactsProofMixin):
     """Holds inferred range facts and proof helpers."""
 
-    type_alias_ranges: Dict[str, Interval] = field(default_factory=dict)
-    scope_ranges: Dict[Optional[str], Dict[str, Interval]] = field(default_factory=dict)
-    expr_scope_ranges: Dict[Tuple[Optional[str], int], Dict[str, Interval]] = field(
+    type_alias_ranges: dict[str, Interval] = field(default_factory=dict)
+    scope_ranges: dict[str | None, dict[str, Interval]] = field(default_factory=dict)
+    expr_scope_ranges: dict[tuple[str | None, int], dict[str, Interval]] = field(
         default_factory=dict
     )
-    expr_unknown_reasons: Dict[Tuple[Optional[str], int], Dict[str, str]] = field(
+    expr_unknown_reasons: dict[tuple[str | None, int], dict[str, str]] = field(
         default_factory=dict
     )
-    expr_loop_reasons: Dict[Tuple[Optional[str], int], Dict[str, str]] = field(
+    expr_loop_reasons: dict[tuple[str | None, int], dict[str, str]] = field(
         default_factory=dict
     )
-    array_infos: Dict[Optional[str], Dict[str, Tuple[Interval, int]]] = field(
+    array_infos: dict[str | None, dict[str, tuple[Interval, int]]] = field(
         default_factory=dict
     )
-    dict_value_infos: Dict[Optional[str], Dict[str, Dict[str, Interval]]] = field(
+    dict_value_infos: dict[str | None, dict[str, dict[str, Interval]]] = field(
         default_factory=dict
     )
-    expr_array_infos: Dict[
-        Tuple[Optional[str], int], Dict[str, Tuple[Interval, int]]
+    expr_array_infos: dict[tuple[str | None, int], dict[str, tuple[Interval, int]]] = (
+        field(default_factory=dict)
+    )
+    expr_dict_value_infos: dict[
+        tuple[str | None, int], dict[str, dict[str, Interval]]
     ] = field(default_factory=dict)
-    expr_dict_value_infos: Dict[
-        Tuple[Optional[str], int], Dict[str, Dict[str, Interval]]
-    ] = field(default_factory=dict)
-    expr_string_infos: Dict[Tuple[Optional[str], int], Dict[str, StringInfo]] = field(
+    expr_string_infos: dict[tuple[str | None, int], dict[str, StringInfo]] = field(
         default_factory=dict
     )
-    scope_relations: Dict[Optional[str], Set[Tuple[str, str, str]]] = field(
+    scope_relations: dict[str | None, set[tuple[str, str, str]]] = field(
         default_factory=dict
     )
-    expr_relations: Dict[Tuple[Optional[str], int], Set[Tuple[str, str, str]]] = field(
+    expr_relations: dict[tuple[str | None, int], set[tuple[str, str, str]]] = field(
         default_factory=dict
     )
-    locked_ranges: Dict[Optional[str], Set[str]] = field(default_factory=dict)
-    unknown_reasons: Dict[Tuple[Optional[str], str], str] = field(default_factory=dict)
-    loop_reasons: Dict[Tuple[Optional[str], str], str] = field(default_factory=dict)
-    call_arg_ranges: Dict[str, Dict[int, Interval]] = field(default_factory=dict)
-    call_arg_string_infos: Dict[str, Dict[int, StringInfo]] = field(
+    locked_ranges: dict[str | None, set[str]] = field(default_factory=dict)
+    unknown_reasons: dict[tuple[str | None, str], str] = field(default_factory=dict)
+    loop_reasons: dict[tuple[str | None, str], str] = field(default_factory=dict)
+    call_arg_ranges: dict[str, dict[int, Interval]] = field(default_factory=dict)
+    call_arg_string_infos: dict[str, dict[int, StringInfo]] = field(
         default_factory=dict
     )
-    call_hint_params: Dict[str, Set[str]] = field(default_factory=dict)
-    function_return_ranges: Dict[str, Interval] = field(default_factory=dict)
-    string_len_vars: Dict[Optional[str], Dict[str, str]] = field(default_factory=dict)
-    string_infos: Dict[Optional[str], Dict[str, StringInfo]] = field(
-        default_factory=dict
-    )
-    safe_char_at_calls: Set[Tuple[Optional[str], int]] = field(default_factory=set)
-    nonnegative_vars: Set[Tuple[Optional[str], str]] = field(default_factory=set)
+    call_hint_params: dict[str, set[str]] = field(default_factory=dict)
+    function_return_ranges: dict[str, Interval] = field(default_factory=dict)
+    string_len_vars: dict[str | None, dict[str, str]] = field(default_factory=dict)
+    string_infos: dict[str | None, dict[str, StringInfo]] = field(default_factory=dict)
+    safe_char_at_calls: set[tuple[str | None, int]] = field(default_factory=set)
+    nonnegative_vars: set[tuple[str | None, str]] = field(default_factory=set)
 
-    def has_expr_scope_snapshot(
-        self, expr: A.ASTNode, func_scope: Optional[str]
-    ) -> bool:
+    def has_expr_scope_snapshot(self, expr: A.ASTNode, func_scope: str | None) -> bool:
         return (func_scope, id(expr)) in self.expr_scope_ranges
 
-    def get_var_range(
-        self, var_name: str, func_scope: Optional[str]
-    ) -> Optional[Interval]:
+    def get_var_range(self, var_name: str, func_scope: str | None) -> Interval | None:
         scoped = self.scope_ranges.get(func_scope)
         if scoped is not None and var_name in scoped:
             return scoped[var_name]
@@ -102,39 +95,39 @@ class RangeFacts(RangeFactsProofMixin):
         return None
 
     def set_var_range(
-        self, var_name: str, interval: Interval, func_scope: Optional[str]
+        self, var_name: str, interval: Interval, func_scope: str | None
     ) -> None:
         if func_scope not in self.scope_ranges:
             self.scope_ranges[func_scope] = {}
         self.scope_ranges[func_scope][var_name] = interval
 
-    def clear_var_range(self, var_name: str, func_scope: Optional[str]) -> None:
+    def clear_var_range(self, var_name: str, func_scope: str | None) -> None:
         scoped = self.scope_ranges.get(func_scope)
         if scoped is not None:
             scoped.pop(var_name, None)
 
-    def lock_var_range(self, var_name: str, func_scope: Optional[str]) -> None:
+    def lock_var_range(self, var_name: str, func_scope: str | None) -> None:
         self.locked_ranges.setdefault(func_scope, set()).add(var_name)
 
     def set_unknown_reason(
-        self, var_name: str, func_scope: Optional[str], reason: str
+        self, var_name: str, func_scope: str | None, reason: str
     ) -> None:
         self.unknown_reasons[(func_scope, var_name)] = reason
 
-    def clear_unknown_reason(self, var_name: str, func_scope: Optional[str]) -> None:
+    def clear_unknown_reason(self, var_name: str, func_scope: str | None) -> None:
         self.unknown_reasons.pop((func_scope, var_name), None)
 
     def set_loop_reason(
-        self, var_name: str, func_scope: Optional[str], reason: str
+        self, var_name: str, func_scope: str | None, reason: str
     ) -> None:
         self.loop_reasons[(func_scope, var_name)] = reason
 
-    def clear_loop_reason(self, var_name: str, func_scope: Optional[str]) -> None:
+    def clear_loop_reason(self, var_name: str, func_scope: str | None) -> None:
         self.loop_reasons.pop((func_scope, var_name), None)
 
     def get_array_info(
-        self, var_name: str, func_scope: Optional[str]
-    ) -> Optional[Tuple[Interval, int]]:
+        self, var_name: str, func_scope: str | None
+    ) -> tuple[Interval, int] | None:
         scoped = self.array_infos.get(func_scope)
         if scoped is not None and var_name in scoped:
             return scoped[var_name]
@@ -148,21 +141,21 @@ class RangeFacts(RangeFactsProofMixin):
         var_name: str,
         elem_interval: Interval,
         array_len: int,
-        func_scope: Optional[str],
+        func_scope: str | None,
     ) -> None:
         self.array_infos.setdefault(func_scope, {})[var_name] = (
             elem_interval,
             array_len,
         )
 
-    def clear_array_info(self, var_name: str, func_scope: Optional[str]) -> None:
+    def clear_array_info(self, var_name: str, func_scope: str | None) -> None:
         scoped = self.array_infos.get(func_scope)
         if scoped is not None:
             scoped.pop(var_name, None)
 
     def get_dict_value_info(
-        self, var_name: str, key: str, func_scope: Optional[str]
-    ) -> Optional[Interval]:
+        self, var_name: str, key: str, func_scope: str | None
+    ) -> Interval | None:
         scoped = self.dict_value_infos.get(func_scope)
         if scoped is not None:
             values = scoped.get(var_name)
@@ -176,19 +169,19 @@ class RangeFacts(RangeFactsProofMixin):
         return None
 
     def set_dict_value_info(
-        self, var_name: str, key: str, interval: Interval, func_scope: Optional[str]
+        self, var_name: str, key: str, interval: Interval, func_scope: str | None
     ) -> None:
         self.dict_value_infos.setdefault(func_scope, {}).setdefault(var_name, {})[
             key
         ] = interval
 
     def set_dict_value_infos(
-        self, var_name: str, values: Dict[str, Interval], func_scope: Optional[str]
+        self, var_name: str, values: dict[str, Interval], func_scope: str | None
     ) -> None:
         self.dict_value_infos.setdefault(func_scope, {})[var_name] = dict(values)
 
     def clear_dict_value_info(
-        self, var_name: str, func_scope: Optional[str], key: Optional[str] = None
+        self, var_name: str, func_scope: str | None, key: str | None = None
     ) -> None:
         scoped = self.dict_value_infos.get(func_scope)
         if scoped is None:
@@ -223,13 +216,13 @@ class RangeFacts(RangeFactsProofMixin):
         )
 
     def set_string_info(
-        self, func_scope: Optional[str], var_name: str, info: StringInfo
+        self, func_scope: str | None, var_name: str, info: StringInfo
     ) -> None:
         self.string_infos.setdefault(func_scope, {})[var_name] = info
 
     def get_string_info(
-        self, func_scope: Optional[str], var_name: str
-    ) -> Optional[StringInfo]:
+        self, func_scope: str | None, var_name: str
+    ) -> StringInfo | None:
         scoped = self.string_infos.get(func_scope)
         if scoped is not None and var_name in scoped:
             return scoped[var_name]
@@ -238,17 +231,17 @@ class RangeFacts(RangeFactsProofMixin):
             return global_scope.get(var_name)
         return None
 
-    def clear_string_info(self, func_scope: Optional[str], var_name: str) -> None:
+    def clear_string_info(self, func_scope: str | None, var_name: str) -> None:
         scoped = self.string_infos.get(func_scope)
         if scoped is not None:
             scoped.pop(var_name, None)
 
     def set_string_len_var(
-        self, func_scope: Optional[str], len_var: str, string_var: str
+        self, func_scope: str | None, len_var: str, string_var: str
     ) -> None:
         self.string_len_vars.setdefault(func_scope, {})[len_var] = string_var
 
-    def clear_string_len_var(self, func_scope: Optional[str], var_name: str) -> None:
+    def clear_string_len_var(self, func_scope: str | None, var_name: str) -> None:
         scoped = self.string_len_vars.get(func_scope)
         if not scoped:
             return
@@ -257,27 +250,23 @@ class RangeFacts(RangeFactsProofMixin):
         for name in stale:
             scoped.pop(name, None)
 
-    def mark_safe_char_at_call(
-        self, func_scope: Optional[str], call_node: A.Call
-    ) -> None:
+    def mark_safe_char_at_call(self, func_scope: str | None, call_node: A.Call) -> None:
         self.safe_char_at_calls.add((func_scope, id(call_node)))
 
-    def is_safe_char_at_call(
-        self, func_scope: Optional[str], call_node: A.Call
-    ) -> bool:
+    def is_safe_char_at_call(self, func_scope: str | None, call_node: A.Call) -> bool:
         return (func_scope, id(call_node)) in self.safe_char_at_calls
 
-    def mark_nonnegative_var(self, func_scope: Optional[str], var_name: str) -> None:
+    def mark_nonnegative_var(self, func_scope: str | None, var_name: str) -> None:
         self.nonnegative_vars.add((func_scope, var_name))
 
-    def clear_nonnegative_var(self, func_scope: Optional[str], var_name: str) -> None:
+    def clear_nonnegative_var(self, func_scope: str | None, var_name: str) -> None:
         self.nonnegative_vars.discard((func_scope, var_name))
 
-    def is_nonnegative_var(self, func_scope: Optional[str], var_name: str) -> bool:
+    def is_nonnegative_var(self, func_scope: str | None, var_name: str) -> bool:
         return (func_scope, var_name) in self.nonnegative_vars
 
     def capture_expr_scope(
-        self, expr: A.ASTNode, func_scope: Optional[str], scope: Dict[str, Interval]
+        self, expr: A.ASTNode, func_scope: str | None, scope: dict[str, Interval]
     ) -> None:
         """Store a per-expression scope snapshot for point-in-time proofs."""
         self.expr_scope_ranges[(func_scope, id(expr))] = dict(scope)
@@ -306,52 +295,50 @@ class RangeFacts(RangeFactsProofMixin):
         )
 
     def _expr_scope_snapshot(
-        self, expr: A.ASTNode, func_scope: Optional[str]
-    ) -> Optional[Dict[str, Interval]]:
+        self, expr: A.ASTNode, func_scope: str | None
+    ) -> dict[str, Interval] | None:
         return self.expr_scope_ranges.get((func_scope, id(expr)))
 
     def _expr_unknown_snapshot(
-        self, expr: A.ASTNode, func_scope: Optional[str]
-    ) -> Optional[Dict[str, str]]:
+        self, expr: A.ASTNode, func_scope: str | None
+    ) -> dict[str, str] | None:
         return self.expr_unknown_reasons.get((func_scope, id(expr)))
 
     def _expr_array_snapshot(
-        self, expr: A.ASTNode, func_scope: Optional[str]
-    ) -> Optional[Dict[str, Tuple[Interval, int]]]:
+        self, expr: A.ASTNode, func_scope: str | None
+    ) -> dict[str, tuple[Interval, int]] | None:
         return self.expr_array_infos.get((func_scope, id(expr)))
 
     def _expr_dict_value_snapshot(
-        self, expr: A.ASTNode, func_scope: Optional[str]
-    ) -> Optional[Dict[str, Dict[str, Interval]]]:
+        self, expr: A.ASTNode, func_scope: str | None
+    ) -> dict[str, dict[str, Interval]] | None:
         return self.expr_dict_value_infos.get((func_scope, id(expr)))
 
     def _expr_string_snapshot(
-        self, expr: A.ASTNode, func_scope: Optional[str]
-    ) -> Optional[Dict[str, StringInfo]]:
+        self, expr: A.ASTNode, func_scope: str | None
+    ) -> dict[str, StringInfo] | None:
         return self.expr_string_infos.get((func_scope, id(expr)))
 
     def _expr_loop_reason_snapshot(
-        self, expr: A.ASTNode, func_scope: Optional[str]
-    ) -> Optional[Dict[str, str]]:
+        self, expr: A.ASTNode, func_scope: str | None
+    ) -> dict[str, str] | None:
         return self.expr_loop_reasons.get((func_scope, id(expr)))
 
     def _expr_relation_snapshot(
-        self, expr: A.ASTNode, func_scope: Optional[str]
-    ) -> Optional[Set[Tuple[str, str, str]]]:
+        self, expr: A.ASTNode, func_scope: str | None
+    ) -> set[tuple[str, str, str]] | None:
         return self.expr_relations.get((func_scope, id(expr)))
 
     @staticmethod
     def _range_from_scope(
-        var_name: str, scope: Optional[Dict[str, Interval]]
-    ) -> Optional[Interval]:
+        var_name: str, scope: dict[str, Interval] | None
+    ) -> Interval | None:
         if scope is None:
             return None
         return scope.get(var_name)
 
     @staticmethod
-    def _unknown_from_scope(
-        var_name: str, scope: Optional[Dict[str, str]]
-    ) -> Optional[str]:
+    def _unknown_from_scope(var_name: str, scope: dict[str, str] | None) -> str | None:
         if scope is None:
             return None
         return scope.get(var_name)
@@ -392,19 +379,19 @@ class RangeFactsAnalyzer:
     }
 
     def __init__(self) -> None:
-        self._known_function_names: Set[str] = set()
-        self._known_function_names_lower: Set[str] = set()
+        self._known_function_names: set[str] = set()
+        self._known_function_names_lower: set[str] = set()
 
-    def run(self, nodes: List[A.ASTNode]) -> RangeFacts:
+    def run(self, nodes: list[A.ASTNode]) -> RangeFacts:
         self._known_function_names = {
             node.name for node in nodes if isinstance(node, A.Function)
         }
         self._known_function_names_lower = {
             name.lower() for name in self._known_function_names
         }
-        prior_calls: Dict[str, Dict[int, Interval]] = {}
-        prior_string_calls: Dict[str, Dict[int, StringInfo]] = {}
-        prior_returns: Dict[str, Interval] = {}
+        prior_calls: dict[str, dict[int, Interval]] = {}
+        prior_string_calls: dict[str, dict[int, StringInfo]] = {}
+        prior_returns: dict[str, Interval] = {}
         facts = RangeFacts()
         for _ in range(3):
             facts = RangeFacts(
@@ -452,7 +439,7 @@ class RangeFactsAnalyzer:
         return facts
 
     def _collect_type_alias_ranges(
-        self, nodes: List[A.ASTNode], facts: RangeFacts
+        self, nodes: list[A.ASTNode], facts: RangeFacts
     ) -> None:
         for node in nodes:
             if isinstance(node, A.TypeAlias):
@@ -462,8 +449,8 @@ class RangeFactsAnalyzer:
 
     def _scan_nodes(
         self,
-        nodes: List[A.ASTNode],
-        func_scope: Optional[str],
+        nodes: list[A.ASTNode],
+        func_scope: str | None,
         facts: RangeFacts,
     ) -> None:
         if func_scope not in facts.scope_ranges:
@@ -472,7 +459,7 @@ class RangeFactsAnalyzer:
             self._scan_node(node, func_scope, facts)
 
     def _scan_node(
-        self, node: A.ASTNode, func_scope: Optional[str], facts: RangeFacts
+        self, node: A.ASTNode, func_scope: str | None, facts: RangeFacts
     ) -> None:
         _scan_node_impl(self, node, func_scope, facts, interval_ctor=Interval)
 
@@ -494,11 +481,11 @@ class RangeFactsAnalyzer:
 
     def _infer_array_info(
         self,
-        expr: Optional[A.ASTNode],
-        func_scope: Optional[str],
+        expr: A.ASTNode | None,
+        func_scope: str | None,
         facts: RangeFacts,
-        scope: Dict[str, Interval],
-    ) -> Optional[Tuple[Interval, int]]:
+        scope: dict[str, Interval],
+    ) -> tuple[Interval, int] | None:
         out = _infer_array_info_impl(
             self,
             expr,
@@ -516,7 +503,7 @@ class RangeFactsAnalyzer:
 
     def _range_from_type_name(
         self, type_name: object, facts: RangeFacts
-    ) -> Optional[Interval]:
+    ) -> Interval | None:
         name = str(type_name)
         return facts.type_alias_ranges.get(name)
 
@@ -524,8 +511,8 @@ class RangeFactsAnalyzer:
         self,
         range_node: object,
         facts: RangeFacts,
-        func_scope: Optional[str],
-    ) -> Optional[Interval]:
+        func_scope: str | None,
+    ) -> Interval | None:
         if not isinstance(range_node, A.RangeType):
             return None
         low = facts._expr_interval(range_node.low, func_scope)

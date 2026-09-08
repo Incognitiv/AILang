@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from parser import ast as A
 
+from transpiler.c_bigint import (
+    is_unbounded_spec,
+    owned_bigint_expr,
+)
 from transpiler.codegen_int_ranges import (
     clear_loop_variant_ranges,
     merge_codegen_ranges,
@@ -12,7 +16,6 @@ from transpiler.codegen_int_ranges import (
     snapshot_codegen_ranges,
 )
 from transpiler.fixed_int_cast_codegen import checked_fixed_int_conversion_expr
-from transpiler.c_bigint import is_unbounded_spec, owned_bigint_expr, expression_is_borrowed_bigint
 from transpiler.strlen_cache import (
     enter_strlen_cache_control,
     leave_strlen_cache_control,
@@ -61,8 +64,10 @@ def _returned_string_borrows_cleaned_array(self, node: A.ASTNode) -> bool:
     """
     owner_name = None
     if isinstance(node, A.Call) and node.name in {"split_str_get", "str_array_get"}:
-        if node.args and isinstance(node.args[0], A.Variable):
-            owner_name = node.args[0].name
+        if node.args:
+            first_arg, *_remaining_args = node.args
+            if isinstance(first_arg, A.Variable):
+                owner_name = first_arg.name
     elif isinstance(node, A.ArrayAccess) and isinstance(node.array, A.Variable):
         owner_name = node.array.name
     if owner_name is None:
@@ -73,7 +78,11 @@ def _returned_string_borrows_cleaned_array(self, node: A.ASTNode) -> bool:
         "_lc_str_array_locals_for_cleanup",
     ):
         for entry in getattr(self, attr, None) or []:
-            cleanup_names.add(entry[0] if isinstance(entry, tuple) else entry)
+            if isinstance(entry, tuple):
+                entry_name, *_entry_metadata = entry
+                cleanup_names.add(entry_name)
+            else:
+                cleanup_names.add(entry)
     return owner_name in cleanup_names
 
 
@@ -523,9 +532,7 @@ def visit_Return(self, node: A.Return) -> None:
             # Parser validation should reject this first, but the C backend
             # must not manufacture a value when a non-void function executes
             # a bare `return`.
-            raise ValueError(
-                "bare return is not valid in a non-void function"
-            )
+            raise ValueError("bare return is not valid in a non-void function")
 
 
 def visit_Break(self, _node: A.Break) -> None:

@@ -37,7 +37,11 @@ def _print_builtins():
             "utitan",
             "ucolos",
         ],
-        "Float types": ["float (32-bit)", "double (64-bit)", "quad/f128 (reserved; real binary128 not implemented)"],
+        "Float types": [
+            "float (32-bit)",
+            "double (64-bit)",
+            "quad/f128 (reserved; real binary128 not implemented)",
+        ],
         "Other": ["bool", "string", "array", "dict", "void"],
         "SIMD vectors": [
             "vec4i, vec8i, vec16i (int32)",

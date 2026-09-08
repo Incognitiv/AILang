@@ -75,7 +75,7 @@ end
     assert "int64_t ailang_answer(void)" not in c_text
 
     proc = subprocess.run(
-        [cc, "-std=gnu23", "-Wall", "-Wextra", "-Werror", "-c", str(generated_c), "-o", str(obj)],
+        [cc, "-std=gnu2x", "-Wall", "-Wextra", "-Werror", "-c", str(generated_c), "-o", str(obj)],
         cwd=tmp_path,
         capture_output=True,
         text=True,
@@ -97,7 +97,7 @@ int main(void) {
         encoding="utf-8",
     )
     proc = subprocess.run(
-        [cc, "-std=gnu23", str(consumer), str(obj), "-o", str(exe)],
+        [cc, "-std=gnu2x", str(consumer), str(obj), "-o", str(exe)],
         cwd=tmp_path,
         capture_output=True,
         text=True,

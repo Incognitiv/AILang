@@ -8,7 +8,7 @@ Phase A7 extraction from ``CodeGen``.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any, Optional
+from typing import Any
 
 from llvmlite import ir
 from transpiler.codegen_int_ranges import (
@@ -38,7 +38,7 @@ class SafetyEmitter(SafetyArithmeticMixin):
                 return sign is False
         name = value_name
         if name:
-            base = name[:-4] if name.endswith("_val") else name
+            base = name.removesuffix("_val")
             if base in self.var_signedness:
                 return self.var_signedness.get(base, True) is False
         return False
@@ -220,7 +220,7 @@ class SafetyEmitter(SafetyArithmeticMixin):
         right: ir.Value,
         op: str,
         is_unsigned: bool,
-    ) -> Optional[ir.Value]:
+    ) -> ir.Value | None:
         """Emit raw int arithmetic with no-wrap flags when overflow is proven impossible."""
         if self._unchecked_mode:
             return None
@@ -276,7 +276,7 @@ class SafetyEmitter(SafetyArithmeticMixin):
         *,
         is_float: bool,
         is_unsigned: bool,
-    ) -> Optional[ir.Value]:
+    ) -> ir.Value | None:
         """Emit raw modulo when range facts prove runtime safety checks redundant."""
         if self._unchecked_mode or is_float:
             return None
@@ -338,7 +338,7 @@ class SafetyEmitter(SafetyArithmeticMixin):
         rhs_range: object,
         *,
         is_unsigned: bool,
-    ) -> Optional[ir.Value]:
+    ) -> ir.Value | None:
         """Lower `x % m` to at most one subtract when ranges prove it safe."""
         lhs_pair = self._range_pair(lhs_range)
         rhs_pair = self._range_pair(rhs_range)
@@ -361,7 +361,7 @@ class SafetyEmitter(SafetyArithmeticMixin):
         self.set_signedness(out, not is_unsigned)
         return out
 
-    def _range_pair(self, value: object) -> Optional[tuple[int, int]]:
+    def _range_pair(self, value: object) -> tuple[int, int] | None:
         if not isinstance(value, Sequence) or len(value) < 2:
             return None
         return int(value[0]), int(value[1])
@@ -374,7 +374,7 @@ class SafetyEmitter(SafetyArithmeticMixin):
         *,
         is_float: bool,
         is_unsigned: bool,
-    ) -> Optional[ir.Value]:
+    ) -> ir.Value | None:
         """Emit raw division when range facts prove runtime checks redundant."""
         if self._unchecked_mode or is_float:
             return None
@@ -447,11 +447,17 @@ class SafetyEmitter(SafetyArithmeticMixin):
         """Convert any supported LLVM value to a boolean i1."""
         if self.is_bigint_type(value.type):
             zero = self.current_builder.call(
-                self._get_bigint_from_int(), [ir.Constant(ir.IntType(64), 0)], name="bigint_bool_zero"
+                self._get_bigint_from_int(),
+                [ir.Constant(ir.IntType(64), 0)],
+                name="bigint_bool_zero",
             )
-            cmpv = self.current_builder.call(self._get_bigint_cmp(), [value, zero], name="bigint_bool_cmp")
+            cmpv = self.current_builder.call(
+                self._get_bigint_cmp(), [value, zero], name="bigint_bool_cmp"
+            )
             self.current_builder.call(self._get_bigint_free(), [zero])
-            return self.current_builder.icmp_signed("!=", cmpv, ir.Constant(ir.IntType(64), 0), name="tobool_bigint")
+            return self.current_builder.icmp_signed(
+                "!=", cmpv, ir.Constant(ir.IntType(64), 0), name="tobool_bigint"
+            )
         if isinstance(value.type, ir.IntType):
             if value.type.width == 1:
                 return value

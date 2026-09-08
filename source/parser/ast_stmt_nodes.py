@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 from .ast_base import ASTNode, ParsedType
 
 
 class Return(ASTNode):
-    def __init__(self, value: Optional[ASTNode]) -> None:
-        self.value: Optional[ASTNode] = value
+    def __init__(self, value: ASTNode | None) -> None:
+        self.value: ASTNode | None = value
 
 
 class Break(ASTNode): ...
@@ -24,9 +22,9 @@ class Assert(ASTNode):
     If condition is false, prints error and exits with code 1.
     """
 
-    def __init__(self, condition: ASTNode, message: Optional[ASTNode] = None) -> None:
+    def __init__(self, condition: ASTNode, message: ASTNode | None = None) -> None:
         self.condition: ASTNode = condition
-        self.message: Optional[ASTNode] = message  # Optional error message
+        self.message: ASTNode | None = message  # Optional error message
 
 
 class VarDecl(ASTNode):
@@ -69,11 +67,11 @@ class RangeVarDecl(ASTNode):
         self,
         var_name: str,
         range_type: RangeType,
-        init_value: Optional[ASTNode] = None,
+        init_value: ASTNode | None = None,
     ) -> None:
         self.var_name: str = var_name
         self.range_type: RangeType = range_type
-        self.init_value: Optional[ASTNode] = init_value  # Initial value (optional)
+        self.init_value: ASTNode | None = init_value  # Initial value (optional)
 
 
 class Assign(ASTNode):
@@ -107,11 +105,11 @@ class While(ASTNode):
         self,
         cond: ASTNode,
         body: list[ASTNode],
-        max_iterations: Optional[ASTNode] = None,
+        max_iterations: ASTNode | None = None,
     ) -> None:
         self.cond: ASTNode = cond
         self.body: list[ASTNode] = body
-        self.max_iterations: Optional[ASTNode] = max_iterations  # Bounded loop limit
+        self.max_iterations: ASTNode | None = max_iterations  # Bounded loop limit
 
 
 class DoWhile(ASTNode):
@@ -125,35 +123,35 @@ class DoWhile(ASTNode):
         self,
         body: list[ASTNode],
         cond: ASTNode,
-        max_iterations: Optional[ASTNode] = None,
+        max_iterations: ASTNode | None = None,
     ) -> None:
         self.body: list[ASTNode] = body
         self.cond: ASTNode = cond
-        self.max_iterations: Optional[ASTNode] = max_iterations
+        self.max_iterations: ASTNode | None = max_iterations
 
 
 class For(ASTNode):
     def __init__(
         self,
-        init: Optional[ASTNode],
+        init: ASTNode | None,
         cond: ASTNode,
-        step: Optional[ASTNode],
+        step: ASTNode | None,
         body: list[ASTNode],
-        max_iterations: Optional[ASTNode] = None,
+        max_iterations: ASTNode | None = None,
     ) -> None:
-        self.init: Optional[ASTNode] = init
+        self.init: ASTNode | None = init
         self.cond: ASTNode = cond
-        self.step: Optional[ASTNode] = step
+        self.step: ASTNode | None = step
         self.body: list[ASTNode] = body
-        self.max_iterations: Optional[ASTNode] = max_iterations
+        self.max_iterations: ASTNode | None = max_iterations
 
 
 class Loop(ASTNode):
     def __init__(
-        self, body: list[ASTNode], max_iterations: Optional[ASTNode] = None
+        self, body: list[ASTNode], max_iterations: ASTNode | None = None
     ) -> None:
         self.body: list[ASTNode] = body
-        self.max_iterations: Optional[ASTNode] = max_iterations
+        self.max_iterations: ASTNode | None = max_iterations
 
 
 class Foreach(ASTNode):
@@ -162,12 +160,12 @@ class Foreach(ASTNode):
         var_name: str,
         iterable: ASTNode,
         body: list[ASTNode],
-        max_iterations: Optional[ASTNode] = None,
+        max_iterations: ASTNode | None = None,
     ) -> None:
         self.var_name: str = var_name
         self.iterable: ASTNode = iterable
         self.body: list[ASTNode] = body
-        self.max_iterations: Optional[ASTNode] = max_iterations
+        self.max_iterations: ASTNode | None = max_iterations
 
 
 class Repeat(ASTNode):
@@ -232,13 +230,13 @@ class AtomicOp(ASTNode):
         self,
         op: str,
         ptr: ASTNode,
-        value: Optional[ASTNode] = None,
-        expected: Optional[ASTNode] = None,
+        value: ASTNode | None = None,
+        expected: ASTNode | None = None,
     ) -> None:
         self.op: str = op  # "load", "store", "add", "sub", "exchange", "cmpxchg"
         self.ptr: ASTNode = ptr
-        self.value: Optional[ASTNode] = value
-        self.expected: Optional[ASTNode] = expected
+        self.value: ASTNode | None = value
+        self.expected: ASTNode | None = expected
 
 
 class ChannelCreate(ASTNode):
@@ -316,23 +314,21 @@ class TryExcept(ASTNode):
 
     def __init__(
         self,
-        try_expr: Optional[ASTNode],
+        try_expr: ASTNode | None,
         try_body: list[ASTNode],
-        catch_blocks: list[tuple[str, Optional[str], list[ASTNode]]],
-        except_block: Optional[tuple[str, list[ASTNode]]],
-        finally_block: Optional[list[ASTNode]],
+        catch_blocks: list[tuple[str, str | None, list[ASTNode]]],
+        except_block: tuple[str, list[ASTNode]] | None,
+        finally_block: list[ASTNode] | None,
     ) -> None:
-        self.try_expr: Optional[ASTNode] = try_expr  # Optional expression to try
+        self.try_expr: ASTNode | None = try_expr  # Optional expression to try
         self.try_body: list[ASTNode] = try_body  # Statements in try block
-        self.catch_blocks: list[tuple[str, Optional[str], list[ASTNode]]] = (
+        self.catch_blocks: list[tuple[str, str | None, list[ASTNode]]] = (
             catch_blocks  # [(error_type, var_name, body), ...]
         )
-        self.except_block: Optional[tuple[str, list[ASTNode]]] = (
+        self.except_block: tuple[str, list[ASTNode]] | None = (
             except_block  # (var_name, body) or None
         )
-        self.finally_block: Optional[list[ASTNode]] = (
-            finally_block  # Statements or None
-        )
+        self.finally_block: list[ASTNode] | None = finally_block  # Statements or None
 
 
 class Throw(ASTNode):
@@ -340,11 +336,11 @@ class Throw(ASTNode):
 
     def __init__(
         self,
-        error_type: Optional[str],
-        message: Optional[ASTNode],
+        error_type: str | None,
+        message: ASTNode | None,
     ) -> None:
-        self.error_type: Optional[str] = error_type
-        self.message: Optional[ASTNode] = message
+        self.error_type: str | None = error_type
+        self.message: ASTNode | None = message
 
 
 # ============================================================================

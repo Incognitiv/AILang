@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import ast
 import importlib
-from typing import Any, Dict, List, cast
+from typing import Any, cast
 
 from .common import read_file, validate_filepath
 
 
-def run_radon(filepath: str, _actual_name: str) -> Dict[str, Any]:
+def run_radon(filepath: str, _actual_name: str) -> dict[str, Any]:
     """Run radon using its Python API."""
     try:
         complexity_mod = cast(Any, importlib.import_module("radon.complexity"))
@@ -43,11 +43,11 @@ def run_radon(filepath: str, _actual_name: str) -> Dict[str, Any]:
             "passed": passed,
             "issues": issues,
         }
-    except (OSError, IOError, SyntaxError) as exc:
+    except (OSError, SyntaxError) as exc:
         return {"error": str(exc)}
 
 
-def run_cohesion(filepath: str, _actual_name: str) -> Dict[str, Any]:
+def run_cohesion(filepath: str, _actual_name: str) -> dict[str, Any]:
     """Run cohesion check using AST analysis."""
     validated_path, err = validate_filepath(filepath)
     if err:
@@ -64,11 +64,11 @@ def run_cohesion(filepath: str, _actual_name: str) -> Dict[str, Any]:
             "issues": low_cohesion[:100],
             "passed": not low_cohesion,
         }
-    except (OSError, IOError) as exc:
+    except OSError as exc:
         return {"error": str(exc)}
 
 
-def _analyze_class_cohesion(module: ast.Module) -> List[str]:
+def _analyze_class_cohesion(module: ast.Module) -> list[str]:
     """Analyze class cohesion and return list of low-cohesion classes."""
     results = []
     skip = {"EnhancedPythonVerifier", "VerificationCache"}
@@ -81,7 +81,7 @@ def _analyze_class_cohesion(module: ast.Module) -> List[str]:
         if not methods:
             continue
         instance_attrs: set[str] = set()
-        method_attrs: List[set[str]] = []
+        method_attrs: list[set[str]] = []
         for method in methods:
             attrs: set[str] = set()
             for child in ast.walk(method):
@@ -118,7 +118,7 @@ def _calculate_max_nesting(node: ast.AST, depth: int = 0) -> int:
     return max_depth
 
 
-def check_nesting_depth(code: str, max_allowed: int = 8) -> Dict[str, Any]:
+def check_nesting_depth(code: str, max_allowed: int = 8) -> dict[str, Any]:
     """Check code nesting depth using pure AST analysis."""
     try:
         tree = ast.parse(code)

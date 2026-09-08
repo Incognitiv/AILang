@@ -23,8 +23,8 @@ import concurrent.futures
 import hashlib
 import re
 import sys
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Tuple
 
 from diagnostics.transpile_validator_models import (
     ClassInfo,
@@ -69,15 +69,15 @@ def run_with_timeout(func: Callable, timeout: int, *args, **kwargs):
 class PythonAnalyzer:
     """Analyzes Python source code to extract structure."""
 
-    def analyze(self, source: str) -> Tuple[List[FunctionInfo], List[ClassInfo]]:
+    def analyze(self, source: str) -> tuple[list[FunctionInfo], list[ClassInfo]]:
         """Analyze Python source and return functions and classes."""
         try:
             tree = ast.parse(source)
         except SyntaxError as e:
             raise ValueError(f"Invalid Python syntax: {e}") from e
 
-        functions: List[FunctionInfo] = []
-        classes: List[ClassInfo] = []
+        functions: list[FunctionInfo] = []
+        classes: list[ClassInfo] = []
 
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef):
@@ -99,7 +99,7 @@ class PythonAnalyzer:
         return False
 
     def _analyze_function(
-        self, node: ast.FunctionDef, source: str, class_name: Optional[str] = None
+        self, node: ast.FunctionDef, source: str, class_name: str | None = None
     ) -> FunctionInfo:
         """Extract information about a function."""
         # Get parameters
@@ -154,7 +154,7 @@ class PythonAnalyzer:
         ]
 
         # Get fields from __init__ assignments
-        fields: Dict[str, str] = {}
+        fields: dict[str, str] = {}
         for item in node.body:
             if isinstance(item, ast.FunctionDef) and item.name == "__init__":
                 for stmt in ast.walk(item):
@@ -206,15 +206,15 @@ class AILangAnalyzer:
     RECORD_PATTERN = re.compile(r"record\s+(\w+)\s*(?:\((.*?)\))?\s*:", re.MULTILINE)
     CLASS_PATTERN = re.compile(r"class\s+(\w+)\s*(?:\((.*?)\))?\s*:", re.MULTILINE)
 
-    def analyze(self, source: str) -> Tuple[List[FunctionInfo], List[str]]:
+    def analyze(self, source: str) -> tuple[list[FunctionInfo], list[str]]:
         """Analyze AILang source and return functions and records."""
         functions = self._extract_functions(source)
         records = self._extract_records(source)
         return functions, records
 
-    def _extract_functions(self, source: str) -> List[FunctionInfo]:
+    def _extract_functions(self, source: str) -> list[FunctionInfo]:
         """Extract function information from AILang source."""
-        functions: List[FunctionInfo] = []
+        functions: list[FunctionInfo] = []
 
         for match in self.FUNCTION_PATTERN.finditer(source):
             name = match.group(1)
@@ -251,7 +251,7 @@ class AILangAnalyzer:
 
         return functions
 
-    def _extract_records(self, source: str) -> List[str]:
+    def _extract_records(self, source: str) -> list[str]:
         """Extract record names from AILang source."""
         return [match.group(1) for match in self.RECORD_PATTERN.finditer(source)]
 
@@ -452,7 +452,7 @@ class TranspileValidator:
     def validate_file(
         self,
         python_file: Path,
-        transpile_fn: Optional[Callable[[str], str]] = None,
+        transpile_fn: Callable[[str], str] | None = None,
     ) -> TranspileResult:
         """
         Validate transpilation of a Python file.
@@ -545,7 +545,7 @@ class TranspileValidator:
         self,
         directory: Path,
         pattern: str = "*.py",
-        transpile_fn: Optional[Callable[[str], str]] = None,
+        transpile_fn: Callable[[str], str] | None = None,
         max_files: int = 50,
     ) -> ValidationReport:
         """

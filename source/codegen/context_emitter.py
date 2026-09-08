@@ -87,9 +87,14 @@ class ContextEmitter:
             if class_name == "__ailang_bigint__":
                 bigint_ptr = self._cg._get_bigint_type()
                 value = obj_ptr
-                if isinstance(getattr(obj_ptr, "type", None), ir.PointerType) and obj_ptr.type != bigint_ptr:
+                if (
+                    isinstance(getattr(obj_ptr, "type", None), ir.PointerType)
+                    and obj_ptr.type != bigint_ptr
+                ):
                     if obj_ptr.type.pointee == bigint_ptr:
-                        value = self.current_builder.load(obj_ptr, name=f"{var_name}_bigint_cleanup")
+                        value = self.current_builder.load(
+                            obj_ptr, name=f"{var_name}_bigint_cleanup"
+                        )
                 if getattr(value, "type", None) == bigint_ptr:
                     self.current_builder.call(self._cg._get_bigint_free(), [value])
                 continue

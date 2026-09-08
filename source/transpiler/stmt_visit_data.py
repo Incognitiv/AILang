@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 from parser import ast as A
-from transpiler.wide_int_types import info_for_ailang, info_for_c
-from transpiler.fixed_int_types import c_name_for_fixed, info_for_c_fixed, info_for_fixed_int
 from parser.ast import ParsedType, parsed_type_to_str
 from typing import cast
 
 from ast_access import arg_at
 from transpiler import optimizer_decisions as opt
 from transpiler import virtual_array_fields as vaf
+from transpiler.arithmetic_literal_proofs import int_literal_value
 from transpiler.array_literal_hints import update_array_literal_hints
+from transpiler.c_bigint import is_unbounded_spec, owned_bigint_expr
 from transpiler.class_field_ownership import (
     auto_owned_field_kind,
     is_auto_owned_field_type,
@@ -21,6 +21,12 @@ from transpiler.class_field_ownership import (
     string_len_field_name,
 )
 from transpiler.codegen_int_ranges import range_assignment_proven, remember_assign_range
+from transpiler.fixed_int_cast_codegen import checked_fixed_int_conversion_expr
+from transpiler.fixed_int_types import (
+    c_name_for_fixed,
+    info_for_c_fixed,
+    info_for_fixed_int,
+)
 from transpiler.stack_class_c import emit_stack_class_zero_init
 from transpiler.stmt_visit_dict import _emit_dict_literal_assign
 from transpiler.stmt_visit_slices import try_emit_fixed_array_slice_alias
@@ -29,9 +35,7 @@ from transpiler.strlen_assign_cache import (
     update_strlen_cache_after_assign,
 )
 from transpiler.type_name_aliases import type_name_to_ailang
-from transpiler.fixed_int_cast_codegen import checked_fixed_int_conversion_expr
-from transpiler.arithmetic_literal_proofs import int_literal_value
-from transpiler.c_bigint import is_unbounded_spec, owned_bigint_expr
+from transpiler.wide_int_types import info_for_ailang
 
 
 def _emit_stack_class_construct(
@@ -124,7 +128,9 @@ def _emit_stack_class_construct(
             and not isinstance(default_node.value, float)
             and int(default_node.value) == 0
         ):
-            default_expr = f"({self._ailang_type_to_c(parsed_type_to_str(field_type))}){{0}}"
+            default_expr = (
+                f"({self._ailang_type_to_c(parsed_type_to_str(field_type))}){{0}}"
+            )
         self.emit(f"  {storage}.{field_name} = {default_expr};")
         if is_string_type(field_type):
             self.emit(
@@ -173,7 +179,11 @@ def _emit_stack_class_construct(
                 arg_expr = "NULL" if can_elide_virtual else self.expr(arg)
                 if index < len(init_method.params or []):
                     source = init_method.params[index]
-                    if isinstance(source, tuple) and len(source) >= 2 and not can_elide_virtual:
+                    if (
+                        isinstance(source, tuple)
+                        and len(source) >= 2
+                        and not can_elide_virtual
+                    ):
                         checked_arg = checked_fixed_int_conversion_expr(
                             self, arg, arg_expr, source[1]
                         )
@@ -335,7 +345,11 @@ def _emit_checked_fixed_int_assignment(
     literal = int_literal_value(value_node)
     if literal is not None:
         low = 0 if target_info.unsigned else -(1 << (target_info.bits - 1))
-        high = (1 << target_info.bits) - 1 if target_info.unsigned else (1 << (target_info.bits - 1)) - 1
+        high = (
+            (1 << target_info.bits) - 1
+            if target_info.unsigned
+            else (1 << (target_info.bits - 1)) - 1
+        )
         if low <= literal <= high:
             # Literals are adaptable to their declared fixed type.  Keep the
             # full target width in C rather than materializing through int64_t.
@@ -447,7 +461,9 @@ def _emit_tracked_local_reassign(
                 else "int"
             )
             push_val = self.expr(arg_at(value, 1))
-            _emit_dyn_array_push_in_place(self, var, push_val, value_kind, arg_at(value, 1))
+            _emit_dyn_array_push_in_place(
+                self, var, push_val, value_kind, arg_at(value, 1)
+            )
             return True
         if (
             isinstance(value, A.Call)
@@ -487,9 +503,12 @@ def visit_Assign(self, node: A.Assign) -> None:
     # 200` back to plain `int`, causing the C backend to route the operation
     # through the 64-bit safety helpers.
     local_type = getattr(self, "_current_local_c_types", {}).get(node.var_name)
-    existing_type = local_type if local_type is not None else self._var_types.get(node.var_name)
+    existing_type = (
+        local_type if local_type is not None else self._var_types.get(node.var_name)
+    )
     if local_type is None and (
-        existing_type is None or (
+        existing_type is None
+        or (
             not is_unbounded_spec(self, existing_type)
             and info_for_ailang(existing_type) is None
             and _fixed_int_info_for_ailang_spec(self, existing_type) is None
@@ -541,7 +560,9 @@ def visit_Assign(self, node: A.Assign) -> None:
             else:
                 array_len_hints[key] = propagated_array_len
         val = self.expr(node.value)
-        target_spec = local_type if local_type is not None else self._var_types.get(node.var_name)
+        target_spec = (
+            local_type if local_type is not None else self._var_types.get(node.var_name)
+        )
         if target_spec is not None and _emit_checked_fixed_int_assignment(
             self, var, target_spec, node.value, val
         ):
@@ -613,8 +634,10 @@ def _infer_ailang_type(self, node: A.ASTNode) -> str:
             # callee's parameter type and avoids redundant casts.
             if ret in ("array", "str_array", "dict", "string"):
                 return ret
-    if isinstance(node, A.BinaryOp) and node.op == "+" and (
-        self._might_be_string(node.left) or self._might_be_string(node.right)
+    if (
+        isinstance(node, A.BinaryOp)
+        and node.op == "+"
+        and (self._might_be_string(node.left) or self._might_be_string(node.right))
     ):
         return "string"
     if isinstance(node, A.StringLit):
@@ -742,11 +765,17 @@ def visit_TupleAssign(self, node: A.TupleAssign) -> None:
 
 def visit_VarDecl(self, node: A.VarDecl) -> None:
     """Generate variable declaration (works for both local and global)."""
-    declared_unbounded = node.type_name is not None and is_unbounded_spec(self, node.type_name)
+    declared_unbounded = node.type_name is not None and is_unbounded_spec(
+        self, node.type_name
+    )
     val = (
         owned_bigint_expr(self, node.init_value)
         if declared_unbounded and node.init_value is not None
-        else ("ailang_bigint_from_int(0)" if declared_unbounded else (self.expr(node.init_value) if node.init_value else "0"))
+        else (
+            "ailang_bigint_from_int(0)"
+            if declared_unbounded
+            else (self.expr(node.init_value) if node.init_value else "0")
+        )
     )
     if node.init_value is not None:
         update_array_literal_hints(self, node.var_name, node.init_value)
@@ -850,7 +879,9 @@ def visit_VarDecl(self, node: A.VarDecl) -> None:
             )
         ):
             pass
-        elif not _emit_tracked_local_reassign(self, node.var_name, node.init_value, val):
+        elif not _emit_tracked_local_reassign(
+            self, node.var_name, node.init_value, val
+        ):
             self.emit(f"{target} = {val};")
         if node.init_value is not None:
             update_strlen_cache_after_assign(self, node.var_name, node.init_value)

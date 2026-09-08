@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from parser.ast import RangeType, parsed_type_to_str
-from typing import Any, Optional
+from typing import Any
 
 from callback_types import callback_parts, is_callback_type, resolve_callback_alias
 from codegen.codegen import CodeGenError
@@ -257,7 +257,7 @@ class TypeLowering:
             f"LLVM backend: no executable representation for AILang type {type_spec!r}"
         )
 
-    def get_variable_class_type(self, var_name: str) -> Optional[str]:
+    def get_variable_class_type(self, var_name: str) -> str | None:
         """Get the class type of a variable if it was annotated with a class type.
 
         Checks:
@@ -270,8 +270,7 @@ class TypeLowering:
         if self.current_function:
             func_name = self.current_function.name
             # Remove underscore prefix if private function
-            if func_name.startswith("_"):
-                func_name = func_name[1:]
+            func_name = func_name.removeprefix("_")
 
             key = (func_name, var_name)
             if key in self.param_class_types:

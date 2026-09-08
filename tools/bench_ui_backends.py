@@ -521,7 +521,7 @@ def _build_c_backend(frames: int, cycles: int) -> Path:
     compile_steps = [
         [
             gcc,
-            "-std=gnu23",
+            "-std=gnu2x",
             "-O2",
             "-c",
             str(generated_c),
@@ -530,7 +530,7 @@ def _build_c_backend(frames: int, cycles: int) -> Path:
         ],
         [
             gcc,
-            "-std=gnu23",
+            "-std=gnu2x",
             "-O2",
             "-Dmalloc=ail_bench_malloc",
             "-Dcalloc=ail_bench_calloc",
@@ -543,7 +543,7 @@ def _build_c_backend(frames: int, cycles: int) -> Path:
         ],
         [
             gcc,
-            "-std=gnu23",
+            "-std=gnu2x",
             "-O2",
             "-c",
             str(tracker_c),
@@ -588,7 +588,7 @@ def _build_pure_backend(frames: int, cycles: int) -> Path:
     proc = _run(
         [
             gcc,
-            "-std=gnu23",
+            "-std=gnu2x",
             "-O2",
             "-c",
             str(tracker_c),

@@ -140,8 +140,7 @@ class REPL:
             print(f"Error: {type(e).__name__}: {e}")
 
     def show_help(self) -> None:
-        print(
-            """
+        print("""
 AILang REPL Commands:
   exit, quit  - Exit the REPL
   help        - Show this help
@@ -159,8 +158,7 @@ Define a function:
 
 Then call it:
   greet("World")
-"""
-        )
+""")
 
 
 if __name__ == "__main__":

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 from .ast import ASTNode, Function, ParsedType, parsed_type_to_str
 
 _INTERNAL_C_ABI_TYPES: dict[str, tuple[str, ParsedType]] = {
@@ -105,7 +103,7 @@ def _c_abi_for_ailang_type(ptype: ParsedType) -> str:
 
 def _parse_internal_param(
     self,
-) -> tuple[tuple[str, ParsedType, Optional[ASTNode]], str]:
+) -> tuple[tuple[str, ParsedType, ASTNode | None], str]:
     param_name = self.consume("IDENT")
     param_type: ParsedType = "i64"
     abi_type = "int64_t"
@@ -137,7 +135,7 @@ def _parse_internal_function(
 
     self.consume("LPAREN")
     self.skip_newlines()
-    params: list[tuple[str, ParsedType, Optional[ASTNode]]] = []
+    params: list[tuple[str, ParsedType, ASTNode | None]] = []
     c_params: list[str] = []
     if self.peek_type() != "RPAREN":
         param, c_param = _parse_internal_param(self)

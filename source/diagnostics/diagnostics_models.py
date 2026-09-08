@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 
 class Fix:
     """Represents an auto-fixable change."""
@@ -25,9 +23,9 @@ class Diagnostic:
         line: int,
         column: int,
         message: str,
-        suggestion: Optional[str] = None,
+        suggestion: str | None = None,
         severity: str = "error",  # error, warning, hint
-        fix: Optional[Fix] = None,  # Auto-fix if available
+        fix: Fix | None = None,  # Auto-fix if available
     ):
         self.line = line
         self.column = column

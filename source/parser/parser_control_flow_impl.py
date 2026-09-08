@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 from token_access import token_line_at, token_type_at
 
 from .ast import (
@@ -229,7 +227,7 @@ def _parse_auto_bound_loop(self) -> ASTNode:
     raise AssertionError("unreachable")
 
 
-def _extract_bound_from_condition(self, cond: ASTNode) -> Optional[ASTNode]:
+def _extract_bound_from_condition(self, cond: ASTNode) -> ASTNode | None:
     """Try to extract a numeric bound from a comparison condition.
 
     Examples:
@@ -252,7 +250,7 @@ def _is_max_keyword(self) -> bool:
     return self.peek_type() == "IDENT" and self.peek_text() == "max"
 
 
-def _parse_inline_max(self) -> Optional[ASTNode]:
+def _parse_inline_max(self) -> ASTNode | None:
     """Parse optional inline max: N or max: infinity clause.
 
     Used after condition in loops: while x < 10 max: 100 then
@@ -269,9 +267,7 @@ def _parse_inline_max(self) -> Optional[ASTNode]:
     return self.parse_expression()
 
 
-def _finish_while_parse(
-    self, cond: ASTNode, max_iterations: Optional[ASTNode]
-) -> While:
+def _finish_while_parse(self, cond: ASTNode, max_iterations: ASTNode | None) -> While:
     """Finish parsing a while loop after condition is parsed."""
     self.consume("THEN")
     # Check for inline max: N
@@ -317,7 +313,7 @@ def _parse_for_with_auto_bound(self) -> For | Foreach:
 
 
 def _parse_for_internal(
-    self, max_iterations: Optional[ASTNode] = None, auto_bound: bool = False
+    self, max_iterations: ASTNode | None = None, auto_bound: bool = False
 ) -> For | Foreach:
     """Internal helper to parse for loop with optional bound.
 

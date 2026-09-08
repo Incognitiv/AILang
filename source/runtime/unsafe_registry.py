@@ -7,7 +7,6 @@ during compilation. Supports interactive and batch modes.
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 
 
 class UnsafeMode(Enum):
@@ -26,7 +25,7 @@ class UnsafeOperation:
     line: int
     description: str
     operation: str  # e.g., "char_at", "array_access", "poke"
-    approved: Optional[bool] = None  # None = not yet asked
+    approved: bool | None = None  # None = not yet asked
 
 
 class UnsafeRegistry:
@@ -159,7 +158,7 @@ class UnsafeRegistry:
 class _RegistryHolder:
     """Holder for the global registry instance to avoid module-level global."""
 
-    instance: Optional[UnsafeRegistry] = None
+    instance: UnsafeRegistry | None = None
 
 
 def get_registry() -> UnsafeRegistry:

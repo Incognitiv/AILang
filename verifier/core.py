@@ -7,9 +7,10 @@ Coordinates multiple external tools plus custom checks to enforce 10/10 quality.
 import importlib.util
 import sys
 import tempfile
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any
 
 from .cache import VerificationCache
 from .tools import (
@@ -50,11 +51,11 @@ class EnhancedPythonVerifier:
         self.available_tools = self._check_available_tools()
         self._check_missing_dependencies()
 
-    def get_available_tools(self) -> Dict[str, bool]:
+    def get_available_tools(self) -> dict[str, bool]:
         """Return dictionary of available verification tools."""
         return self.available_tools.copy()
 
-    def _check_available_tools(self) -> Dict[str, bool]:
+    def _check_available_tools(self) -> dict[str, bool]:
         # Custom checkers - always available (no external deps)
         tools = {
             "nesting": True,
@@ -108,10 +109,10 @@ class EnhancedPythonVerifier:
                     f"\nInstall with: python -m pip install --user {install_cmd}",
                     file=sys.stderr,
                 )
-            print("", file=sys.stderr)
+            print(file=sys.stderr)
 
-    def _prepare_tool_jobs(self) -> List[Tuple[str, Callable, bool]]:
-        jobs: List[Tuple[str, Callable, bool]] = [
+    def _prepare_tool_jobs(self) -> list[tuple[str, Callable, bool]]:
+        jobs: list[tuple[str, Callable, bool]] = [
             ("pyflakes", run_pyflakes, True),
             # pylint replaced by ruff + strict_extras (W0201 + W1114).
             # Runtime: pylint ~17.8s -> ruff ~0.05s + strict_extras ~0.1s.
@@ -141,12 +142,12 @@ class EnhancedPythonVerifier:
 
     def _execute_tools_parallel(
         self,
-        jobs: List[Tuple[str, Callable, bool]],
+        jobs: list[tuple[str, Callable, bool]],
         filepath: str,
         display_name: str,
         check_imports: bool = False,
-    ) -> Dict[str, Any]:
-        results: Dict[str, Any] = {}
+    ) -> dict[str, Any]:
+        results: dict[str, Any] = {}
         tools = self.available_tools
         with ThreadPoolExecutor(max_workers=min(8, len(jobs))) as pool:
             task_futures = {}
@@ -178,8 +179,8 @@ class EnhancedPythonVerifier:
         display_name: str,
         preset: str,
         check_imports: bool,
-        result_cache: Optional[VerificationCache],
-    ) -> Dict:
+        result_cache: VerificationCache | None,
+    ) -> dict:
         """Core verification logic shared by verify_code and verify_file."""
         if result_cache:
             cached = result_cache.get(code, preset)
@@ -231,8 +232,8 @@ class EnhancedPythonVerifier:
         code: str,
         filename: str = "temp.py",
         preset: str = "strict",
-        result_cache: Optional[VerificationCache] = None,
-    ) -> Dict:
+        result_cache: VerificationCache | None = None,
+    ) -> dict:
         """Verify Python code string using all available tools."""
         temp_file: str = ""
         with tempfile.NamedTemporaryFile(
@@ -252,9 +253,9 @@ class EnhancedPythonVerifier:
         self,
         filepath: Path,
         preset: str = "strict",
-        result_cache: Optional[VerificationCache] = None,
+        result_cache: VerificationCache | None = None,
         check_imports: bool = False,
-    ) -> Dict:
+    ) -> dict:
         """Verify a Python file in-place (enables import checking when requested)."""
         code = filepath.read_text(encoding="utf-8")
         filename = str(filepath)
@@ -264,7 +265,7 @@ class EnhancedPythonVerifier:
 
     # Tool-specific runners are provided by tool_runners; no per-instance wrappers here.
 
-    def _score_pylint(self, results: Dict) -> float:
+    def _score_pylint(self, results: dict) -> float:
         """Score the lint slot (max 15 points).
 
         Reads from the strict_extras tool (W0201 + W1114 coverage that
@@ -288,7 +289,7 @@ class EnhancedPythonVerifier:
             return 0.0
         return (pylint_score / 10.0) * 15.0
 
-    def _score_security(self, results: Dict) -> float:
+    def _score_security(self, results: dict) -> float:
         bandit = results.get("bandit")
         if bandit is None:
             return 0.0  # Tool missing - no credit awarded
@@ -311,7 +312,7 @@ class EnhancedPythonVerifier:
 
         return max(0.0, 25.0 - deduction)
 
-    def _score_pyflakes(self, results: Dict) -> float:
+    def _score_pyflakes(self, results: dict) -> float:
         """Score pyflakes (max 15 points, -2 per issue)."""
         pyflakes_result = results.get("pyflakes")
         if pyflakes_result is None:
@@ -321,7 +322,7 @@ class EnhancedPythonVerifier:
             return 0.0
         return max(0.0, 15.0 - (issues * 2))
 
-    def _score_mypy(self, results: Dict) -> float:
+    def _score_mypy(self, results: dict) -> float:
         """Score mypy (max 30 points - correctness is king, -3 per error)."""
         mypy_result = results.get("mypy")
         if mypy_result is None:
@@ -331,7 +332,7 @@ class EnhancedPythonVerifier:
             return 0.0
         return max(0.0, 30.0 - (errors * 3))
 
-    def _score_complexity(self, results: Dict) -> float:
+    def _score_complexity(self, results: dict) -> float:
         """Score complexity (max 15 points - algorithm quality matters).
 
         Uses lenient thresholds to allow complex but maintainable code.
@@ -349,7 +350,7 @@ class EnhancedPythonVerifier:
             points -= 5.0
         return max(0.0, points)
 
-    def _strict_deductions(self, results: Dict, preset: str) -> float:
+    def _strict_deductions(self, results: dict, preset: str) -> float:
         if preset != "strict":
             return 0.0
         penalties = {"black": 5.0, "isort": 3.0, "ruff": 5.0}
@@ -377,7 +378,7 @@ class EnhancedPythonVerifier:
     _MAGIC_PENALTY_PER = 4.0
     _MAGIC_PENALTY_CAP = 20.0
 
-    def _suppression_deduction(self, results: Dict) -> float:
+    def _suppression_deduction(self, results: dict) -> float:
         """Compute the score deduction from suppression markers."""
         supp = results.get("suppressions") or {}
         count = supp.get("total", 0) if isinstance(supp, dict) else 0
@@ -385,7 +386,7 @@ class EnhancedPythonVerifier:
             return 0.0
         return min(self._SUPPRESSION_PENALTY_CAP, count * self._SUPPRESSION_PENALTY_PER)
 
-    def _magic_index_deduction(self, results: Dict) -> float:
+    def _magic_index_deduction(self, results: dict) -> float:
         """Compute the score deduction from magic-index patterns."""
         magic = results.get("magic_index") or {}
         count = magic.get("magic_index_count", 0) if isinstance(magic, dict) else 0
@@ -393,7 +394,7 @@ class EnhancedPythonVerifier:
             return 0.0
         return min(self._MAGIC_PENALTY_CAP, count * self._MAGIC_PENALTY_PER)
 
-    def _calculate_score(self, results: Dict, preset: str = "strict") -> float:
+    def _calculate_score(self, results: dict, preset: str = "strict") -> float:
         """Calculate overall quality score (0-100) with balanced weighting."""
         if not results["syntax"]["valid"]:
             return 0.0
@@ -421,9 +422,9 @@ class EnhancedPythonVerifier:
         total -= scores.get("deductions", 0.0)
         return round(max(total, 0.0), 2)
 
-    def _determine_pass(self, results: Dict) -> Tuple[bool, List[str]]:
+    def _determine_pass(self, results: dict) -> tuple[bool, list[str]]:
         """Enforce absolute pass criteria - must achieve 100/100 score."""
-        reasons: List[str] = []
+        reasons: list[str] = []
 
         # Strict score requirement: must be exactly 100
         score = results.get("overall_score", 0.0)
