@@ -1,0 +1,273 @@
+@library("adapt_serve_http_fixture")
+
+// HTTP parsing/response helpers extracted from the ADAPT server corpus fixture.
+
+def srv_find(hay: string, needle: string, start_at: int): int
+    // Hot path delegated to libc strstr via index_of_from. Was a
+    // hand-rolled O(n*m) char_at loop that ate ~5% CPU per `perf`
+    // — strstr is typically Boyer-Moore-Horspool-flavored, much
+    // faster on long buffers like accumulated HTTP requests.
+    return index_of_from(hay, needle, start_at)
+end
+
+@unchecked
+def srv_find_legacy(hay: string, needle: string, start_at: int): int
+    nh = strlen(hay)
+    nn = strlen(needle)
+    if nn == 0 then
+        return start_at
+    end
+    i = start_at
+    while i + nn <= nh then
+        is_match = 1
+        j = 0
+        while j < nn then
+            if char_at(hay, i + j) != char_at(needle, j) then
+                is_match = 0
+                j = nn
+            end
+            j = j + 1
+        end
+        if is_match == 1 then
+            return i
+        end
+        i = i + 1
+    end
+    return -1
+end
+
+// Extract the HTTP method (token before the first space). Returns "" if
+// the request line is malformed.
+@unchecked
+def srv_method(req: string): string
+    sp = srv_find(req, " ", 0)
+    if sp < 0 then
+        return ""
+    end
+    return substr(req, 0, sp)
+end
+
+// Extract the path (token between first and second space).
+@unchecked
+def srv_path(req: string): string
+    sp1 = srv_find(req, " ", 0)
+    if sp1 < 0 then
+        return ""
+    end
+    sp2 = srv_find(req, " ", sp1 + 1)
+    if sp2 < 0 then
+        return ""
+    end
+    return substr(req, sp1 + 1, sp2 - sp1 - 1)
+end
+
+// Find the body offset — first byte after the \r\n\r\n separator.
+// Returns -1 if no separator (request still being received).
+@unchecked
+def srv_body_offset(req: string): int
+    pos = srv_find(req, "\r\n\r\n", 0)
+    if pos < 0 then
+        return -1
+    end
+    return pos + 4
+end
+
+// Parse the body out of the full request buffer. Empty string if no
+// body separator found.
+@unchecked
+def srv_body(req: string): string
+    off = srv_body_offset(req)
+    if off < 0 then
+        return ""
+    end
+    return substr(req, off, strlen(req) - off)
+end
+
+// Parse a Content-Length header value to int. Returns 0 if absent
+// or unparseable (which is the right default — no body).
+@unchecked
+def srv_content_length(req: string): int
+    cl_header = "Content-Length:"
+    pos = srv_find(req, cl_header, 0)
+    if pos < 0 then
+        return 0
+    end
+    start = pos + strlen(cl_header)
+    while char_at(req, start) == 32 then
+        start = start + 1
+    end
+    end_pos = srv_find(req, "\r", start)
+    if end_pos < 0 then
+        return 0
+    end
+    return parse_int(substr(req, start, end_pos - start))
+end
+
+// True (1) if the request asks the connection to close after
+// response (Connection: close header). HTTP/1.1 default is
+// keep-alive, so if the header is absent we keep the connection
+// open. We do a substring match rather than a strict header parse
+// because every value of Connection: close looks the same.
+@unchecked
+def srv_wants_close(req: string): int
+    if srv_find(req, "Connection: close", 0) >= 0 then
+        return 1
+    end
+    if srv_find(req, "connection: close", 0) >= 0 then
+        return 1
+    end
+    return 0
+end
+
+// Read one complete HTTP request from the connection. HTTP/1.1
+// keep-alive needs strict request boundaries: read until we see
+// \r\n\r\n (end of headers), parse Content-Length, then read
+// exactly that many body bytes. Returns "" if the client closed
+// before sending a complete request.
+@unchecked
+def srv_read_request(conn: int): string
+    accumulated = ""
+    // Read until we have the full headers (terminated by \r\n\r\n).
+    // The 4096-byte chunk size matches typical kernel TCP buffer
+    // grain so most requests come in one recv call.
+    have_headers = 0
+    body_start = -1
+    while have_headers == 0 then
+        chunk = tcp_recv(conn, 4096)
+        chunk_len = strlen(chunk)
+        if chunk_len == 0 then
+            return ""
+        end
+        accumulated = accumulated + chunk
+        body_start = srv_find(accumulated, "\r\n\r\n", 0)
+        if body_start >= 0 then
+            have_headers = 1
+            body_start = body_start + 4
+        end
+    end
+
+    // Determine if there's a body and read it to completion.
+    cl = srv_content_length(accumulated)
+    body_have = strlen(accumulated) - body_start
+    while body_have < cl then
+        chunk = tcp_recv(conn, cl - body_have)
+        chunk_len = strlen(chunk)
+        if chunk_len == 0 then
+            // Client closed mid-body — return what we have, which
+            // is incomplete. Caller will likely produce a 400-style
+            // response and close.
+            return accumulated
+        end
+        accumulated = accumulated + chunk
+        body_have = body_have + chunk_len
+    end
+    return accumulated
+end
+
+// Find the value of `header_name` (case-insensitive prefix match would
+// be ideal but we only need exact-case for known headers like
+// "Content-Length:"). Returns "" if absent.
+@unchecked
+def srv_header(req: string, name: string): string
+    pos = srv_find(req, name, 0)
+    if pos < 0 then
+        return ""
+    end
+    start = pos + strlen(name)
+    // Skip leading spaces after the colon
+    while char_at(req, start) == 32 then
+        start = start + 1
+    end
+    // Find end of line (CR)
+    end_pos = srv_find(req, "\r", start)
+    if end_pos < 0 then
+        return ""
+    end
+    return substr(req, start, end_pos - start)
+end
+
+// ---------------------------------------------------------------------
+// JSON helpers (delegate to frame_json_escape from core.frame)
+// ---------------------------------------------------------------------
+
+// Build {"key":"<escaped>", ...}-style fragments. Caller composes them.
+def srv_jstr(key: string, value: string): string
+    return "\"" + key + "\":\"" + frame_json_escape(value) + "\""
+end
+
+def srv_jnum(key: string, value: int): string
+    return "\"" + key + "\":" + str(value)
+end
+
+def srv_jbool(key: string, truthy: int): string
+    if truthy == 1 then
+        return "\"" + key + "\":true"
+    end
+    return "\"" + key + "\":false"
+end
+
+// Look at the suffix of a path and return the right Content-Type.
+// Limited to text formats — binary files are out of scope (see file header).
+def srv_mime(path: string): string
+    if endswith(path, ".html") == 1 then
+        return "text/html; charset=utf-8"
+    end
+    if endswith(path, ".css") == 1 then
+        return "text/css; charset=utf-8"
+    end
+    if endswith(path, ".js") == 1 then
+        return "application/javascript; charset=utf-8"
+    end
+    if endswith(path, ".svg") == 1 then
+        return "image/svg+xml"
+    end
+    if endswith(path, ".json") == 1 then
+        return "application/json; charset=utf-8"
+    end
+    return "text/plain; charset=utf-8"
+end
+
+// ---------------------------------------------------------------------
+// HTTP response builders
+// ---------------------------------------------------------------------
+
+// Build an HTTP/1.1 response. Always emits Connection: keep-alive;
+// per-request close decision lives in the main loop (which checks
+// the client's request-side Connection header). Threading a
+// keep_alive bit through every handler would be invasive and
+// provide no real benefit — clients tolerate a slight header
+// mismatch (response says keep-alive, server closes anyway).
+def srv_response(
+    status_line: string, content_type: string, body: string
+): string
+    body_len = strlen(body)
+    return "HTTP/1.1 " + status_line + "\r\n"
+        + "Content-Type: " + content_type + "\r\n"
+        + "Content-Length: " + str(body_len) + "\r\n"
+        + "Connection: keep-alive" + "\r\n"
+        + "Cache-Control: no-store" + "\r\n"
+        + "\r\n"
+        + body
+end
+
+def srv_ok_json(body: string): string
+    return srv_response("200 OK", "application/json; charset=utf-8", body)
+end
+
+def srv_ok_static(content_type: string, body: string): string
+    return srv_response("200 OK", content_type, body)
+end
+
+def srv_404(): string
+    return srv_response(
+        "404 Not Found", "text/plain; charset=utf-8", "Not Found\n"
+    )
+end
+
+def srv_405(): string
+    return srv_response(
+        "405 Method Not Allowed",
+        "text/plain; charset=utf-8",
+        "Method Not Allowed\n"
+    )
+end

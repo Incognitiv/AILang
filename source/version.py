@@ -4,9 +4,9 @@ __version__ = "1.8.0"
 __version_info__ = (1, 8, 0)
 
 # Release metadata
-RELEASE_NAME = "RVS Serious App Proof"
+RELEASE_NAME = "Golden Gate Stabilization"
 RELEASE_DATE = "2026-05-15"
-CODENAME = "FreeBSD Homecoming"
+CODENAME = "Golden Gate"
 
 # Feature flags for this version
 FEATURES = {
@@ -23,7 +23,6 @@ FEATURES = {
     "sqlite_fast_text_bind": True,
     "jit_opt_levels": True,
     "jit_ir_dump": True,
-    "adapt_hot_shape_helpers": True,
     "aot_pgo_hooks": True,
     "llvm_ir_pgo_probe": True,
     "llvm_ir_pgo_hosted": True,
@@ -48,9 +47,6 @@ FEATURES = {
     "virtual_string_fields": True,
     "virtual_array_field_scalarization": True,
     "stack_class_scalarization": True,
-    "rvs_serious_app_proof": True,
-    "rvs_freebsd_command_bridge": True,
-    "rvs_profile_lifecycle_basics": True,
 }
 
 

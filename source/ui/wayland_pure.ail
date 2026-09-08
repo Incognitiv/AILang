@@ -2,6 +2,8 @@
 // Wayland does not let clients choose global window position; placement is compositor-owned.
 // JSON cimport is the canonical checked binding spec; generated bindings are an optimization cache.
 #cimport linux "wayland_pure.cbind.json"
+
+import source.ui.wayland_pure_helpers
 const int AIL_UI_PLATFORM_LINUX = 2
 const int AIL_UI_EVENT_NONE = 0
 const int AIL_UI_EVENT_CLOSE = 1
@@ -61,24 +63,10 @@ def wayland_set_pending_event(kind: int, x: int, y: int, key: int, width_px: int
     g_wayland_event_height_px = height_px
 end
 
-def wayland_color(color: int): int
-    out = color % 16777216
-    if out < 0 then
-        return out + 16777216
-    end
-    return out
-end
 def wayland_event_constant_sentinel(): int
     total = AIL_UI_EVENT_MOUSE_MOVE + AIL_UI_EVENT_MOUSE_DOWN
     total = total + AIL_UI_EVENT_MOUSE_UP + AIL_UI_EVENT_KEY_DOWN
     return total + AIL_UI_EVENT_KEY_UP
-end
-
-def wayland_fixed_to_int(value: short): int
-    return value / 256
-end
-def wayland_has_capability(capabilities: ushort, capability: int): int
-    return (capabilities / capability) % 2
 end
 
 @export

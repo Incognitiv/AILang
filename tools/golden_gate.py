@@ -25,6 +25,7 @@ DEFAULT_OUT_DIR = REPO_ROOT / "out" / "golden_gate"
 GATE_STEP_IDS = [
     "source_strict",
     "verifier_strict",
+    "repository_hygiene",
     "full_pytest",
     "c23_hosted_compile",
     "c23_freestanding_compile",
@@ -141,6 +142,19 @@ def _strict_steps(timeout: int) -> list[GateStep]:
             timeout,
         ),
     ]
+
+
+def _repository_hygiene_step(timeout: int, out_dir: Path) -> GateStep:
+    return GateStep(
+        "repository_hygiene",
+        "Repository clone/hardcode hygiene",
+        _python(
+            "tools/repository_hygiene_audit.py",
+            "--json-output",
+            str(out_dir / "repository_hygiene.json"),
+        ),
+        timeout,
+    )
 
 
 def _pytest_step(timeout: int, quick: bool) -> GateStep:
@@ -271,6 +285,7 @@ def build_steps(args: argparse.Namespace) -> list[GateStep]:
     steps: list[GateStep] = []
     if not args.skip_verifier:
         steps.extend(_strict_steps(timeout))
+        steps.append(_repository_hygiene_step(timeout, args.output_dir))
     if not args.skip_pytest:
         steps.append(_pytest_step(timeout, args.quick))
     if not args.skip_compile:

@@ -28,6 +28,11 @@ UI_BACKEND_SMOKE = REPO_ROOT / "examples" / "ui" / "ui_backend_smoke.ail"
 DESKTOP_PURE_DEMO = REPO_ROOT / "examples" / "ui" / "ui_desktop_pure.ail"
 WIN32_BACKEND = REPO_ROOT / "examples" / "ui" / "backends" / "ail_ui_win32_min.c"
 WIN32_PURE_BACKEND = SOURCE_UI_ROOT / "win32_pure.ail"
+WIN32_PURE_MODULES = (
+    WIN32_PURE_BACKEND,
+    SOURCE_UI_ROOT / "win32_pure_core.ail",
+    SOURCE_UI_ROOT / "win32_pure_window.ail",
+)
 WIN32_PURE_BINDINGS = SOURCE_UI_ROOT / "win32_pure.cbind.json"
 X11_PURE_BACKEND = SOURCE_UI_ROOT / "x11_pure.ail"
 X11_PURE_BINDINGS = SOURCE_UI_ROOT / "x11_pure.cbind.json"
@@ -193,7 +198,7 @@ def test_win32_pure_backend_proof_passes_check() -> None:
 
 
 def test_win32_pure_backend_covers_borderless_dwm_and_dib_surface() -> None:
-    source = WIN32_PURE_BACKEND.read_text(encoding="utf-8")
+    source = "\n".join(path.read_text(encoding="utf-8") for path in WIN32_PURE_MODULES)
     spec = json.loads(WIN32_PURE_BINDINGS.read_text(encoding="utf-8"))
     functions = {row["name"] for row in spec["functions"]}
     macros = set(spec["macros"])

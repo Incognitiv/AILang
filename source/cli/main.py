@@ -38,21 +38,16 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import json
 
+from cli import commands as _commands
 from cli.cinclude_diagnostics import emit_cinclude_backend_warning
 from cli.emit_c_output import maybe_emit_c_source
-
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    import tomli as tomllib
-
-from cli import commands as _commands
 from cli.pgo_options import (
     parse_pgo_cli_options,
     run_llvm_pgo_probe_cli,
     validate_pgo_cli_options,
     wants_llvm_pgo_probe,
 )
+from cli.version_info import read_project_version
 from runtime.modes import CompilationContext, CompilationMode
 from runtime.phases import enable_profiling, get_profile
 from runtime.unsafe_registry import UnsafeMode, UnsafeRegistry, set_registry
@@ -83,31 +78,6 @@ report_runtime_needs = _commands.report_runtime_needs
 run_static_analysis = _commands.run_static_analysis
 run_effect_policy_gate = _commands.run_effect_policy_gate
 _print_builtins = _commands._print_builtins
-DEFAULT_VERSION = "1.8.0"
-
-
-def _read_project_version() -> str:
-    """Read canonical version, falling back to DEFAULT_VERSION."""
-    try:
-        import version as _version
-
-        raw = getattr(_version, "__version__", "")
-        if isinstance(raw, str) and raw.strip():
-            return raw.strip()
-    except ImportError:
-        pass
-
-    # Fallback for source-only trees where version.py might be unavailable.
-    pyproject = Path(__file__).resolve().parents[2] / "pyproject.toml"
-    try:
-        data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
-        project = data.get("project", {})
-        version = project.get("version")
-        if isinstance(version, str) and version.strip():
-            return version.strip()
-    except (OSError, tomllib.TOMLDecodeError):
-        pass
-    return DEFAULT_VERSION
 
 
 def main():
@@ -132,14 +102,14 @@ def main():
 
         atexit.register(_print_phase_report)
     if "--version" in sys.argv:
-        print(f"AILang Compiler v{_read_project_version()}")
+        print(f"AILang Compiler v{read_project_version()}")
         sys.exit(0)
     if wants_llvm_pgo_probe(sys.argv):
         sys.exit(run_llvm_pgo_probe_cli(sys.argv))
     show_help = "--help" in sys.argv or "-h" in sys.argv
     if len(sys.argv) < 2 or show_help:
 
-        print(f"AILang Compiler v{_read_project_version()} - JIT and AOT Compilation")
+        print(f"AILang Compiler v{read_project_version()} - JIT and AOT Compilation")
         print()
         print("Usage:")
         print(

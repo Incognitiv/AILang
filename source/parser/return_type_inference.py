@@ -381,9 +381,7 @@ def infer_unannotated_return_types(program: list[A.ASTNode]) -> None:
                     f"Cannot infer return type for function '{fn.name}': it mixes value returns with bare return"
                 )
             else:
-                env = _collect_env(
-                    fn, cls, fn_returns, class_fields, class_methods
-                )
+                env = _collect_env(fn, cls, fn_returns, class_fields, class_methods)
                 inferred = ""
                 unresolved = False
                 for ret in valued:

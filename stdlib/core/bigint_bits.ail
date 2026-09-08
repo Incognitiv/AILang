@@ -1,0 +1,287 @@
+@library("core_bigint_bits")
+import stdlib.core.bigint
+
+// Bitwise, fit-check, and text-conversion operations for unbounded integers.
+
+u32 ailang_bigint_twos_limb(pointer x, int index, int width_limbs):
+    if index < 0 or index >= width_limbs then
+        return 0
+    end
+    if ailang_bigint_sign(x) >= 0 then
+        return ailang_bigint_limb(x, index)
+    end
+    // Infinite two's complement: ~magnitude + 1.
+    u64 carry = 1
+    int i = 0
+    u32 out = 0
+    while i <= index then
+        u64 cur = ((ailang_bigint_limb(x, i) bxor 4294967295) & 4294967295) + carry
+        out = cur & 4294967295
+        carry = cur >> 32
+        i += 1
+    end
+    return out
+end
+
+pointer ailang_bigint_from_twos_words(pointer words, int width_limbs):
+    if width_limbs <= 0 then
+        return ailang_bigint_new(1)
+    end
+    u32 top = reinterpret(u32, peek32(reinterpret(int, words), width_limbs - 1))
+    int negative = (top >> 31) & 1
+    pointer out = ailang_bigint_new(width_limbs)
+    int i = 0
+    if negative == 0 then
+        while i < width_limbs then
+            ailang_bigint_set_limb(out, i, reinterpret(u32, peek32(reinterpret(int, words), i)))
+            i += 1
+        end
+        ailang_bigint_set_len(out, width_limbs)
+        ailang_bigint_set_sign(out, 1)
+        ailang_bigint_normalize(out)
+        return out
+    end
+    // Magnitude is two's-complement negation of the finite word vector.
+    u64 carry = 1
+    while i < width_limbs then
+        u64 cur = ((reinterpret(u32, peek32(reinterpret(int, words), i)) bxor 4294967295) & 4294967295) + carry
+        ailang_bigint_set_limb(out, i, cur & 4294967295)
+        carry = cur >> 32
+        i += 1
+    end
+    ailang_bigint_set_len(out, width_limbs)
+    ailang_bigint_set_sign(out, -1)
+    ailang_bigint_normalize(out)
+    return out
+end
+
+pointer ailang_bigint_bitwise(pointer a, pointer b, int op):
+    int width = ailang_bigint_max_int(ailang_bigint_len(a), ailang_bigint_len(b)) + 1
+    int raw = alloc(width * 4)
+    int i = 0
+    while i < width then
+        u32 av = ailang_bigint_twos_limb(a, i, width)
+        u32 bv = ailang_bigint_twos_limb(b, i, width)
+        u32 value = 0
+        if op == 0 then
+            value = av & bv
+        else
+            if op == 1 then
+                value = av | bv
+            else
+                value = av bxor bv
+            end
+        end
+        poke32(raw, i, value)
+        i += 1
+    end
+    pointer out = ailang_bigint_from_twos_words(reinterpret(pointer, raw), width)
+    dealloc(raw)
+    return out
+end
+
+pointer ailang_bigint_and(pointer a, pointer b):
+    return ailang_bigint_bitwise(a, b, 0)
+end
+
+pointer ailang_bigint_or(pointer a, pointer b):
+    return ailang_bigint_bitwise(a, b, 1)
+end
+
+pointer ailang_bigint_xor(pointer a, pointer b):
+    return ailang_bigint_bitwise(a, b, 2)
+end
+
+pointer ailang_bigint_not(pointer a):
+    // Infinite two's-complement identity: ~x == -x - 1.
+    pointer zero = ailang_bigint_from_int(0)
+    pointer neg = ailang_bigint_sub(zero, a)
+    pointer one = ailang_bigint_from_int(1)
+    pointer out = ailang_bigint_sub(neg, one)
+    ailang_bigint_free(zero)
+    ailang_bigint_free(neg)
+    ailang_bigint_free(one)
+    return out
+end
+
+int ailang_bigint_is_power_of_two_abs(pointer x):
+    if ailang_bigint_sign(x) == 0 then
+        return 0
+    end
+    int seen = 0
+    int i = 0
+    while i < ailang_bigint_len(x) then
+        u32 v = ailang_bigint_limb(x, i)
+        if v != 0 then
+            if (v & (v - 1)) != 0 then
+                return 0
+            end
+            seen += 1
+            if seen > 1 then
+                return 0
+            end
+        end
+        i += 1
+    end
+    return seen
+end
+
+int ailang_bigint_fits_unsigned(pointer x, int bits):
+    if bits < 0 then
+        return 0
+    end
+    if ailang_bigint_sign(x) < 0 then
+        return 0
+    end
+    if ailang_bigint_sign(x) == 0 then
+        return 1
+    end
+    return ailang_bigint_bit_length_abs(x) <= bits
+end
+
+int ailang_bigint_fits_signed(pointer x, int bits):
+    if bits <= 0 then
+        return 0
+    end
+    int sign = ailang_bigint_sign(x)
+    if sign == 0 then
+        return 1
+    end
+    int length = ailang_bigint_bit_length_abs(x)
+    if sign > 0 then
+        return length < bits
+    end
+    if length < bits then
+        return 1
+    end
+    if length == bits and ailang_bigint_is_power_of_two_abs(x) != 0 then
+        return 1
+    end
+    return 0
+end
+
+u64 ailang_bigint_word_at(pointer x, int word_index):
+    if word_index < 0 then
+        return 0
+    end
+    int limb_index = word_index * 2
+    u64 low = ailang_bigint_limb(x, limb_index)
+    u64 high = ailang_bigint_limb(x, limb_index + 1)
+    return low | (high << 32)
+end
+
+int ailang_bigint_to_i64(pointer x):
+    if ailang_bigint_fits_signed(x, 64) == 0 then
+        ailang_bigint_fail("value does not fit i64")
+    end
+    u64 mag = ailang_bigint_word_at(x, 0)
+    if ailang_bigint_sign(x) < 0 then
+        if mag == 9223372036854775808 then
+            return -9223372036854775807 - 1
+        end
+        return -mag
+    end
+    return mag
+end
+
+u64 ailang_bigint_to_u64(pointer x):
+    if ailang_bigint_fits_unsigned(x, 64) == 0 then
+        ailang_bigint_fail("value does not fit u64")
+    end
+    return ailang_bigint_word_at(x, 0)
+end
+
+int ailang_bigint_div_small_inplace(pointer x, int divisor):
+    if divisor <= 0 then
+        ailang_bigint_fail("invalid small divisor")
+    end
+    u64 remainder = 0
+    int i = ailang_bigint_len(x)
+    while i > 0 then
+        i -= 1
+        u64 cur = (remainder << 32) | ailang_bigint_limb(x, i)
+        u64 q = cur / divisor
+        remainder = cur % divisor
+        ailang_bigint_set_limb(x, i, q)
+    end
+    ailang_bigint_normalize(x)
+    return remainder
+end
+
+string ailang_bigint_to_decimal(pointer x):
+    // Build decimal text directly in one owned byte buffer.  The old
+    // str_array/chr implementation allocated one heap string per digit and
+    // str_array only owned its pointer table, so formatting leaked every
+    // temporary character.  Raw bytes express the actual job without any
+    // foreign runtime or hidden ownership convention.
+    if ailang_bigint_sign(x) == 0 then
+        raw_zero = alloc(2)
+        poke8(raw_zero, 0, 48)
+        poke8(raw_zero, 1, 0)
+        return reinterpret(string, raw_zero)
+    end
+
+    pointer work = ailang_bigint_clone(x)
+    bool negative = ailang_bigint_sign(work) < 0
+    if negative then
+        ailang_bigint_set_sign(work, 1)
+    end
+
+    // bit_length/3 is a conservative upper bound for decimal digits because
+    // 1/log2(10) < 1/3.  Four spare bytes cover rounding, sign and NUL.
+    int capacity = ailang_bigint_bit_length_abs(work) / 3 + 4
+    raw = alloc(capacity + 1)
+    poke8(raw, capacity, 0)
+    int pos = capacity
+
+    while ailang_bigint_sign(work) != 0 then
+        int digit = ailang_bigint_div_small_inplace(work, 10)
+        pos -= 1
+        poke8(raw, pos, 48 + digit)
+    end
+    if negative then
+        pos -= 1
+        poke8(raw, pos, 45)
+    end
+
+    // Compact the suffix to the allocation base so ordinary dealloc(string)
+    // can free it; never return an interior pointer.
+    int length = capacity - pos
+    int i = 0
+    while i <= length then
+        poke8(raw, i, peek8(raw, pos + i))
+        i += 1
+    end
+    ailang_bigint_free(work)
+    return reinterpret(string, raw)
+end
+
+string ailang_bigint_to_decimal_take(pointer x):
+    string text = ailang_bigint_to_decimal(x)
+    ailang_bigint_free(x)
+    return text
+end
+
+void ailang_bigint_print(pointer x):
+    string text = ailang_bigint_to_decimal(x)
+    print(text)
+    dealloc(text)
+end
+
+int ailang_bigint_digits(pointer x):
+    string text = ailang_bigint_to_decimal(x)
+    int n = strlen(text)
+    dealloc(text)
+    if ailang_bigint_sign(x) < 0 then
+        return n - 1
+    end
+    return n
+end
+
+int ailang_bigint_live_count():
+    return ailang_bigint_live_count_value
+end
+
+int ailang_bigint_live_limb_bytes():
+    return ailang_bigint_live_limb_bytes_value
+end

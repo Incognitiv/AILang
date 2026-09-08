@@ -45,6 +45,7 @@ def test_hardening_gate_seed_matches_python_gate_metadata() -> None:
     names = [
         "AILANG_GATE_SOURCE_STRICT",
         "AILANG_GATE_VERIFIER_STRICT",
+        "AILANG_GATE_REPOSITORY_HYGIENE",
         "AILANG_GATE_FULL_PYTEST",
         "AILANG_GATE_C23_HOSTED",
         "AILANG_GATE_C23_FREESTANDING",

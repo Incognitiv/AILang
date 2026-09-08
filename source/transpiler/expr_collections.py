@@ -12,6 +12,7 @@ from typing import Any
 from llvmlite import ir
 from target_info import os_from_triple
 from transpiler.arithmetic_literal_proofs import int_literal_in_range
+from transpiler.comptime_eval import evaluate_comptime
 from transpiler.expr_common import ExprGenError
 from transpiler.llvm_fixed_dicts import try_fixed_dict_access
 
@@ -428,72 +429,11 @@ class ExprCollectionEmitter:
         return self.generate_expr(node.expr)
 
     def _evaluate_comptime(self, expr):
-        """Evaluate expression at compile time if possible."""
-        from parser import ast as A
-
-        if isinstance(expr, A.Number):
-            if expr.is_float:
-                return float(expr.value)
-            return int(expr.value)
-
-        if isinstance(expr, A.Bool):
-            return expr.value
-
-        if isinstance(expr, A.StringLit):
-            return expr.value
-
-        if isinstance(expr, A.Call):
-            if expr.args:
-                return None
-            if expr.name == "target_os":
-                return os_from_triple(self.codegen.module.triple)
-            if expr.name == "target_backend":
-                return "llvm"
-
-        if isinstance(expr, A.BinaryOp):
-            left = self._evaluate_comptime(expr.left)
-            right = self._evaluate_comptime(expr.right)
-            if left is None or right is None:
-                return None
-
-            op = expr.op
-            if op == "+":
-                return left + right
-            if op == "-":
-                return left - right
-            if op == "*":
-                return left * right
-            if op == "/":
-                if right == 0:
-                    return None
-                return left // right if isinstance(left, int) else left / right
-            if op == "%":
-                return left % right
-            if op == "**":
-                return left**right
-            if op == "==":
-                return left == right
-            if op == "!=":
-                return left != right
-            if op == "<":
-                return left < right
-            if op == ">":
-                return left > right
-            if op == "<=":
-                return left <= right
-            if op == ">=":
-                return left >= right
-
-        if isinstance(expr, A.UnaryOp):
-            operand = self._evaluate_comptime(expr.operand)
-            if operand is None:
-                return None
-            if expr.op == "-":
-                return -operand
-            if expr.op in ("not", "!"):
-                return not operand
-
-        return None
+        return evaluate_comptime(
+            expr,
+            target_os=os_from_triple(self.codegen.module.triple),
+            target_backend="llvm",
+        )
 
     def visit_Cast(self, node: Cast):
         value = self.generate_expr(node.expr)

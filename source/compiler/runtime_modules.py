@@ -12,7 +12,13 @@ from parser import ast as A
 from parser.ast import parsed_type_to_str
 from typing import Any
 
-_BIGINT_MODULES = ("stdlib.core.bigint", "stdlib.core.bigint_pow")
+_BIGINT_MODULES = (
+    "stdlib.core.bigint",
+    "stdlib.core.bigint_bits",
+    "stdlib.core.bigint_adapters",
+    "stdlib.core.bigint_wide_adapters",
+    "stdlib.core.bigint_pow",
+)
 
 
 def _spec_is_unbounded(value: Any) -> bool:

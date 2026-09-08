@@ -2,10 +2,11 @@
 // Python currently owns orchestration; this file keeps the contract visible to
 // AILang-side tooling so a future self-hosted compiler can inherit it directly.
 
-const int AILANG_GOLDEN_GATE_STEP_COUNT = 8
+const int AILANG_GOLDEN_GATE_STEP_COUNT = 9
 
 const string AILANG_GATE_SOURCE_STRICT = "source_strict"
 const string AILANG_GATE_VERIFIER_STRICT = "verifier_strict"
+const string AILANG_GATE_REPOSITORY_HYGIENE = "repository_hygiene"
 const string AILANG_GATE_FULL_PYTEST = "full_pytest"
 const string AILANG_GATE_C23_HOSTED = "c23_hosted_compile"
 const string AILANG_GATE_C23_FREESTANDING = "c23_freestanding_compile"
@@ -14,7 +15,7 @@ const string AILANG_GATE_EXECUTION_MATRIX = "ailang_execution_matrix"
 const string AILANG_GATE_EQUIVALENT_WORKLOADS = "equivalent_workload_parity"
 
 // Compatibility alias for tooling written before the Golden Gate rename.
-const int AILANG_HARD_GATE_STEP_COUNT = 8
+const int AILANG_HARD_GATE_STEP_COUNT = 9
 
 def golden_gate_step_count(): int
     return AILANG_GOLDEN_GATE_STEP_COUNT
@@ -28,21 +29,24 @@ def golden_gate_step_name(index: int): string
         return AILANG_GATE_VERIFIER_STRICT
     end
     if index == 2 then
-        return AILANG_GATE_FULL_PYTEST
+        return AILANG_GATE_REPOSITORY_HYGIENE
     end
     if index == 3 then
-        return AILANG_GATE_C23_HOSTED
+        return AILANG_GATE_FULL_PYTEST
     end
     if index == 4 then
-        return AILANG_GATE_C23_FREESTANDING
+        return AILANG_GATE_C23_HOSTED
     end
     if index == 5 then
-        return AILANG_GATE_BACKEND_DIFFERENTIAL
+        return AILANG_GATE_C23_FREESTANDING
     end
     if index == 6 then
-        return AILANG_GATE_EXECUTION_MATRIX
+        return AILANG_GATE_BACKEND_DIFFERENTIAL
     end
     if index == 7 then
+        return AILANG_GATE_EXECUTION_MATRIX
+    end
+    if index == 8 then
         return AILANG_GATE_EQUIVALENT_WORKLOADS
     end
     return ""
@@ -66,5 +70,6 @@ def main(): int
     print golden_gate_step_name(5)
     print golden_gate_step_name(6)
     print golden_gate_step_name(7)
+    print golden_gate_step_name(8)
     return 0
 end

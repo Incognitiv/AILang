@@ -1,0 +1,510 @@
+@library("core_bigint_wide_adapters")
+import stdlib.core.bigint
+import stdlib.core.bigint_bits
+
+// Wide fixed-width conversion adapters (u256/i256 through u8192/i8192).
+
+pointer ailang_bigint_from_u256_value(u256 value):
+    int raw = alloc(32)
+    int i = 0
+    while i < 4 then
+        u256 shifted = value >> (i * 64)
+        u64 word = shifted & 18446744073709551615
+        poke64(raw, i, word)
+        i += 1
+    end
+    int sign = 0
+    if value != 0 then
+        sign = 1
+    end
+    pointer out = ailang_bigint_from_words(sign, reinterpret(pointer, raw), 4)
+    dealloc(raw)
+    return out
+end
+
+pointer ailang_bigint_from_i256_value(i256 value):
+    u256 mag = reinterpret(u256, value)
+    int sign = 0
+    if value < 0 then
+        i256 neg_one = -1
+        u256 all_bits = reinterpret(u256, neg_one)
+        mag = (mag bxor all_bits) + 1
+        sign = -1
+    else
+        if value > 0 then
+            sign = 1
+        end
+    end
+    int raw = alloc(32)
+    int i = 0
+    while i < 4 then
+        u256 shifted = mag >> (i * 64)
+        u64 word = shifted & 18446744073709551615
+        poke64(raw, i, word)
+        i += 1
+    end
+    pointer out = ailang_bigint_from_words(sign, reinterpret(pointer, raw), 4)
+    dealloc(raw)
+    return out
+end
+
+u256 ailang_bigint_to_u256_value(pointer value):
+    if ailang_bigint_fits_unsigned(value, 256) == 0 then
+        ailang_bigint_fail("value does not fit u256")
+    end
+    u256 out = 0
+    int i = 0
+    while i < 4 then
+        u256 piece = ailang_bigint_word_at(value, i)
+        if i != 0 then
+            piece = piece << (i * 64)
+        end
+        out = out | piece
+        i += 1
+    end
+    return out
+end
+
+i256 ailang_bigint_to_i256_value(pointer value):
+    if ailang_bigint_fits_signed(value, 256) == 0 then
+        ailang_bigint_fail("value does not fit i256")
+    end
+    u256 mag = 0
+    int i = 0
+    while i < 4 then
+        u256 piece = ailang_bigint_word_at(value, i)
+        if i != 0 then
+            piece = piece << (i * 64)
+        end
+        mag = mag | piece
+        i += 1
+    end
+    if ailang_bigint_sign(value) < 0 then
+        i256 neg_one = -1
+        u256 all_bits = reinterpret(u256, neg_one)
+        u256 bits = (mag bxor all_bits) + 1
+        return reinterpret(i256, bits)
+    end
+    return reinterpret(i256, mag)
+end
+
+pointer ailang_bigint_from_u512_value(u512 value):
+    int raw = alloc(64)
+    int i = 0
+    while i < 8 then
+        u512 shifted = value >> (i * 64)
+        u64 word = shifted & 18446744073709551615
+        poke64(raw, i, word)
+        i += 1
+    end
+    int sign = 0
+    if value != 0 then
+        sign = 1
+    end
+    pointer out = ailang_bigint_from_words(sign, reinterpret(pointer, raw), 8)
+    dealloc(raw)
+    return out
+end
+
+pointer ailang_bigint_from_i512_value(i512 value):
+    u512 mag = reinterpret(u512, value)
+    int sign = 0
+    if value < 0 then
+        i512 neg_one = -1
+        u512 all_bits = reinterpret(u512, neg_one)
+        mag = (mag bxor all_bits) + 1
+        sign = -1
+    else
+        if value > 0 then
+            sign = 1
+        end
+    end
+    int raw = alloc(64)
+    int i = 0
+    while i < 8 then
+        u512 shifted = mag >> (i * 64)
+        u64 word = shifted & 18446744073709551615
+        poke64(raw, i, word)
+        i += 1
+    end
+    pointer out = ailang_bigint_from_words(sign, reinterpret(pointer, raw), 8)
+    dealloc(raw)
+    return out
+end
+
+u512 ailang_bigint_to_u512_value(pointer value):
+    if ailang_bigint_fits_unsigned(value, 512) == 0 then
+        ailang_bigint_fail("value does not fit u512")
+    end
+    u512 out = 0
+    int i = 0
+    while i < 8 then
+        u512 piece = ailang_bigint_word_at(value, i)
+        if i != 0 then
+            piece = piece << (i * 64)
+        end
+        out = out | piece
+        i += 1
+    end
+    return out
+end
+
+i512 ailang_bigint_to_i512_value(pointer value):
+    if ailang_bigint_fits_signed(value, 512) == 0 then
+        ailang_bigint_fail("value does not fit i512")
+    end
+    u512 mag = 0
+    int i = 0
+    while i < 8 then
+        u512 piece = ailang_bigint_word_at(value, i)
+        if i != 0 then
+            piece = piece << (i * 64)
+        end
+        mag = mag | piece
+        i += 1
+    end
+    if ailang_bigint_sign(value) < 0 then
+        i512 neg_one = -1
+        u512 all_bits = reinterpret(u512, neg_one)
+        u512 bits = (mag bxor all_bits) + 1
+        return reinterpret(i512, bits)
+    end
+    return reinterpret(i512, mag)
+end
+
+pointer ailang_bigint_from_u1024_value(u1024 value):
+    int raw = alloc(128)
+    int i = 0
+    while i < 16 then
+        u1024 shifted = value >> (i * 64)
+        u64 word = shifted & 18446744073709551615
+        poke64(raw, i, word)
+        i += 1
+    end
+    int sign = 0
+    if value != 0 then
+        sign = 1
+    end
+    pointer out = ailang_bigint_from_words(sign, reinterpret(pointer, raw), 16)
+    dealloc(raw)
+    return out
+end
+
+pointer ailang_bigint_from_i1024_value(i1024 value):
+    u1024 mag = reinterpret(u1024, value)
+    int sign = 0
+    if value < 0 then
+        i1024 neg_one = -1
+        u1024 all_bits = reinterpret(u1024, neg_one)
+        mag = (mag bxor all_bits) + 1
+        sign = -1
+    else
+        if value > 0 then
+            sign = 1
+        end
+    end
+    int raw = alloc(128)
+    int i = 0
+    while i < 16 then
+        u1024 shifted = mag >> (i * 64)
+        u64 word = shifted & 18446744073709551615
+        poke64(raw, i, word)
+        i += 1
+    end
+    pointer out = ailang_bigint_from_words(sign, reinterpret(pointer, raw), 16)
+    dealloc(raw)
+    return out
+end
+
+u1024 ailang_bigint_to_u1024_value(pointer value):
+    if ailang_bigint_fits_unsigned(value, 1024) == 0 then
+        ailang_bigint_fail("value does not fit u1024")
+    end
+    u1024 out = 0
+    int i = 0
+    while i < 16 then
+        u1024 piece = ailang_bigint_word_at(value, i)
+        if i != 0 then
+            piece = piece << (i * 64)
+        end
+        out = out | piece
+        i += 1
+    end
+    return out
+end
+
+i1024 ailang_bigint_to_i1024_value(pointer value):
+    if ailang_bigint_fits_signed(value, 1024) == 0 then
+        ailang_bigint_fail("value does not fit i1024")
+    end
+    u1024 mag = 0
+    int i = 0
+    while i < 16 then
+        u1024 piece = ailang_bigint_word_at(value, i)
+        if i != 0 then
+            piece = piece << (i * 64)
+        end
+        mag = mag | piece
+        i += 1
+    end
+    if ailang_bigint_sign(value) < 0 then
+        i1024 neg_one = -1
+        u1024 all_bits = reinterpret(u1024, neg_one)
+        u1024 bits = (mag bxor all_bits) + 1
+        return reinterpret(i1024, bits)
+    end
+    return reinterpret(i1024, mag)
+end
+
+pointer ailang_bigint_from_u2048_value(u2048 value):
+    int raw = alloc(256)
+    int i = 0
+    while i < 32 then
+        u2048 shifted = value >> (i * 64)
+        u64 word = shifted & 18446744073709551615
+        poke64(raw, i, word)
+        i += 1
+    end
+    int sign = 0
+    if value != 0 then
+        sign = 1
+    end
+    pointer out = ailang_bigint_from_words(sign, reinterpret(pointer, raw), 32)
+    dealloc(raw)
+    return out
+end
+
+pointer ailang_bigint_from_i2048_value(i2048 value):
+    u2048 mag = reinterpret(u2048, value)
+    int sign = 0
+    if value < 0 then
+        i2048 neg_one = -1
+        u2048 all_bits = reinterpret(u2048, neg_one)
+        mag = (mag bxor all_bits) + 1
+        sign = -1
+    else
+        if value > 0 then
+            sign = 1
+        end
+    end
+    int raw = alloc(256)
+    int i = 0
+    while i < 32 then
+        u2048 shifted = mag >> (i * 64)
+        u64 word = shifted & 18446744073709551615
+        poke64(raw, i, word)
+        i += 1
+    end
+    pointer out = ailang_bigint_from_words(sign, reinterpret(pointer, raw), 32)
+    dealloc(raw)
+    return out
+end
+
+u2048 ailang_bigint_to_u2048_value(pointer value):
+    if ailang_bigint_fits_unsigned(value, 2048) == 0 then
+        ailang_bigint_fail("value does not fit u2048")
+    end
+    u2048 out = 0
+    int i = 0
+    while i < 32 then
+        u2048 piece = ailang_bigint_word_at(value, i)
+        if i != 0 then
+            piece = piece << (i * 64)
+        end
+        out = out | piece
+        i += 1
+    end
+    return out
+end
+
+i2048 ailang_bigint_to_i2048_value(pointer value):
+    if ailang_bigint_fits_signed(value, 2048) == 0 then
+        ailang_bigint_fail("value does not fit i2048")
+    end
+    u2048 mag = 0
+    int i = 0
+    while i < 32 then
+        u2048 piece = ailang_bigint_word_at(value, i)
+        if i != 0 then
+            piece = piece << (i * 64)
+        end
+        mag = mag | piece
+        i += 1
+    end
+    if ailang_bigint_sign(value) < 0 then
+        i2048 neg_one = -1
+        u2048 all_bits = reinterpret(u2048, neg_one)
+        u2048 bits = (mag bxor all_bits) + 1
+        return reinterpret(i2048, bits)
+    end
+    return reinterpret(i2048, mag)
+end
+
+pointer ailang_bigint_from_u4096_value(u4096 value):
+    int raw = alloc(512)
+    int i = 0
+    while i < 64 then
+        u4096 shifted = value >> (i * 64)
+        u64 word = shifted & 18446744073709551615
+        poke64(raw, i, word)
+        i += 1
+    end
+    int sign = 0
+    if value != 0 then
+        sign = 1
+    end
+    pointer out = ailang_bigint_from_words(sign, reinterpret(pointer, raw), 64)
+    dealloc(raw)
+    return out
+end
+
+pointer ailang_bigint_from_i4096_value(i4096 value):
+    u4096 mag = reinterpret(u4096, value)
+    int sign = 0
+    if value < 0 then
+        i4096 neg_one = -1
+        u4096 all_bits = reinterpret(u4096, neg_one)
+        mag = (mag bxor all_bits) + 1
+        sign = -1
+    else
+        if value > 0 then
+            sign = 1
+        end
+    end
+    int raw = alloc(512)
+    int i = 0
+    while i < 64 then
+        u4096 shifted = mag >> (i * 64)
+        u64 word = shifted & 18446744073709551615
+        poke64(raw, i, word)
+        i += 1
+    end
+    pointer out = ailang_bigint_from_words(sign, reinterpret(pointer, raw), 64)
+    dealloc(raw)
+    return out
+end
+
+u4096 ailang_bigint_to_u4096_value(pointer value):
+    if ailang_bigint_fits_unsigned(value, 4096) == 0 then
+        ailang_bigint_fail("value does not fit u4096")
+    end
+    u4096 out = 0
+    int i = 0
+    while i < 64 then
+        u4096 piece = ailang_bigint_word_at(value, i)
+        if i != 0 then
+            piece = piece << (i * 64)
+        end
+        out = out | piece
+        i += 1
+    end
+    return out
+end
+
+i4096 ailang_bigint_to_i4096_value(pointer value):
+    if ailang_bigint_fits_signed(value, 4096) == 0 then
+        ailang_bigint_fail("value does not fit i4096")
+    end
+    u4096 mag = 0
+    int i = 0
+    while i < 64 then
+        u4096 piece = ailang_bigint_word_at(value, i)
+        if i != 0 then
+            piece = piece << (i * 64)
+        end
+        mag = mag | piece
+        i += 1
+    end
+    if ailang_bigint_sign(value) < 0 then
+        i4096 neg_one = -1
+        u4096 all_bits = reinterpret(u4096, neg_one)
+        u4096 bits = (mag bxor all_bits) + 1
+        return reinterpret(i4096, bits)
+    end
+    return reinterpret(i4096, mag)
+end
+
+pointer ailang_bigint_from_u8192_value(u8192 value):
+    int raw = alloc(1024)
+    int i = 0
+    while i < 128 then
+        u8192 shifted = value >> (i * 64)
+        u64 word = shifted & 18446744073709551615
+        poke64(raw, i, word)
+        i += 1
+    end
+    int sign = 0
+    if value != 0 then
+        sign = 1
+    end
+    pointer out = ailang_bigint_from_words(sign, reinterpret(pointer, raw), 128)
+    dealloc(raw)
+    return out
+end
+
+pointer ailang_bigint_from_i8192_value(i8192 value):
+    u8192 mag = reinterpret(u8192, value)
+    int sign = 0
+    if value < 0 then
+        i8192 neg_one = -1
+        u8192 all_bits = reinterpret(u8192, neg_one)
+        mag = (mag bxor all_bits) + 1
+        sign = -1
+    else
+        if value > 0 then
+            sign = 1
+        end
+    end
+    int raw = alloc(1024)
+    int i = 0
+    while i < 128 then
+        u8192 shifted = mag >> (i * 64)
+        u64 word = shifted & 18446744073709551615
+        poke64(raw, i, word)
+        i += 1
+    end
+    pointer out = ailang_bigint_from_words(sign, reinterpret(pointer, raw), 128)
+    dealloc(raw)
+    return out
+end
+
+u8192 ailang_bigint_to_u8192_value(pointer value):
+    if ailang_bigint_fits_unsigned(value, 8192) == 0 then
+        ailang_bigint_fail("value does not fit u8192")
+    end
+    u8192 out = 0
+    int i = 0
+    while i < 128 then
+        u8192 piece = ailang_bigint_word_at(value, i)
+        if i != 0 then
+            piece = piece << (i * 64)
+        end
+        out = out | piece
+        i += 1
+    end
+    return out
+end
+
+i8192 ailang_bigint_to_i8192_value(pointer value):
+    if ailang_bigint_fits_signed(value, 8192) == 0 then
+        ailang_bigint_fail("value does not fit i8192")
+    end
+    u8192 mag = 0
+    int i = 0
+    while i < 128 then
+        u8192 piece = ailang_bigint_word_at(value, i)
+        if i != 0 then
+            piece = piece << (i * 64)
+        end
+        mag = mag | piece
+        i += 1
+    end
+    if ailang_bigint_sign(value) < 0 then
+        i8192 neg_one = -1
+        u8192 all_bits = reinterpret(u8192, neg_one)
+        u8192 bits = (mag bxor all_bits) + 1
+        return reinterpret(i8192, bits)
+    end
+    return reinterpret(i8192, mag)
+end
+

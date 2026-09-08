@@ -398,15 +398,11 @@ def _load_sqlite_library() -> None:
         if sqlite_lib and _try_load_lib(sqlite_lib):
             return
 
-    # Fallback: try common paths on Linux
+    # Loader-level fallback. Sonames remain portable across Unix filesystem
+    # layouts; the dynamic loader decides where the library actually lives.
     if sys.platform != "win32":
-        common_paths = [
-            "/usr/lib/x86_64-linux-gnu/libsqlite3.so.0",
-            "/usr/lib/libsqlite3.so",
-            "/usr/local/lib/libsqlite3.so",
-        ]
-        for path in common_paths:
-            if _try_load_lib(path):
+        for soname in ("libsqlite3.so.0", "libsqlite3.so", "libsqlite3.dylib"):
+            if _try_load_lib(soname):
                 return
     # SQLite not available - that's okay for non-SQLite programs
 

@@ -21,6 +21,7 @@ from transpiler.class_field_ownership import (
     string_len_field_name,
     string_len_param_name,
 )
+from transpiler.comptime_eval import evaluate_comptime
 from transpiler.fixed_int_cast_codegen import checked_fixed_int_conversion_expr
 
 from .local_int_narrowing import apply_proven_i32_narrowing
@@ -516,74 +517,11 @@ def visit_StaticAssert(self, node: A.StaticAssert) -> None:
 
 
 def _evaluate_comptime(self, expr: A.ASTNode) -> Any:
-    """Evaluate an expression at compile time if possible."""
-    if isinstance(expr, A.Number):
-        if expr.is_float:
-            return float(expr.value)
-        return int(expr.value)
-
-    if isinstance(expr, A.Bool):
-        return expr.value
-
-    if isinstance(expr, A.StringLit):
-        return expr.value
-
-    if isinstance(expr, A.Call):
-        if expr.args:
-            return None
-        if expr.name == "target_os":
-            return os_from_platform()
-        if expr.name == "target_backend":
-            return "c"
-
-    if isinstance(expr, A.BinaryOp):
-        left = self._evaluate_comptime(expr.left)
-        right = self._evaluate_comptime(expr.right)
-        if left is None or right is None:
-            return None
-
-        op = expr.op
-        if op == "+":
-            return left + right
-        if op == "-":
-            return left - right
-        if op == "*":
-            return left * right
-        if op == "/":
-            if right == 0:
-                return None  # Can't divide by zero
-            return left // right if isinstance(left, int) else left / right
-        if op == "%":
-            return left % right
-        if op == "**":
-            return left**right
-        if op == "==":
-            return left == right
-        if op == "!=":
-            return left != right
-        if op == "<":
-            return left < right
-        if op == ">":
-            return left > right
-        if op == "<=":
-            return left <= right
-        if op == ">=":
-            return left >= right
-        if op in ("and", "&&"):
-            return left and right
-        if op in ("or", "||"):
-            return left or right
-
-    if isinstance(expr, A.UnaryOp):
-        operand = self._evaluate_comptime(expr.operand)
-        if operand is None:
-            return None
-        if expr.op == "-":
-            return -operand
-        if expr.op in ("not", "!"):
-            return not operand
-
-    return None
+    return evaluate_comptime(
+        expr,
+        target_os=os_from_platform(),
+        target_backend="c",
+    )
 
 
 def visit_ClassDef(self, node: A.ClassDef) -> None:

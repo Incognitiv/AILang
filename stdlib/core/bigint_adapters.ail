@@ -1,0 +1,287 @@
+@library("core_bigint_adapters")
+import stdlib.core.bigint
+import stdlib.core.bigint_bits
+
+// Ownership-taking and fixed-width adapter operations for unbounded integers.
+
+// === unbounded language adapters (pure AILang) ===
+// These adapters are compiled from this .ail module by every backend.  They
+// contain language semantics/ownership bridges that previously leaked into C.
+
+pointer ailang_bigint_add_take(pointer a, pointer b):
+    pointer out = ailang_bigint_add(a, b)
+    ailang_bigint_free(a)
+    ailang_bigint_free(b)
+    return out
+end
+
+pointer ailang_bigint_sub_take(pointer a, pointer b):
+    pointer out = ailang_bigint_sub(a, b)
+    ailang_bigint_free(a)
+    ailang_bigint_free(b)
+    return out
+end
+
+pointer ailang_bigint_mul_take(pointer a, pointer b):
+    pointer out = ailang_bigint_mul(a, b)
+    ailang_bigint_free(a)
+    ailang_bigint_free(b)
+    return out
+end
+
+pointer ailang_bigint_div_take(pointer a, pointer b):
+    pointer out = ailang_bigint_div(a, b)
+    ailang_bigint_free(a)
+    ailang_bigint_free(b)
+    return out
+end
+
+pointer ailang_bigint_mod_take(pointer a, pointer b):
+    pointer out = ailang_bigint_mod(a, b)
+    ailang_bigint_free(a)
+    ailang_bigint_free(b)
+    return out
+end
+
+pointer ailang_bigint_and_take(pointer a, pointer b):
+    pointer out = ailang_bigint_and(a, b)
+    ailang_bigint_free(a)
+    ailang_bigint_free(b)
+    return out
+end
+
+pointer ailang_bigint_or_take(pointer a, pointer b):
+    pointer out = ailang_bigint_or(a, b)
+    ailang_bigint_free(a)
+    ailang_bigint_free(b)
+    return out
+end
+
+pointer ailang_bigint_xor_take(pointer a, pointer b):
+    pointer out = ailang_bigint_xor(a, b)
+    ailang_bigint_free(a)
+    ailang_bigint_free(b)
+    return out
+end
+
+int ailang_bigint_cmp_take(pointer a, pointer b):
+    int out = ailang_bigint_cmp(a, b)
+    ailang_bigint_free(a)
+    ailang_bigint_free(b)
+    return out
+end
+
+pointer ailang_bigint_not_take(pointer a):
+    pointer out = ailang_bigint_not(a)
+    ailang_bigint_free(a)
+    return out
+end
+
+pointer ailang_bigint_neg_take(pointer a):
+    pointer zero = ailang_bigint_from_int(0)
+    pointer out = ailang_bigint_sub(zero, a)
+    ailang_bigint_free(zero)
+    ailang_bigint_free(a)
+    return out
+end
+
+pointer ailang_bigint_pow_take(pointer a, int exponent):
+    pointer out = ailang_bigint_pow(a, exponent)
+    ailang_bigint_free(a)
+    return out
+end
+
+pointer ailang_bigint_shl_take(pointer a, int shift):
+    pointer out = ailang_bigint_shl(a, shift)
+    ailang_bigint_free(a)
+    return out
+end
+
+pointer ailang_bigint_shr_take(pointer a, int shift):
+    pointer out = ailang_bigint_shr(a, shift)
+    ailang_bigint_free(a)
+    return out
+end
+
+int ailang_bigint_count_take(pointer value):
+    if ailang_bigint_sign(value) < 0 or ailang_bigint_fits_signed(value, 64) == 0 then
+        ailang_bigint_free(value)
+        ailang_bigint_fail("unbounded shift/exponent does not fit non-negative i64")
+    end
+    int out = ailang_bigint_to_i64(value)
+    ailang_bigint_free(value)
+    return out
+end
+
+pointer ailang_bigint_from_i8_value(i8 value):
+    return ailang_bigint_from_int(value)
+end
+
+pointer ailang_bigint_from_u8_value(u8 value):
+    return ailang_bigint_from_u64(value)
+end
+
+i8 ailang_bigint_to_i8_value(pointer value):
+    if ailang_bigint_fits_signed(value, 8) == 0 then
+        ailang_bigint_fail("value does not fit i8")
+    end
+    return ailang_bigint_to_i64(value)
+end
+
+u8 ailang_bigint_to_u8_value(pointer value):
+    if ailang_bigint_fits_unsigned(value, 8) == 0 then
+        ailang_bigint_fail("value does not fit u8")
+    end
+    return ailang_bigint_to_u64(value)
+end
+
+pointer ailang_bigint_from_i16_value(i16 value):
+    return ailang_bigint_from_int(value)
+end
+
+pointer ailang_bigint_from_u16_value(u16 value):
+    return ailang_bigint_from_u64(value)
+end
+
+i16 ailang_bigint_to_i16_value(pointer value):
+    if ailang_bigint_fits_signed(value, 16) == 0 then
+        ailang_bigint_fail("value does not fit i16")
+    end
+    return ailang_bigint_to_i64(value)
+end
+
+u16 ailang_bigint_to_u16_value(pointer value):
+    if ailang_bigint_fits_unsigned(value, 16) == 0 then
+        ailang_bigint_fail("value does not fit u16")
+    end
+    return ailang_bigint_to_u64(value)
+end
+
+pointer ailang_bigint_from_i32_value(i32 value):
+    return ailang_bigint_from_int(value)
+end
+
+pointer ailang_bigint_from_u32_value(u32 value):
+    return ailang_bigint_from_u64(value)
+end
+
+i32 ailang_bigint_to_i32_value(pointer value):
+    if ailang_bigint_fits_signed(value, 32) == 0 then
+        ailang_bigint_fail("value does not fit i32")
+    end
+    return ailang_bigint_to_i64(value)
+end
+
+u32 ailang_bigint_to_u32_value(pointer value):
+    if ailang_bigint_fits_unsigned(value, 32) == 0 then
+        ailang_bigint_fail("value does not fit u32")
+    end
+    return ailang_bigint_to_u64(value)
+end
+
+pointer ailang_bigint_from_i64_value(i64 value):
+    return ailang_bigint_from_int(value)
+end
+
+pointer ailang_bigint_from_u64_value(u64 value):
+    return ailang_bigint_from_u64(value)
+end
+
+i64 ailang_bigint_to_i64_value(pointer value):
+    if ailang_bigint_fits_signed(value, 64) == 0 then
+        ailang_bigint_fail("value does not fit i64")
+    end
+    return ailang_bigint_to_i64(value)
+end
+
+u64 ailang_bigint_to_u64_value(pointer value):
+    if ailang_bigint_fits_unsigned(value, 64) == 0 then
+        ailang_bigint_fail("value does not fit u64")
+    end
+    return ailang_bigint_to_u64(value)
+end
+
+pointer ailang_bigint_from_u128_value(u128 value):
+    int raw = alloc(16)
+    int i = 0
+    while i < 2 then
+        u128 shifted = value >> (i * 64)
+        u64 word = shifted & 18446744073709551615
+        poke64(raw, i, word)
+        i += 1
+    end
+    int sign = 0
+    if value != 0 then
+        sign = 1
+    end
+    pointer out = ailang_bigint_from_words(sign, reinterpret(pointer, raw), 2)
+    dealloc(raw)
+    return out
+end
+
+pointer ailang_bigint_from_i128_value(i128 value):
+    u128 mag = reinterpret(u128, value)
+    int sign = 0
+    if value < 0 then
+        i128 neg_one = -1
+        u128 all_bits = reinterpret(u128, neg_one)
+        mag = (mag bxor all_bits) + 1
+        sign = -1
+    else
+        if value > 0 then
+            sign = 1
+        end
+    end
+    int raw = alloc(16)
+    int i = 0
+    while i < 2 then
+        u128 shifted = mag >> (i * 64)
+        u64 word = shifted & 18446744073709551615
+        poke64(raw, i, word)
+        i += 1
+    end
+    pointer out = ailang_bigint_from_words(sign, reinterpret(pointer, raw), 2)
+    dealloc(raw)
+    return out
+end
+
+u128 ailang_bigint_to_u128_value(pointer value):
+    if ailang_bigint_fits_unsigned(value, 128) == 0 then
+        ailang_bigint_fail("value does not fit u128")
+    end
+    u128 out = 0
+    int i = 0
+    while i < 2 then
+        u128 piece = ailang_bigint_word_at(value, i)
+        if i != 0 then
+            piece = piece << (i * 64)
+        end
+        out = out | piece
+        i += 1
+    end
+    return out
+end
+
+i128 ailang_bigint_to_i128_value(pointer value):
+    if ailang_bigint_fits_signed(value, 128) == 0 then
+        ailang_bigint_fail("value does not fit i128")
+    end
+    u128 mag = 0
+    int i = 0
+    while i < 2 then
+        u128 piece = ailang_bigint_word_at(value, i)
+        if i != 0 then
+            piece = piece << (i * 64)
+        end
+        mag = mag | piece
+        i += 1
+    end
+    if ailang_bigint_sign(value) < 0 then
+        i128 neg_one = -1
+        u128 all_bits = reinterpret(u128, neg_one)
+        u128 bits = (mag bxor all_bits) + 1
+        return reinterpret(i128, bits)
+    end
+    return reinterpret(i128, mag)
+end
+

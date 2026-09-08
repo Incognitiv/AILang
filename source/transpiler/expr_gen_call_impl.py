@@ -419,7 +419,7 @@ def _generate_call(self, node: A.Call) -> str:
 
     builtins = c_builtin_mappings(self)
 
-    # ADAPT_REPAIR_DEALLOC_STR_ARRAY_DISPATCH_V1
+    # Dispatch deallocation by the resolved collection element type.
     # dealloc_str_array() is used for two C-side representations.
     # split() returns StringArray, which owns its copied token strings;
     # str_array_new()/str_array_push() return ailang_str_array, whose

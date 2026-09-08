@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import shlex
 import shutil
 import subprocess
 import sys
@@ -22,6 +21,7 @@ from cli.cinclude_diagnostics import collect_cinclude_include_dirs
 from cli.compilation import _extract_ailang_link_flags, _merge_link_flags
 from transpiler.core import transpile_file
 from validation_programs import generated_cases, materialize_case, runtime_surface_cases
+from wsl_smoke_common import run_in_wsl
 
 CORPUS_DIR = REPO_ROOT / "tests" / "corpus"
 DEFAULT_PROGRAMS = ["01_hello", "02_factorial", "03_fibonacci", "04_string_concat"]
@@ -65,21 +65,7 @@ def _run(cmd: list[str], *, env: dict[str, str] | None = None, timeout: int = 18
 
 
 def _run_wsl(args: argparse.Namespace) -> int:
-    if shutil.which("wsl.exe") is None and shutil.which("wsl") is None:
-        print("sanitizer smoke: wsl not found")
-        return 2
-    path_proc = subprocess.run(
-        ["wsl", "wslpath", "-a", REPO_ROOT.as_posix()],
-        capture_output=True,
-        text=True,
-        timeout=30,
-        check=False,
-    )
-    if path_proc.returncode != 0:
-        print(path_proc.stderr.strip() or "sanitizer smoke: wslpath failed")
-        return 2
-    repo_wsl = path_proc.stdout.strip()
-    forwarded = ["python3", "tools/sanitizer_smoke.py"]
+    forwarded: list[str] = []
     if args.compiler != "auto":
         forwarded.extend(["--compiler", args.compiler])
     for name in args.program:
@@ -91,14 +77,12 @@ def _run_wsl(args: argparse.Namespace) -> int:
     if args.generated:
         forwarded.extend(["--generated", str(args.generated)])
     forwarded.extend(["--seed", str(args.seed)])
-    command = (
-        "cd "
-        + shlex.quote(repo_wsl)
-        + " && "
-        + " ".join(shlex.quote(part) for part in forwarded)
+    return run_in_wsl(
+        repo_root=REPO_ROOT,
+        tool_path="tools/sanitizer_smoke.py",
+        forwarded_args=forwarded,
+        label="sanitizer smoke",
     )
-    proc = subprocess.run(["wsl", "bash", "-lc", command], check=False)
-    return int(proc.returncode)
 
 
 def _compile_and_run(source_file: Path, tmp: Path, compiler: str) -> SmokeResult:

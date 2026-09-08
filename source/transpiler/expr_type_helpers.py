@@ -7,6 +7,7 @@ refactor.
 
 from __future__ import annotations
 
+import sys
 from parser.ast import Number, Variable
 from typing import Any
 
