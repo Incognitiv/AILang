@@ -81,12 +81,12 @@ jobs:
           s = s.replace(old, new, 1)
           p.write_text(s, encoding='utf-8')
 
-          p = Path('source/transpiler/stmt_visit_data.py')
+          p = Path('source/transpiler/drop_plan.py')
           s = p.read_text(encoding='utf-8')
-          old = '''    if (\n        var_name in stack_classes\n        and isinstance(value, A.NewExpr)\n        and _emit_stack_class_construct(self, var_name, stack_classes[var_name], value)\n    ):\n'''
-          new = '''    if (\n        var_name in stack_classes\n        and getattr(self, "_loop_depth", 0) == 0\n        and isinstance(value, A.NewExpr)\n        and _emit_stack_class_construct(self, var_name, stack_classes[var_name], value)\n    ):\n'''
+          old = '''    if coerced == DropKind.OWNED_STRING:\n        checker = is_owned_string_alloc or _default_owned_string_alloc\n        return bool(checker(expr))\n'''
+          new = '''    if coerced == DropKind.OWNED_STRING:\n        # In a string-typed ownership context, binary + is the language string\n        # concatenation operator and therefore materializes fresh storage. Do\n        # not make transfer ownership depend on a secondary type-info lookup:\n        # constructor lowering already knows the target parameter/field is a\n        # string, and stale function-scope type facts must not turn an owning\n        # value into a borrowed one.\n        if isinstance(expr, A.BinaryOp) and expr.op.lower() in {"+", "plus"}:\n            return True\n        checker = is_owned_string_alloc or _default_owned_string_alloc\n        return bool(checker(expr))\n'''
           if old not in s:
-              raise SystemExit('stack class reassign anchor missing')
+              raise SystemExit('owned string drop-plan anchor missing')
           p.write_text(s.replace(old, new, 1), encoding='utf-8')
 
           t = Path('tests/test_c_wide_ints.py')
@@ -133,7 +133,7 @@ jobs:
           ])
           t.write_text(text[:start] + replacement + text[end:], encoding='utf-8')
           PY
-          python -m py_compile source/transpiler/core_type_lowering.py source/cli/compilation.py source/transpiler/strlen_assign_cache.py source/transpiler/stmt_visit_data.py tests/test_c_wide_ints.py tests/test_llvm_wide_ints.py
+          python -m py_compile source/transpiler/core_type_lowering.py source/cli/compilation.py source/transpiler/strlen_assign_cache.py source/transpiler/drop_plan.py tests/test_c_wide_ints.py tests/test_llvm_wide_ints.py
 
       - name: C fixed wide and unbounded integers
         run: |
