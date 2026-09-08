@@ -52,6 +52,43 @@ jobs:
               raise SystemExit('C backend timeout anchor missing')
           p.write_text(s.replace(old, new, 1), encoding='utf-8')
 
+          p = Path('source/transpiler/strlen_assign_cache.py')
+          s = p.read_text(encoding='utf-8')
+          anchor = 'def strlen_cache_var_name(var_name: str) -> str:\n    return f"__ailang_strlen_{var_name}"\n\n\n'
+          insert = '''def strlen_cache_var_name(var_name: str) -> str:\n    return f"__ailang_strlen_{var_name}"\n\n\ndef _emission_type_map(emitter: Any) -> Dict[str, str]:\n    """Use the same function-local type facts during analysis and emission."""\n    local_types = getattr(emitter, "_current_local_c_types", None)\n    if isinstance(local_types, dict) and local_types:\n        return local_types\n    fallback = getattr(emitter, "_var_types", None)\n    return fallback if isinstance(fallback, dict) else {}\n\n\n'''
+          if anchor not in s:
+              raise SystemExit('strlen type-map insertion anchor missing')
+          s = s.replace(anchor, insert, 1)
+          s = s.replace(
+              '    value_arg = str_known_integer_arg(emitter, value)\n',
+              '    type_map = _emission_type_map(emitter)\n    value_arg = str_known_integer_arg(emitter, value, type_map)\n',
+              1,
+          )
+          s = s.replace(
+              '    base_arg = baseconv_known_integer_arg(emitter, value)\n',
+              '    base_arg = baseconv_known_integer_arg(emitter, value, type_map)\n',
+              1,
+          )
+          s = s.replace(
+              '    if interpolation_known_length(emitter, value, getattr(emitter, "_var_types", {})):\n',
+              '    if interpolation_known_length(emitter, value, type_map):\n',
+              1,
+          )
+          old = '''    return is_length_only_string_producer(\n        emitter, value, getattr(emitter, "_var_types", {})\n    )\n'''
+          new = '''    return is_length_only_string_producer(\n        emitter, value, _emission_type_map(emitter)\n    )\n'''
+          if old not in s:
+              raise SystemExit('length-only emission anchor missing')
+          s = s.replace(old, new, 1)
+          p.write_text(s, encoding='utf-8')
+
+          p = Path('source/transpiler/stmt_visit_data.py')
+          s = p.read_text(encoding='utf-8')
+          old = '''    if (\n        var_name in stack_classes\n        and isinstance(value, A.NewExpr)\n        and _emit_stack_class_construct(self, var_name, stack_classes[var_name], value)\n    ):\n'''
+          new = '''    if (\n        var_name in stack_classes\n        and getattr(self, "_loop_depth", 0) == 0\n        and isinstance(value, A.NewExpr)\n        and _emit_stack_class_construct(self, var_name, stack_classes[var_name], value)\n    ):\n'''
+          if old not in s:
+              raise SystemExit('stack class reassign anchor missing')
+          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+
           t = Path('tests/test_c_wide_ints.py')
           text = t.read_text(encoding='utf-8')
           start = text.index('def test_c_backend_rejects_unbounded_instead_of_silent_i64_truncation():')
@@ -96,7 +133,7 @@ jobs:
           ])
           t.write_text(text[:start] + replacement + text[end:], encoding='utf-8')
           PY
-          python -m py_compile source/transpiler/core_type_lowering.py source/cli/compilation.py tests/test_c_wide_ints.py tests/test_llvm_wide_ints.py
+          python -m py_compile source/transpiler/core_type_lowering.py source/cli/compilation.py source/transpiler/strlen_assign_cache.py source/transpiler/stmt_visit_data.py tests/test_c_wide_ints.py tests/test_llvm_wide_ints.py
 
       - name: C fixed wide and unbounded integers
         run: |
@@ -126,5 +163,5 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
           git diff --cached --check
-          git commit -m 'Align bool and unbounded integer backend semantics'
+          git commit -m 'Repair integer, ownership, and scalarization semantics'
           git push origin HEAD:agent/unbounded-field-semantics
