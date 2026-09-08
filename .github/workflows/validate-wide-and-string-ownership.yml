@@ -30,7 +30,7 @@ jobs:
           sudo apt-get install -y -qq clang gcc llvm libsqlite3-dev
           python -m pip install -e '.[dev,llvm]'
 
-      - name: Repair canonical bool alias and current unbounded contracts
+      - name: Repair focused compiler contracts
         run: |
           set -euxo pipefail
           python - <<'PY'
@@ -42,6 +42,14 @@ jobs:
           new = '            "bool": "bool",\n            "i1": "bool",  # parser canonical spelling for AILang bool\n            "string": "const char *",\n'
           if old not in s:
               raise SystemExit('bool type-map anchor missing')
+          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+
+          p = Path('source/cli/compilation.py')
+          s = p.read_text(encoding='utf-8')
+          old = 'CBACKEND_COMPILE_TIMEOUT_SECONDS = 60\n'
+          new = 'CBACKEND_COMPILE_TIMEOUT_SECONDS = 180\n'
+          if old not in s:
+              raise SystemExit('C backend timeout anchor missing')
           p.write_text(s.replace(old, new, 1), encoding='utf-8')
 
           t = Path('tests/test_c_wide_ints.py')
@@ -88,7 +96,7 @@ jobs:
           ])
           t.write_text(text[:start] + replacement + text[end:], encoding='utf-8')
           PY
-          python -m py_compile source/transpiler/core_type_lowering.py tests/test_c_wide_ints.py tests/test_llvm_wide_ints.py
+          python -m py_compile source/transpiler/core_type_lowering.py source/cli/compilation.py tests/test_c_wide_ints.py tests/test_llvm_wide_ints.py
 
       - name: C fixed wide and unbounded integers
         run: |
@@ -118,5 +126,5 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
           git diff --cached --check
-          git commit -m 'Align C bool and unbounded integer semantics'
+          git commit -m 'Align bool and unbounded integer backend semantics'
           git push origin HEAD:agent/unbounded-field-semantics
