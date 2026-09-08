@@ -175,9 +175,13 @@ def mul_zero(n: int): int
 end
 """
     c_code = _to_c(src)
-    assert "ailang_safe_add" not in c_code
-    assert "ailang_safe_sub" not in c_code
-    assert "ailang_safe_mul" not in c_code
+    bodies = "\n".join(
+        _c_function_body(c_code, name)
+        for name in ("add_zero", "zero_add", "sub_zero", "mul_one", "one_mul", "mul_zero")
+    )
+    assert "ailang_safe_add" not in bodies
+    assert "ailang_safe_sub" not in bodies
+    assert "ailang_safe_mul" not in bodies
     assert "return (n + 0LL);" in _c_function_body(c_code, "add_zero")
     assert "return (0LL + n);" in _c_function_body(c_code, "zero_add")
     assert "return (n - 0LL);" in _c_function_body(c_code, "sub_zero")
@@ -511,9 +515,11 @@ def literal_mul(): int
 end
 """
     c_code = _to_c(src)
-    assert "ailang_safe_add" not in c_code
-    assert "ailang_safe_mul" not in c_code
-    assert "return (6LL + 2LL);" in _c_function_body(c_code, "literal_add")
+    literal_add_body = _c_function_body(c_code, "literal_add")
+    literal_mul_body = _c_function_body(c_code, "literal_mul")
+    assert "ailang_safe_add" not in literal_add_body
+    assert "ailang_safe_mul" not in literal_mul_body
+    assert "return (6LL + 2LL);" in literal_add_body
     assert "return (7LL * 3LL);" in _c_function_body(c_code, "literal_mul")
 
 
@@ -572,8 +578,6 @@ end
     assert "return (n << 3LL);" in shl_body
     assert "ailang_safe_shr(" not in shr_body
     assert "return (n >> 2LL);" in shr_body
-    assert "ailang_safe_shl" not in c_code
-    assert "ailang_safe_shr" not in c_code
 
 
 def test_c_invalid_literal_shift_amount_keeps_runtime_checks() -> None:

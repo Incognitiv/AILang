@@ -197,10 +197,21 @@ def _run_cmd(
 
 
 def _extract_result_int(text: str) -> Optional[int]:
-    tokens = re.findall(r"[-+]?\d+", text.replace("\r", "\n"))
-    if not tokens:
+    """Extract the benchmark result from a standalone integer output line.
+
+    AILang JIT also emits diagnostics such as ``Program exited with code: 0``.
+    Parsing the last integer token made benchmark correctness depend on stdout
+    buffering order.  Benchmark programs have a stricter contract: their result
+    is printed on its own line, so diagnostics containing numbers are ignored.
+    """
+    numeric_lines = [
+        line.strip()
+        for line in text.replace("\r", "\n").splitlines()
+        if re.fullmatch(r"[-+]?\d+", line.strip())
+    ]
+    if not numeric_lines:
         return None
-    return int(tokens[-1])
+    return int(numeric_lines[-1])
 
 
 def _parse_leak_report(text: str) -> Optional[tuple[int, int, int]]:
@@ -1009,6 +1020,12 @@ def parse_args() -> argparse.Namespace:
         help="Allowed max live bytes for leak check when --check-leaks is enabled. "
         "(default: 0)",
     )
+    parser.add_argument(
+        "--fail-on-error",
+        action="store_true",
+        help="Exit non-zero if any selected implementation fails to build, run, "
+        "match output, or satisfy an enabled leak check.",
+    )
     return parser.parse_args()
 
 
@@ -1210,6 +1227,19 @@ def main() -> int:
 
     print(f"\nResults written to {output_path}")
     print(f"JSON data written to {output_path.with_suffix('.json')}")
+    failures = [
+        (case, impl, measurement)
+        for case, impls in results.items()
+        for impl, measurement in impls.items()
+        if measurement.status != "ok"
+    ]
+    if args.fail_on_error and failures:
+        for case, impl, measurement in failures:
+            print(
+                f"benchmark gate failure: {case}/{impl}: "
+                f"{measurement.status} {measurement.note}"
+            )
+        return 1
     return 0
 
 

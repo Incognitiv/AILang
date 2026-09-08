@@ -30,3 +30,7 @@ def test_god_object_audit_has_no_candidates() -> None:
         assert proc.returncode == 0, proc.stdout + proc.stderr
         payload = json.loads(json_out.read_text(encoding="utf-8"))
     assert payload["candidate_count"] == 0
+    # Long modules are tracked as size debt separately; they must not silently
+    # grow while the structural God-Object metric stays clean.
+    assert payload["oversized_file_count"] <= 14
+    assert payload["max_file_line_count"] <= 1143

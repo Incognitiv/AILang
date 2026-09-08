@@ -257,6 +257,24 @@ class ExprCallEmitter:
                     ) from None
             arg_values.append(arg_value)
 
+        if is_variadic and len(provided_args) > expected_count:
+            for arg_node in provided_args[expected_count:]:
+                arg_value = self.generate_expr(arg_node)
+                # C varargs use the default argument promotions. LLVM IR does
+                # not apply them for us, so emit them explicitly at the ABI
+                # boundary: f32 -> f64 and integer types narrower than 32 bits
+                # -> i32. Wider integers, pointers, and aggregates keep their
+                # language/native representation.
+                if isinstance(arg_value.type, ir.FloatType):
+                    arg_value = self.builder.fpext(arg_value, ir.DoubleType())
+                elif isinstance(arg_value.type, ir.IntType) and arg_value.type.width < 32:
+                    target = ir.IntType(32)
+                    if self.codegen.is_unsigned_value(arg_value):
+                        arg_value = self.builder.zext(arg_value, target)
+                    else:
+                        arg_value = self.builder.sext(arg_value, target)
+                arg_values.append(arg_value)
+
         result = self.codegen.call_or_invoke(func, arg_values, name=f"call_{node.name}")
         # A function call creates a fresh SSA value.  LLVM's iN carries no
         # signedness, so restore the language return contract at the call site

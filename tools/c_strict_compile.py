@@ -167,8 +167,10 @@ def main() -> int:
 
     strict_flags = _strict_flags(args.std, freestanding=args.freestanding)
     names = [] if args.no_corpus else (args.program or DEFAULT_PROGRAMS)
+    out_dir = REPO_ROOT / "out"
+    out_dir.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(
-        prefix="ailang_strict_c_", dir=REPO_ROOT / "out"
+        prefix="ailang_strict_c_", dir=out_dir
     ) as td:
         tmp = Path(td)
         source_items: list[CompileResult | Path] = [

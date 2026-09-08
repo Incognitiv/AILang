@@ -26,6 +26,8 @@ dev = [
   "vulture",
   "pip-audit",
   "detect-secrets",
+  "pyflakes",
+  "cohesion",
 ]
 
 [project.scripts]

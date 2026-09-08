@@ -87,7 +87,9 @@ KERNELS: dict[str, Kernel] = {
     ),
 }
 
-IMPLS = ("ailang_c", "ailang_llvm", "c", "c_erased", "rust", "rust_erased")
+PRIMARY_IMPLS = ("ailang_c", "ailang_llvm", "c", "rust")
+ERASED_IMPLS = ("c_erased", "rust_erased")
+IMPLS = (*PRIMARY_IMPLS, *ERASED_IMPLS)
 RESULT_RE = re.compile(r"[-+]?\d+")
 LEAK_RE = re.compile(r"live at exit:\s*(\d+)\s*bytes", re.IGNORECASE)
 
@@ -351,6 +353,38 @@ def _check_thresholds(
     return checked
 
 
+
+
+def _relative_to_c_failures(
+    results: list[RunResult], max_ratio: float
+) -> list[tuple[str, str, float]]:
+    """Return AILang lanes that exceed the same-host C baseline by *max_ratio*.
+
+    Absolute ns/op budgets are useful trend data but are not portable across
+    GitHub runner generations or developer machines.  Release gating therefore
+    compares semantically equivalent AILang lanes against the C implementation
+    measured in the same process run.
+    """
+    by_kernel = {(row.kernel, row.impl): row for row in results}
+    failures: list[tuple[str, str, float]] = []
+    for kernel in KERNELS:
+        baseline = by_kernel.get((kernel, "c"))
+        if (
+            baseline is None
+            or baseline.status != "ok"
+            or baseline.ns_per_op is None
+            or baseline.ns_per_op <= 0
+        ):
+            continue
+        for impl in ("ailang_c", "ailang_llvm"):
+            row = by_kernel.get((kernel, impl))
+            if row is None or row.status != "ok" or row.ns_per_op is None:
+                continue
+            ratio = row.ns_per_op / baseline.ns_per_op
+            if ratio > max_ratio:
+                failures.append((kernel, impl, ratio))
+    return failures
+
 def _write_reports(
     results: list[RunResult],
     native: bool,
@@ -474,6 +508,12 @@ def main() -> int:
     parser.add_argument("--case", action="append", choices=tuple(KERNELS))
     parser.add_argument("--impl", action="append", choices=IMPLS)
     parser.add_argument(
+        "--include-erased",
+        action="store_true",
+        help="Include *_erased lower-bound lanes. These intentionally perform less "
+        "semantic work and are excluded from the default parity comparison.",
+    )
+    parser.add_argument(
         "--native", action="store_true", help="Use native CPU flags for C/Rust."
     )
     parser.add_argument("--no-parity-fail", action="store_true")
@@ -491,13 +531,31 @@ def main() -> int:
     parser.add_argument(
         "--enforce-thresholds",
         action="store_true",
-        help="Fail if any configured ns/op threshold is exceeded.",
+        help="Fail if any configured absolute ns/op threshold is exceeded.",
+    )
+    parser.add_argument(
+        "--enforce-relative-c",
+        action="store_true",
+        help="Fail when an AILang lane is too slow relative to equivalent C on "
+        "the same host.",
+    )
+    parser.add_argument(
+        "--max-relative-c-ratio",
+        type=float,
+        default=1.5,
+        help="Maximum AILang/C ns-per-op ratio for --enforce-relative-c "
+        "(default: 1.5).",
     )
     args = parser.parse_args()
 
     kernels = _selected(args.case, tuple(KERNELS))
     implicit_impls = not args.impl
-    impls = _selected(args.impl, IMPLS)
+    if args.impl:
+        impls = _selected(args.impl, IMPLS)
+    else:
+        impls = list(PRIMARY_IMPLS)
+        if args.include_erased:
+            impls.extend(ERASED_IMPLS)
     results: list[RunResult] = []
     for kernel in kernels:
         for impl in impls:
@@ -552,6 +610,15 @@ def main() -> int:
         failed = True
     if args.enforce_thresholds and any(row.status != "pass" for row in threshold_results):
         failed = True
+    if args.enforce_relative_c:
+        relative_failures = _relative_to_c_failures(results, args.max_relative_c_ratio)
+        for kernel, impl, ratio in relative_failures:
+            print(
+                f"relative C gate failed for {kernel}/{impl}: "
+                f"{ratio:.3f}x > {args.max_relative_c_ratio:.3f}x"
+            )
+        if relative_failures:
+            failed = True
     print(f"reports: {RESULTS_ROOT / 'tri_language_gauntlet.md'}")
     if failed or (parity_failed and not args.no_parity_fail):
         return 1

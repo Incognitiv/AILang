@@ -69,7 +69,16 @@ def _fixed_binary_expr(self, node: A.BinaryOp, left: str, right: str):
     turning valid u64 values above INT64_MAX into failures.
     """
     op = node.op
-    li = info_for_c_fixed(self._infer_type(node.left))
+    left_type = self._infer_type(node.left)
+    right_type = self._infer_type(node.right)
+    # Keep the language-default signed 64-bit lane on the mature generic i64
+    # lowering path.  That path owns the range/literal proofs, optimizer-report
+    # accounting, and loop-specific check elision used by `int`/`i64`.  The
+    # fixed-width lane is for widths/signedness where the generic int64 path
+    # would lose representation fidelity (i8..i32, u8..u64, i128/u128).
+    if str(left_type).strip() == "int64_t" and str(right_type).strip() == "int64_t":
+        return None
+    li = info_for_c_fixed(left_type)
     info = _fixed_binary_info(self, node)
     if info is None or info.bits > 128:
         return None

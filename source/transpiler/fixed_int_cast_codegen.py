@@ -7,6 +7,7 @@ when the destination iN/uN cannot represent it.
 """
 from __future__ import annotations
 
+from parser import ast as A
 from parser.ast import parsed_type_to_str
 from transpiler.fixed_int_types import info_for_c_fixed, info_for_fixed_int
 
@@ -28,6 +29,18 @@ def checked_fixed_int_conversion_expr(
     if target is None or source is None:
         return None
     if source.bits == target.bits and source.unsigned == target.unsigned:
+        # Narrow fixed-width arithmetic is promoted by C before the call. Keep
+        # the AILang boundary contract explicit for expression arguments even
+        # when static inference says the source and target are the same iN/uN.
+        # This also avoids making call-boundary safety depend on an optimizer
+        # range proof that may change independently of ABI lowering.
+        if isinstance(value_node, A.BinaryOp) and target.bits < 64:
+            source_c = "uint64_t" if source.unsigned else "int64_t"
+            source_tag = "u" if source.unsigned else "s"
+            return (
+                f"ailang_cast_{target.canonical}_from_{source_tag}64"
+                f"(({source_c})({value_code}))"
+            )
         return value_code
 
     max_bits = max(source.bits, target.bits)

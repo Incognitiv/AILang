@@ -338,9 +338,11 @@ def emit_runtime_string(self) -> None:
             self._output.append("    (void)input; return NULL;")
             self._output.append("#endif")
             self._output.append("}")
+            self._output.append("#ifndef AILANG_FREESTANDING")
             self._output.append(f"AILANG_UNUSED static void ailang_write_hex_{prefix}(FILE *f, {ctype} v) {{ char *s=ailang_hex_{prefix}(v); if(s){{ fputs(s,f); ailang_safe_free(s); }} }}")
             self._output.append(f"AILANG_UNUSED static void ailang_write_bin_{prefix}(FILE *f, {ctype} v) {{ char *s=ailang_bin_{prefix}(v); if(s){{ fputs(s,f); ailang_safe_free(s); }} }}")
             self._output.append(f"AILANG_UNUSED static void ailang_write_oct_{prefix}(FILE *f, {ctype} v) {{ char *s=ailang_oct_{prefix}(v); if(s){{ fputs(s,f); ailang_safe_free(s); }} }}")
+            self._output.append("#endif")
         self._output.append("#endif")
         self._output.append("")
 

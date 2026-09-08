@@ -210,6 +210,15 @@ def _body_terminates_with_value_or_throw(body: list[A.ASTNode]) -> bool:
             return True
     return False
 
+
+def body_terminates_with_value_or_throw(body: list[A.ASTNode]) -> bool:
+    """Return whether every path through *body* terminates with a value or throw.
+
+    This is shared with code generation so parser validation and backend
+    fallthrough handling use the same control-flow contract.
+    """
+    return _body_terminates_with_value_or_throw(body)
+
 def infer_unannotated_return_types(program: list[A.ASTNode]) -> None:
     """Resolve unannotated ``def`` return types in place; raise on ambiguity."""
     functions: list[tuple[A.Function, str | None]] = []

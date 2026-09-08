@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from parser import ast as A
 from parser.ast import parsed_type_to_str
+from parser.return_type_inference import body_terminates_with_value_or_throw
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from abi_symbols import explicit_c_abi_parts, has_export_decorator
@@ -351,8 +352,10 @@ def visit_Function(self, node: A.Function) -> None:
     for stmt in node.body:
         self.visit(stmt)
 
-    # Implicit return for functions that don't end with a return statement
-    if not node.body or not isinstance(node.body[-1], A.Return):
+    # Emit a fallthrough return only when control flow can actually reach the
+    # function end.  A trailing if/match/try may terminate on every branch
+    # even though the final AST node is not itself Return.
+    if not body_terminates_with_value_or_throw(node.body):
         # Auto-cleanup of non-escaping class locals at function exit.
         self._emit_class_cleanup(None)
         # Unlock @synchronized mutex before implicit return
