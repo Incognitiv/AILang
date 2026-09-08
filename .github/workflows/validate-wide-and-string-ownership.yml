@@ -54,17 +54,28 @@ jobs:
           new = '''        # Prefer the allocation-free numeric specialization before the\n        # generic dynamic planner. Hidden string-length arguments must not\n        # materialize str(i) merely to measure it.\n        virtual_len = self._emit_virtual_strlen(node)\n        if virtual_len is not None:\n            return virtual_len\n        dynamic_len = emit_dynamic_strlen_c(self, node)\n        if dynamic_len is not None:\n            return dynamic_len\n'''
           if old not in s:
               raise SystemExit('known strlen ordering anchor missing')
+          s = s.replace(old, new, 1)
+
+          old = '''        if isinstance(node, A.Variable):\n            var_type = getattr(self, "_var_types", {}).get(node.name)\n            return var_type is not None and self._is_integer_type_name(var_type)\n'''
+          new = '''        if isinstance(node, A.Variable):\n            # Expression emission must use the same function-local type facts\n            # as the scanner. `_var_types` is mutable cross-function state and\n            # can miss locals such as loop counters, disabling virtual strlen\n            # and causing hidden str(i) allocations.\n            local_types = getattr(self, "_current_local_c_types", None)\n            var_type = (\n                local_types.get(node.name)\n                if isinstance(local_types, dict)\n                else None\n            )\n            if var_type is None:\n                var_type = getattr(self, "_var_types", {}).get(node.name)\n            return var_type is not None and self._is_integer_type_name(var_type)\n'''
+          if old not in s:
+              raise SystemExit('known integer local-type anchor missing')
           p.write_text(s.replace(old, new, 1), encoding='utf-8')
           PY
           python -m py_compile source/transpiler/strlen_assign_cache.py source/transpiler/expr_gen.py
       - name: Target class-loop ownership regression
         run: |
           set -euxo pipefail
+          set +e
           pytest -q tests/test_c_string_ownership.py::test_c_backend_cleans_redeclared_class_local_in_loop
+          rc=$?
+          set -e
           f="$(ls -t out/generated/c_backend/loop_redecl_class_*.c | head -1)"
-          grep -n 'Packet_init(&__ailang_stack_p' "$f"
+          grep -n 'Packet_init(&__ailang_stack_p' "$f" || true
+          grep -n -E 'ailang_int_to_str\(i\)|ailang_i64_decimal_len\(i\)' "$f" | tail -n 40 || true
           if grep -q 'ailang_strlen(ailang_int_to_str(i))' "$f"; then
             echo 'hidden length still allocates str(i)' >&2
             exit 1
           fi
           grep -q 'ailang_i64_decimal_len(i)' "$f"
+          exit "$rc"
