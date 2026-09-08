@@ -1,0 +1,68 @@
+name: Patch C backend local string typing
+on:
+  push:
+    branches: [agent/unbounded-field-semantics]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/unbounded-field-semantics
+      - name: Patch
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('source/transpiler/core_cleanup_reports.py')
+          s = p.read_text()
+          old = '''    def _might_be_string(self: Any, node: A.ASTNode) -> bool:\n        return self.type_info.might_be_string(node, self.current_function)\n'''
+          new = '''    def _might_be_string(self: Any, node: A.ASTNode) -> bool:\n        if isinstance(node, A.Variable):\n            local_type = getattr(self, "_current_local_c_types", {}).get(node.name)\n            if isinstance(local_type, str):\n                text = local_type.strip().lower()\n                if text == "string" or "char *" in text:\n                    return True\n        if isinstance(node, A.BinaryOp) and node.op == "+":\n            if self._might_be_string(node.left) or self._might_be_string(node.right):\n                return True\n        return self.type_info.might_be_string(node, self.current_function)\n'''
+          assert old in s
+          p.write_text(s.replace(old, new, 1))
+
+          p = Path('source/transpiler/stmt_visit_data.py')
+          s = p.read_text()
+          old = '''    existing_type = self._var_types.get(node.var_name)\n    if existing_type is None or (\n        not is_unbounded_spec(self, existing_type)\n        and info_for_ailang(existing_type) is None\n        and _fixed_int_info_for_ailang_spec(self, existing_type) is None\n    ):\n        self._var_types[node.var_name] = self._infer_ailang_type(node.value)\n'''
+          new = '''    local_type = getattr(self, "_current_local_c_types", {}).get(node.var_name)\n    existing_type = local_type if local_type is not None else self._var_types.get(node.var_name)\n    if local_type is None and (\n        existing_type is None or (\n            not is_unbounded_spec(self, existing_type)\n            and info_for_ailang(existing_type) is None\n            and _fixed_int_info_for_ailang_spec(self, existing_type) is None\n        )\n    ):\n        self._var_types[node.var_name] = self._infer_ailang_type(node.value)\n'''
+          assert old in s
+          s = s.replace(old, new, 1)
+          old = '        target_spec = self._var_types.get(node.var_name)\n'
+          new = '        target_spec = local_type if local_type is not None else self._var_types.get(node.var_name)\n'
+          assert old in s
+          s = s.replace(old, new, 1)
+          old = '''    if isinstance(node, A.StringLit):\n        return "string"\n'''
+          new = '''    if isinstance(node, A.BinaryOp) and node.op == "+" and (\n        self._might_be_string(node.left) or self._might_be_string(node.right)\n    ):\n        return "string"\n    if isinstance(node, A.StringLit):\n        return "string"\n'''
+          assert old in s
+          p.write_text(s.replace(old, new, 1))
+          PY
+          python3 -m py_compile source/transpiler/core_cleanup_reports.py source/transpiler/stmt_visit_data.py
+          cat >/tmp/t.ail <<'AIL'
+          def letter(x: int): string
+              if x == 1 then return "a" end
+              return "b"
+          end
+          def build_text(): string
+              out = letter(1)
+              out = out + letter(2)
+              out = out + ""
+              return out
+          end
+          def main(): int
+              if streq(build_text(), "ab") == 1 then return 0 end
+              return 1
+          end
+          AIL
+          python3 ailang.py /tmp/t.ail --backend=c -O1 -o /tmp/t
+          /tmp/t
+          rm .github/workflows/patch-local-types-1.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'Keep C backend local string types stable'
+          git push origin HEAD:agent/unbounded-field-semantics
