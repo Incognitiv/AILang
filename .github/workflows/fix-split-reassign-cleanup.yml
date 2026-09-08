@@ -1,4 +1,4 @@
-name: Fix split StringArray reassignment cleanup
+name: Fix split StringArray destructor dispatch
 on:
   push:
     branches: [agent/unbounded-field-semantics]
@@ -17,27 +17,34 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          p = Path('source/transpiler/stmt_visit_data.py')
+          p = Path('source/transpiler/expr_gen_call_impl.py')
           s = p.read_text()
-          old = '''    if var_name in (getattr(self, "_str_array_locals_for_cleanup", None) or []):\n        self.emit(f"{{ typeof({var}) __pre_assign = {val};")\n        self.emit(f"  ailang_str_array_free_v2(&{var});")\n        self.emit(f"  {var} = __pre_assign; }}")\n        return True\n'''
-          new = '''    if var_name in (getattr(self, "_str_array_locals_for_cleanup", None) or []):\n        # split() returns StringArray whose elements are owned; use the\n        # StringArray destructor. str_array_new() uses ailang_str_array and\n        # is handled separately by _lc_str_array_locals_for_cleanup below.\n        self.emit(f"{{ typeof({var}) __pre_assign = {val};")\n        self.emit(f"  ailang_str_array_free(&{var});")\n        self.emit(f"  {var} = __pre_assign; }}")\n        return True\n'''
+          old = '''        if isinstance(source_arg, A.Variable):\n            source_type = self._var_types.get(source_arg.name)\n            if source_type == "StringArray":\n                return f"ailang_str_array_free(&{call_args[0]})"\n'''
+          new = '''        if isinstance(source_arg, A.Variable):\n            source_type = getattr(self, "_current_local_c_types", {}).get(\n                source_arg.name, self._var_types.get(source_arg.name)\n            )\n            if isinstance(source_type, str) and source_type.strip().lower() == "stringarray":\n                return f"ailang_str_array_free(&{call_args[0]})"\n'''
           assert old in s
           p.write_text(s.replace(old, new, 1))
           PY
-          python3 -m py_compile source/transpiler/stmt_visit_data.py
-          cat >/tmp/split_reassign.ail <<'AIL'
+          python3 -m py_compile source/transpiler/expr_gen_call_impl.py
+          cat >/tmp/split_dealloc.ail <<'AIL'
           def main(): int
               words = split("a b", " ")
-              words = split("c d", " ")
+              dealloc_str_array(words)
               return 0
           end
           AIL
-          python3 ailang.py /tmp/split_reassign.ail --backend=c -O1 -o /tmp/split_reassign
-          /tmp/split_reassign
+          python3 ailang.py /tmp/split_dealloc.ail --backend=c -O1 -o /tmp/split_dealloc
+          cfile=$(find out/generated/c_backend -name 'split_dealloc_*.c' -print -quit)
+          test -n "$cfile"
+          grep -q 'ailang_str_array_free(&words)' "$cfile"
+          if grep -q 'ailang_str_array_free_v2(&words)' "$cfile"; then
+              echo 'wrong destructor still emitted' >&2
+              exit 1
+          fi
+          /tmp/split_dealloc
           rm .github/workflows/fix-split-reassign-cleanup.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
           git diff --cached --check
-          git commit -m 'Use StringArray cleanup for split reassignment'
+          git commit -m 'Use local type for string-array destructor dispatch'
           git push origin HEAD:agent/unbounded-field-semantics
