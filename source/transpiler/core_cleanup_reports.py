@@ -152,6 +152,19 @@ class _CTranspilerCleanupReportMixin:
         return self.type_info.field_ailang_type(parent_class, field_name)
 
     def _class_ptr_type(self: Any, node: A.ASTNode) -> Optional[str]:
+        # Prefer the current function/method declaration map. TypeInfo.var_types
+        # is intentionally legacy-global and can be polluted when unrelated
+        # functions reuse a short local name such as `c` or `n`.
+        if isinstance(node, A.Variable):
+            local_type = getattr(self, "_current_local_c_types", {}).get(node.name)
+            if isinstance(local_type, str):
+                c_type = local_type.strip()
+                if c_type in self.classes:
+                    return c_type
+                if c_type.endswith("*"):
+                    base = c_type[:-1].strip()
+                    if base in self.classes:
+                        return base
         return self.type_info.class_ptr_type(node, self._current_class)
 
     def _is_owned_string_alloc(self: Any, expr: A.ASTNode) -> bool:

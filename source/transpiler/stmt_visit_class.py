@@ -219,6 +219,7 @@ def visit_Function(self, node: A.Function) -> None:
     # Collect all variables
     all_vars: Dict[str, str] = {}
     self._collect_vars_in_body(node.body, all_vars)
+    self._current_local_c_types = dict(all_vars)
     self._current_param_type_overrides = apply_proven_i32_narrowing(
         self, node, all_vars
     )
@@ -384,6 +385,7 @@ def visit_Function(self, node: A.Function) -> None:
     self._fixed_dict_value_ranges = {}
     self._codegen_string_length_ranges = {}
     self._current_param_type_overrides = {}
+    self._current_local_c_types = {}
     # Reset unchecked mode and synchronized state after function
     self._unchecked_mode = False
     self._synchronized_mutex_name = None
@@ -678,6 +680,14 @@ def _emit_class_new_wrapper(self, node: A.ClassDef) -> None:
         )
         if checked_expr is not None:
             init_expr = checked_expr
+        field_type_text = parsed_type_to_str(field_type).strip().lower()
+        if (
+            field_type_text in {"array", "str_array", "stringarray", "intarray"}
+            and isinstance(init_value, A.Number)
+            and not isinstance(init_value.value, float)
+            and int(init_value.value) == 0
+        ):
+            init_expr = f"({self._ailang_type_to_c(parsed_type_to_str(field_type))}){{0}}"
         self.emit_raw(f"    __t->{field_name} = {init_expr};")
         if is_string_type(field_type):
             self.emit_raw(

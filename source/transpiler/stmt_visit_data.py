@@ -117,6 +117,14 @@ def _emit_stack_class_construct(
         )
         if checked_default is not None:
             default_expr = checked_default
+        field_type_text = parsed_type_to_str(field_type).strip().lower()
+        if (
+            field_type_text in {"array", "str_array", "stringarray", "intarray"}
+            and isinstance(default_node, A.Number)
+            and not isinstance(default_node.value, float)
+            and int(default_node.value) == 0
+        ):
+            default_expr = f"({self._ailang_type_to_c(parsed_type_to_str(field_type))}){{0}}"
         self.emit(f"  {storage}.{field_name} = {default_expr};")
         if is_string_type(field_type):
             self.emit(

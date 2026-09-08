@@ -270,6 +270,7 @@ def _generate_class_method(self, class_name: str, method: A.Function) -> None:
     # Collect all variables
     all_vars: Dict[str, str] = {}
     self._collect_vars_in_body(method.body, all_vars)
+    self._current_local_c_types = dict(all_vars)
 
     # Build parameter list with self pointer first
     params = f"{class_name} *self"
@@ -367,3 +368,4 @@ def _generate_class_method(self, class_name: str, method: A.Function) -> None:
     self.current_function = None
     self._current_ret_type = ""
     self._current_ret_spec = None
+    self._current_local_c_types = {}
