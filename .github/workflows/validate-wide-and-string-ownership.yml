@@ -30,7 +30,7 @@ jobs:
           sudo apt-get install -y -qq clang gcc llvm libsqlite3-dev
           python -m pip install -e '.[dev,llvm]'
 
-      - name: Repair canonical bool alias and current unbounded contract
+      - name: Repair canonical bool alias and current unbounded contracts
         run: |
           set -euxo pipefail
           python - <<'PY'
@@ -65,15 +65,37 @@ jobs:
               '',
           ])
           t.write_text(text[:start] + replacement + text[end:], encoding='utf-8')
+
+          t = Path('tests/test_llvm_wide_ints.py')
+          text = t.read_text(encoding='utf-8')
+          start = text.index('def test_llvm_backend_rejects_unbounded_instead_of_pointer_placeholder() -> None:')
+          end = text.index('\ndef _compile_and_run_llvm(', start)
+          replacement = '\n'.join([
+              'def test_llvm_backend_unbounded_preserves_arbitrary_precision() -> None:',
+              '    source = """',
+              'def main(): int',
+              '    unbounded x = 1267650600228229401496703205376',
+              '    unbounded y = 7',
+              '    unbounded z = x + y',
+              '    print z',
+              '    return 0',
+              'end',
+              '"""',
+              '    run = _compile_and_run_llvm(source)',
+              '    assert run.returncode == 0, run.stdout + "\\n" + run.stderr',
+              '    assert run.stdout.strip() == "1267650600228229401496703205383"',
+              '',
+          ])
+          t.write_text(text[:start] + replacement + text[end:], encoding='utf-8')
           PY
-          python -m py_compile source/transpiler/core_type_lowering.py tests/test_c_wide_ints.py
+          python -m py_compile source/transpiler/core_type_lowering.py tests/test_c_wide_ints.py tests/test_llvm_wide_ints.py
 
       - name: C fixed wide and unbounded integers
         run: |
           set -euxo pipefail
           pytest -q tests/test_c_wide_ints.py
 
-      - name: LLVM fixed and wide integers
+      - name: LLVM fixed wide and unbounded integers
         run: |
           set -euxo pipefail
           pytest -q tests/test_llvm_wide_ints.py
