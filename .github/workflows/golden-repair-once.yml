@@ -11,6 +11,7 @@ permissions:
 
 jobs:
   repair-and-verify:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
@@ -29,7 +30,6 @@ jobs:
             patch -p1 --batch < "${repair}"
           done
           rm -rf .golden-repair
-          rm -f .github/workflows/golden-repair-once.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
