@@ -682,6 +682,99 @@ class BuiltinStringEmitter:
         phi.add_incoming(true_val, ok_end)
         return phi
 
+
+    def builtin_str_escape_json(self, args: list[ASTNode]) -> ir.Value:
+        """Escape a string for JSON with one allocation and no per-byte strings."""
+        if len(args) != 1:
+            raise CodeGenError("str_escape_json() expects exactly 1 argument")
+        (string_arg,) = args
+        src = self.generate_expr(string_arg)
+        i8 = ir.IntType(8)
+        i64 = ir.IntType(64)
+        zero = ir.Constant(i64, 0)
+        one = ir.Constant(i64, 1)
+        two = ir.Constant(i64, 2)
+        length = self.current_builder.call(self.get_strlen(), [src], name="jsonesc_len")
+        capacity = self.current_builder.add(
+            self.current_builder.mul(length, two, name="jsonesc_2n"),
+            one,
+            name="jsonesc_cap",
+        )
+        out = self.string_alloc(capacity, "jsonesc_out")
+        in_slot = self.current_builder.alloca(i64, name="jsonesc_i_slot")
+        out_slot = self.current_builder.alloca(i64, name="jsonesc_j_slot")
+        self.current_builder.store(zero, in_slot)
+        self.current_builder.store(zero, out_slot)
+
+        func = self.current_function
+        header = func.append_basic_block("jsonesc_hdr")
+        body = func.append_basic_block("jsonesc_body")
+        escaped = func.append_basic_block("jsonesc_escaped")
+        plain = func.append_basic_block("jsonesc_plain")
+        merge = func.append_basic_block("jsonesc_merge")
+        done = func.append_basic_block("jsonesc_done")
+        self.current_builder.branch(header)
+
+        self.current_builder.position_at_end(header)
+        in_i = self.current_builder.load(in_slot, name="jsonesc_i")
+        more = self.current_builder.icmp_unsigned("<", in_i, length, name="jsonesc_more")
+        self.current_builder.cbranch(more, body, done)
+
+        self.current_builder.position_at_end(body)
+        ch_ptr = self.current_builder.gep(src, [in_i], name="jsonesc_srcp")
+        ch = self.current_builder.load(ch_ptr, name="jsonesc_ch")
+        quote = self.current_builder.icmp_unsigned("==", ch, ir.Constant(i8, 34))
+        slash = self.current_builder.icmp_unsigned("==", ch, ir.Constant(i8, 92))
+        nl = self.current_builder.icmp_unsigned("==", ch, ir.Constant(i8, 10))
+        cr = self.current_builder.icmp_unsigned("==", ch, ir.Constant(i8, 13))
+        tab = self.current_builder.icmp_unsigned("==", ch, ir.Constant(i8, 9))
+        backspace = self.current_builder.icmp_unsigned("==", ch, ir.Constant(i8, 8))
+        needs = self.current_builder.or_(quote, slash)
+        needs = self.current_builder.or_(needs, nl)
+        needs = self.current_builder.or_(needs, cr)
+        needs = self.current_builder.or_(needs, tab)
+        needs = self.current_builder.or_(needs, backspace)
+        self.current_builder.cbranch(needs, escaped, plain)
+
+        self.current_builder.position_at_end(escaped)
+        out_i_e = self.current_builder.load(out_slot, name="jsonesc_je")
+        slash_ptr = self.current_builder.gep(out, [out_i_e], name="jsonesc_slashp")
+        self.current_builder.store(ir.Constant(i8, 92), slash_ptr)
+        code = self.current_builder.select(quote, ir.Constant(i8, 34), ch)
+        code = self.current_builder.select(slash, ir.Constant(i8, 92), code)
+        code = self.current_builder.select(nl, ir.Constant(i8, 110), code)
+        code = self.current_builder.select(cr, ir.Constant(i8, 114), code)
+        code = self.current_builder.select(tab, ir.Constant(i8, 116), code)
+        code = self.current_builder.select(backspace, ir.Constant(i8, 98), code)
+        code_pos = self.current_builder.add(out_i_e, one, name="jsonesc_codepos")
+        code_ptr = self.current_builder.gep(out, [code_pos], name="jsonesc_codep")
+        self.current_builder.store(code, code_ptr)
+        self.current_builder.store(
+            self.current_builder.add(out_i_e, two, name="jsonesc_j2"), out_slot
+        )
+        self.current_builder.branch(merge)
+
+        self.current_builder.position_at_end(plain)
+        out_i_p = self.current_builder.load(out_slot, name="jsonesc_jp")
+        plain_ptr = self.current_builder.gep(out, [out_i_p], name="jsonesc_dstp")
+        self.current_builder.store(ch, plain_ptr)
+        self.current_builder.store(
+            self.current_builder.add(out_i_p, one, name="jsonesc_j1"), out_slot
+        )
+        self.current_builder.branch(merge)
+
+        self.current_builder.position_at_end(merge)
+        self.current_builder.store(
+            self.current_builder.add(in_i, one, name="jsonesc_i1"), in_slot
+        )
+        self.current_builder.branch(header)
+
+        self.current_builder.position_at_end(done)
+        final_j = self.current_builder.load(out_slot, name="jsonesc_final_j")
+        end_ptr = self.current_builder.gep(out, [final_j], name="jsonesc_end")
+        self.current_builder.store(ir.Constant(i8, 0), end_ptr)
+        return out
+
     def builtin_str_replace(self, args: list[ASTNode]) -> ir.Value:
         """Replace first occurrence of old with new."""
         if len(args) != 3:

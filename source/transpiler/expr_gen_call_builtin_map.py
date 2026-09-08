@@ -90,6 +90,7 @@ def c_builtin_mappings(self: Any) -> dict[str, Callable[[list[str]], str]]:
         "endswith": lambda a: f"ailang_endswith({a[0]}, {a[1]})",
         # String replace
         "str_replace": lambda a: f"ailang_str_replace({a[0]}, {a[1]}, {a[2]})",
+        "str_escape_json": lambda a: f"ailang_str_escape_json({a[0]})",
         "streq": lambda a: f"(__ailang_strcmp_raw({a[0]}, {a[1]}) == 0 ? 1 : 0)",
         # Pointer arithmetic
         # ptr_add / ptr_sub: AILang treats pointers as int64. Do

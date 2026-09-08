@@ -32,7 +32,10 @@ from diagnostics.static_analysis_models import (
     NullState,
     VariableAccess,
 )
-from diagnostics.static_analysis_perf import check_string_concat_loops
+from diagnostics.static_analysis_perf import (
+    check_owned_string_into_borrowed_str_array,
+    check_string_concat_loops,
+)
 
 
 class StaticAnalyzer:
@@ -119,6 +122,7 @@ class StaticAnalyzer:
         # the empirical 1500ms-vs-28ms demo. Suggest str_array_join.
         for node in ast_nodes:
             check_string_concat_loops(self, node, in_loop=False)
+            check_owned_string_into_borrowed_str_array(self, node)
 
         return self.warnings
 

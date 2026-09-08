@@ -5,6 +5,8 @@ from __future__ import annotations
 from parser import ast as A
 from typing import Any, List
 
+from transpiler.fixed_int_types import info_for_c_fixed
+
 
 def _expr_literal(self: Any, node: A.ASTNode) -> str:
     """Generate C code for literal values."""
@@ -53,7 +55,11 @@ def _expr_interpolated_string(self: Any, node: A.InterpolatedString) -> str:
                 parts_code.append(expr_val)
                 parts_owned.append(self._is_owned_string_alloc(part))
             else:
-                parts_code.append(f"ailang_int_to_str({expr_val})")
+                fixed = info_for_c_fixed(self._infer_type(part))
+                if fixed is not None and fixed.bits > 64:
+                    parts_code.append(f"ailang_str_{fixed.canonical}({expr_val})")
+                else:
+                    parts_code.append(f"ailang_int_to_str({expr_val})")
                 parts_owned.append(True)
     if not parts_code:
         self._record_format_decision(

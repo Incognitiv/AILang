@@ -135,6 +135,7 @@ def _default_owned_string_alloc(expr: A.ASTNode) -> bool:
         "substr",
         "concat",
         "str_replace",
+        "str_escape_json",
     }:
         return True
     return False

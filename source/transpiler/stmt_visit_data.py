@@ -258,9 +258,9 @@ def _emit_dyn_array_push_in_place(
     else:
         value = value_code
         if value_node is not None:
-            wide = info_for_c(self._infer_type(value_node))
-            if wide is not None:
-                value = f"ailang_narrow_i64_{wide.suffix}({value})"
+            fixed = info_for_c_fixed(self._infer_type(value_node))
+            if fixed is not None and fixed.bits > 64:
+                value = f"ailang_narrow_i64_{fixed.canonical}({value})"
     self.emit("{")
     self.emit(f"  if ({target}.length >= {target}.capacity) {{")
     self.emit(f"    {target}.capacity = {target}.capacity ? {target}.capacity * 2 : 4;")

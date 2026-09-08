@@ -469,12 +469,50 @@ def _builtin_num_cpus(self, args) -> ir.Value:
         all_groups = ir.Constant(ir.IntType(16), 0xFFFF)
         count32 = self.builder.call(get_proc_count, [all_groups], name="cpu_count32")
         return self.builder.zext(count32, ir.IntType(64), name="cpu_count")
-    # POSIX: Use sysconf(_SC_NPROCESSORS_ONLN) - value 84 on Linux
+    triple = self.codegen.module.triple.lower()
+    if "freebsd" in triple:
+        # FreeBSD does not share Linux's numeric _SC_NPROCESSORS_ONLN value.
+        # Query the stable kernel sysctl instead of baking libc enum numbers
+        # into generated IR.  sysctlbyname is in libc on FreeBSD.
+        i8 = ir.IntType(8)
+        i8_ptr = i8.as_pointer()
+        i32 = ir.IntType(32)
+        i64 = ir.IntType(64)
+        sysctl_ty = ir.FunctionType(
+            i32, [i8_ptr, i8_ptr, i64.as_pointer(), i8_ptr, i64]
+        )
+        sysctl = self.codegen.module.globals.get("sysctlbyname")
+        if sysctl is None:
+            sysctl = ir.Function(self.codegen.module, sysctl_ty, "sysctlbyname")
+        name = self.codegen.create_string_constant("hw.ncpu")
+        count_ptr = self.builder.alloca(i32, name="freebsd_ncpu")
+        size_ptr = self.builder.alloca(i64, name="freebsd_ncpu_size")
+        self.builder.store(ir.Constant(i64, 4), size_ptr)
+        oldp = self.builder.bitcast(count_ptr, i8_ptr, name="freebsd_ncpu_oldp")
+        nullp = ir.Constant(i8_ptr, None)
+        rc = self.builder.call(
+            sysctl,
+            [name, oldp, size_ptr, nullp, ir.Constant(i64, 0)],
+            name="freebsd_ncpu_rc",
+        )
+        count32 = self.builder.load(count_ptr, name="freebsd_ncpu_value")
+        ok_rc = self.builder.icmp_signed("==", rc, ir.Constant(i32, 0))
+        ok_count = self.builder.icmp_signed(">", count32, ir.Constant(i32, 0))
+        valid = self.builder.and_(ok_rc, ok_count, name="freebsd_ncpu_valid")
+        count64 = self.builder.zext(count32, i64, name="freebsd_ncpu_i64")
+        return self.builder.select(
+            valid, count64, ir.Constant(i64, 1), name="cpu_count_safe"
+        )
+
+    # Linux/POSIX fallback.  Linux defines _SC_NPROCESSORS_ONLN as 84.
+    # Other targets should gain an explicit target implementation instead of
+    # silently reusing this numeric constant.
     sysconf_ty = ir.FunctionType(ir.IntType(64), [ir.IntType(32)])
-    sysconf = ir.Function(self.codegen.module, sysconf_ty, "sysconf")
+    sysconf = self.codegen.module.globals.get("sysconf")
+    if sysconf is None:
+        sysconf = ir.Function(self.codegen.module, sysconf_ty, "sysconf")
     sc_nprocessors = ir.Constant(ir.IntType(32), 84)
     result = self.builder.call(sysconf, [sc_nprocessors], name="cpu_count")
-    # sysconf returns -1 on error, clamp to minimum of 1
     one = ir.Constant(ir.IntType(64), 1)
     is_valid = self.builder.icmp_signed(">", result, ir.Constant(ir.IntType(64), 0))
     return self.builder.select(is_valid, result, one, name="cpu_count_safe")

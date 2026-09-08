@@ -12,6 +12,7 @@ from transpiler.arithmetic_literal_proofs import int_literal_value
 from transpiler.codegen_int_ranges import expr_int_range, range_fits_int64
 from transpiler.expr_gen_call_builtin_map import c_builtin_mappings
 from transpiler.fixed_int_cast_codegen import checked_fixed_int_conversion_expr
+from transpiler.fixed_int_types import info_for_c_fixed
 from transpiler.wide_int_types import info_for_c
 from transpiler.c_bigint import expr_is_unbounded, is_unbounded_spec, owned_bigint_expr
 
@@ -37,9 +38,9 @@ def _int_range_fits_c_type(self, node: A.ASTNode, c_type: str) -> bool:
 
 def _runtime_i64_arg(self, node: A.ASTNode, expr: str) -> str:
     """Narrow a language integer to an i64 runtime boundary without data loss."""
-    wide = info_for_c(self._infer_type(node))
-    if wide is not None:
-        return f"ailang_narrow_i64_{wide.suffix}({expr})"
+    fixed = info_for_c_fixed(self._infer_type(node))
+    if fixed is not None and fixed.bits > 64:
+        return f"ailang_narrow_i64_{fixed.canonical}({expr})"
     return expr
 
 
@@ -202,7 +203,8 @@ def _generate_call(self, node: A.Call) -> str:
             return f"array_set({arr}, {idx}, {val})"
     if node.name == "array_get" and len(node.args) >= 2:
         idx_node = arg_at(node, 1)
-        if info_for_c(self._infer_type(idx_node)) is not None:
+        idx_fixed = info_for_c_fixed(self._infer_type(idx_node))
+        if idx_fixed is not None and idx_fixed.bits > 64:
             arr = self.expr(arg_at(node, 0))
             idx = _runtime_i64_arg(self, idx_node, self.expr(idx_node))
             return f"array_get({arr}, {idx})"
@@ -380,9 +382,9 @@ def _generate_call(self, node: A.Call) -> str:
     if node.name in {"str", "hex", "bin", "oct"} and len(node.args) == 1:
         arg_node = arg_at(node, 0)
         arg_expr = call_args[0]
-        wide = info_for_c(self._infer_type(arg_node))
-        if wide is not None:
-            return f"ailang_{node.name}_{wide.suffix}({arg_expr})"
+        fixed = info_for_c_fixed(self._infer_type(arg_node))
+        if fixed is not None and fixed.bits > 64:
+            return f"ailang_{node.name}_{fixed.canonical}({arg_expr})"
 
     # Special handling for len() - check if argument is an array
     if node.name == "len" and node.args:

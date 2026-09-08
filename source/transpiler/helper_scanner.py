@@ -110,6 +110,7 @@ class HelperScanner:
         "startswith": "startswith",
         "endswith": "endswith",
         "str_replace": "str_replace",
+        "str_escape_json": "str_escape_json",
         "streq": "streq_lit",
         "hex": "base_conv",
         "bin": "base_conv",

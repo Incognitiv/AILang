@@ -137,6 +137,7 @@ class TypeInfo:
             "bin",
             "oct",
             "str_replace",
+            "str_escape_json",
             "typeof",
             "str_array_get",
             "str_array_join",

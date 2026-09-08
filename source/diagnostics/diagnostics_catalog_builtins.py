@@ -62,6 +62,7 @@ BUILTINS = {
     "startswith",
     "endswith",
     "str_replace",
+    "str_escape_json",
     "streq",
     "parse_int",
     "split",

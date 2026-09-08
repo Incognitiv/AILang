@@ -205,6 +205,7 @@ class TypeCollector:
             "substr",
             "concat",
             "str_replace",
+            "str_escape_json",
             "hex",
             "bin",
             "oct",

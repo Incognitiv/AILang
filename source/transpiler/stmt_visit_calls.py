@@ -78,6 +78,10 @@ def _build_interpolation_writer_plan(
             continue
         if inferred in ("double", "float", "long double"):
             return None
+        fixed = info_for_c_fixed(inferred)
+        if fixed is not None and fixed.bits > 64:
+            chunks.append({"kind": "fixed", "expr": self.expr(part), "suffix": fixed.canonical})
+            continue
         if inferred in unsigned_int_types:
             chunks.append({"kind": "u64", "expr": self.expr(part)})
             continue
@@ -116,6 +120,10 @@ def _emit_interpolation_writer_chunks(
             continue
         if kind == "u64":
             self.emit(f"        ailang_write_u64(stdout, (uint64_t)({expr}));")
+            continue
+        if kind == "fixed":
+            suffix = str(chunk.get("suffix", "i128"))
+            self.emit(f"        ailang_write_{suffix}(stdout, {expr});")
             continue
         self.emit(f"        ailang_write_i64(stdout, (int64_t)({expr}));")
 
@@ -306,10 +314,10 @@ def _emit_print_call(self, node: A.Call) -> None:
             if base_kind is not None and isinstance(arg_node, A.Call):
                 inner_node = arg_at(arg_node, 0)
                 inner_expr = self.expr(inner_node)
-                wide = info_for_c(self._infer_type(inner_node))
-                if wide is not None:
+                fixed = info_for_c_fixed(self._infer_type(inner_node))
+                if fixed is not None and fixed.bits > 64:
                     self.emit(
-                        f"        ailang_write_{base_kind}_{wide.suffix}(stdout, {inner_expr});"
+                        f"        ailang_write_{base_kind}_{fixed.canonical}(stdout, {inner_expr});"
                     )
                 elif base_kind == "hex":
                     self.emit(

@@ -146,6 +146,7 @@ class RuntimeEmitter:
                 "startswith",
                 "endswith",
                 "str_replace",
+                "str_escape_json",
                 "print",
             }
         ):

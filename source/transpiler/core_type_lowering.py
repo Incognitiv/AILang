@@ -238,7 +238,11 @@ class _CTranspilerTypeLoweringMixin:
         if spec.startswith("[") and spec.endswith("]"):
             inner = spec[1:-1]
             return f"{self._ailang_type_to_c(inner)} *"
-        return "int64_t"
+        # Never manufacture an i64 representation for an unknown type.
+        # If a C ABI spelling is legitimate it must be mapped explicitly.
+        raise ValueError(
+            f"C backend: no executable representation for AILang type {spec!r}"
+        )
 
     def _function_body_has_value_return(self: Any, body: List[A.ASTNode]) -> bool:
         """Check if any Return node in the body (recursively) has a value."""

@@ -92,6 +92,8 @@ def emit_runtime_fixed_int_casts(self) -> None:
     o("#if defined(__SIZEOF_INT128__)")
     _emit_family(self, 128)
     _emit_arithmetic_family(self, 128)
+    o('AILANG_UNUSED static int64_t ailang_narrow_i64_i128(__int128 v) { if (v < (__int128)INT64_MIN || v > (__int128)INT64_MAX) __ailang_safety_trap("integer value does not fit signed 64-bit boundary"); return (int64_t)v; }')
+    o('AILANG_UNUSED static int64_t ailang_narrow_i64_u128(unsigned __int128 v) { if (v > (unsigned __int128)INT64_MAX) __ailang_safety_trap("integer value does not fit signed 64-bit boundary"); return (int64_t)v; }')
     o("#endif")
     if self._needs.wide_ints:
         _emit_family(self, 8192)

@@ -376,6 +376,7 @@ class CTranspiler(
             "target_os",
             "target_backend",
             "read_stdin",
+            "str_escape_json",
         }
     )
     # Builtins that always allocate a fresh heap string. Assigning their
@@ -388,6 +389,7 @@ class CTranspiler(
             "substr",
             "concat",
             "str_replace",
+            "str_escape_json",
             "hex",
             "bin",
             "oct",
