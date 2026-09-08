@@ -21,9 +21,9 @@ from transpiler.wide_int_types import info_for_ailang
 
 from .stmt_visit_assignment_helpers import (
     _emit_checked_fixed_int_assignment,
-    _emit_tracked_local_reassign,
     _fixed_int_info_for_ailang_spec,
 )
+from .stmt_visit_reassign import _emit_tracked_local_reassign
 
 
 def visit_Assign(self, node: A.Assign) -> None:
