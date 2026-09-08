@@ -1,0 +1,353 @@
+--- a/.github/workflows/ailang-hard-gate.yml
++++ b/.github/workflows/ailang-hard-gate.yml
+@@ -1,15 +1,15 @@
+-name: AILang Hard Gate
++name: AILang Golden Gate
+ 
+ on:
+   push:
+-    branches: ["main", "master"]
++    branches: ["main", "master", "agent/unbounded-field-semantics"]
+   pull_request:
+   workflow_dispatch:
+ 
+ jobs:
+-  hard-gate:
++  golden-gate:
+     runs-on: ubuntu-latest
+-    timeout-minutes: 45
++    timeout-minutes: 60
+     steps:
+       - name: Checkout
+         uses: actions/checkout@v4
+@@ -24,21 +24,25 @@
+           sudo apt-get update
+           sudo apt-get install -y --no-install-recommends clang gcc
+ 
+-      - name: Install Python package
++      - name: Install AILang and verification dependencies
+         run: |
+           python -m pip install --upgrade pip
+           python -m pip install -e ".[dev,llvm]"
+ 
+-      - name: Run bounded hard gate
+-        run: python tools/hard_gate.py
++      - name: Run Golden Gate
++        run: python tools/golden_gate.py
+ 
+-      - name: Upload hard gate reports
++      - name: Upload Golden Gate reports
+         if: always()
+         uses: actions/upload-artifact@v4
+         with:
+-          name: ailang-hard-gate-reports
++          name: ailang-golden-gate-reports
+           path: |
+-            out/codex_audit/hard_gate_current.json
+-            out/codex_audit/hard_gate_current.md
+-            benchmarks/results/c23_workload_compare.json
+-            benchmarks/results/c23_workload_compare.md
++            out/golden_gate/golden_gate_current.json
++            out/golden_gate/golden_gate_current.md
++            out/golden_gate/backend_differential.json
++            out/golden_gate/backend_differential.md
++            out/golden_gate/execution_matrix.json
++            out/golden_gate/execution_matrix.md
++            benchmarks/results/tri_language_gauntlet.json
++            benchmarks/results/tri_language_gauntlet.md
+--- a/benchmarks/run_benchmarks.py
++++ b/benchmarks/run_benchmarks.py
+@@ -197,10 +197,21 @@
+ 
+ 
+ def _extract_result_int(text: str) -> Optional[int]:
+-    tokens = re.findall(r"[-+]?\d+", text.replace("\r", "\n"))
+-    if not tokens:
++    """Extract the benchmark result from a standalone integer output line.
++
++    AILang JIT also emits diagnostics such as ``Program exited with code: 0``.
++    Parsing the last integer token made benchmark correctness depend on stdout
++    buffering order.  Benchmark programs have a stricter contract: their result
++    is printed on its own line, so diagnostics containing numbers are ignored.
++    """
++    numeric_lines = [
++        line.strip()
++        for line in text.replace("\r", "\n").splitlines()
++        if re.fullmatch(r"[-+]?\d+", line.strip())
++    ]
++    if not numeric_lines:
+         return None
+-    return int(tokens[-1])
++    return int(numeric_lines[-1])
+ 
+ 
+ def _parse_leak_report(text: str) -> Optional[tuple[int, int, int]]:
+@@ -1008,6 +1019,12 @@
+         default=0,
+         help="Allowed max live bytes for leak check when --check-leaks is enabled. "
+         "(default: 0)",
++    )
++    parser.add_argument(
++        "--fail-on-error",
++        action="store_true",
++        help="Exit non-zero if any selected implementation fails to build, run, "
++        "match output, or satisfy an enabled leak check.",
+     )
+     return parser.parse_args()
+ 
+@@ -1210,6 +1227,19 @@
+ 
+     print(f"\nResults written to {output_path}")
+     print(f"JSON data written to {output_path.with_suffix('.json')}")
++    failures = [
++        (case, impl, measurement)
++        for case, impls in results.items()
++        for impl, measurement in impls.items()
++        if measurement.status != "ok"
++    ]
++    if args.fail_on_error and failures:
++        for case, impl, measurement in failures:
++            print(
++                f"benchmark gate failure: {case}/{impl}: "
++                f"{measurement.status} {measurement.note}"
++            )
++        return 1
+     return 0
+ 
+ 
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -26,6 +26,8 @@
+   "vulture",
+   "pip-audit",
+   "detect-secrets",
++  "pyflakes",
++  "cohesion",
+ ]
+ 
+ [project.scripts]
+--- a/source/hardening_gates.ail
++++ b/source/hardening_gates.ail
+@@ -1,21 +1,26 @@
+-// AILang-native metadata for the release hard gate.
+-// The Python runner owns execution; this file is the self-hosted contract that
+-// keeps gate identity visible to AILang-side tooling.
++// AILang-native metadata for the Golden Gate release contract.
++// Python currently owns orchestration; this file keeps the contract visible to
++// AILang-side tooling so a future self-hosted compiler can inherit it directly.
+ 
+-const int AILANG_HARD_GATE_STEP_COUNT = 6
++const int AILANG_GOLDEN_GATE_STEP_COUNT = 8
+ 
+ const string AILANG_GATE_SOURCE_STRICT = "source_strict"
+ const string AILANG_GATE_VERIFIER_STRICT = "verifier_strict"
++const string AILANG_GATE_FULL_PYTEST = "full_pytest"
+ const string AILANG_GATE_C23_HOSTED = "c23_hosted_compile"
+ const string AILANG_GATE_C23_FREESTANDING = "c23_freestanding_compile"
+-const string AILANG_GATE_FOCUSED_PYTEST = "focused_pytest"
+-const string AILANG_GATE_C23_WORKLOAD_COMPARE = "c23_workload_compare"
++const string AILANG_GATE_BACKEND_DIFFERENTIAL = "backend_differential"
++const string AILANG_GATE_EXECUTION_MATRIX = "ailang_execution_matrix"
++const string AILANG_GATE_EQUIVALENT_WORKLOADS = "equivalent_workload_parity"
+ 
+-def hard_gate_step_count(): int
+-    return AILANG_HARD_GATE_STEP_COUNT
++// Compatibility alias for tooling written before the Golden Gate rename.
++const int AILANG_HARD_GATE_STEP_COUNT = 8
++
++def golden_gate_step_count(): int
++    return AILANG_GOLDEN_GATE_STEP_COUNT
+ end
+ 
+-def hard_gate_step_name(index: int): string
++def golden_gate_step_name(index: int): string
+     if index == 0 then
+         return AILANG_GATE_SOURCE_STRICT
+     end
+@@ -23,27 +28,43 @@
+         return AILANG_GATE_VERIFIER_STRICT
+     end
+     if index == 2 then
++        return AILANG_GATE_FULL_PYTEST
++    end
++    if index == 3 then
+         return AILANG_GATE_C23_HOSTED
+     end
+-    if index == 3 then
++    if index == 4 then
+         return AILANG_GATE_C23_FREESTANDING
+     end
+-    if index == 4 then
+-        return AILANG_GATE_FOCUSED_PYTEST
++    if index == 5 then
++        return AILANG_GATE_BACKEND_DIFFERENTIAL
+     end
+-    if index == 5 then
+-        return AILANG_GATE_C23_WORKLOAD_COMPARE
++    if index == 6 then
++        return AILANG_GATE_EXECUTION_MATRIX
++    end
++    if index == 7 then
++        return AILANG_GATE_EQUIVALENT_WORKLOADS
+     end
+     return ""
+ end
+ 
++def hard_gate_step_count(): int
++    return AILANG_HARD_GATE_STEP_COUNT
++end
++
++def hard_gate_step_name(index: int): string
++    return golden_gate_step_name(index)
++end
++
+ def main(): int
+-    print hard_gate_step_count()
+-    print hard_gate_step_name(0)
+-    print hard_gate_step_name(1)
+-    print hard_gate_step_name(2)
+-    print hard_gate_step_name(3)
+-    print hard_gate_step_name(4)
+-    print hard_gate_step_name(5)
++    print golden_gate_step_count()
++    print golden_gate_step_name(0)
++    print golden_gate_step_name(1)
++    print golden_gate_step_name(2)
++    print golden_gate_step_name(3)
++    print golden_gate_step_name(4)
++    print golden_gate_step_name(5)
++    print golden_gate_step_name(6)
++    print golden_gate_step_name(7)
+     return 0
+ end
+--- a/source/parser/return_type_inference.py
++++ b/source/parser/return_type_inference.py
+@@ -209,6 +209,15 @@
+         if _stmt_terminates_with_value_or_throw(stmt):
+             return True
+     return False
++
++
++def body_terminates_with_value_or_throw(body: list[A.ASTNode]) -> bool:
++    """Return whether every path through *body* terminates with a value or throw.
++
++    This is shared with code generation so parser validation and backend
++    fallthrough handling use the same control-flow contract.
++    """
++    return _body_terminates_with_value_or_throw(body)
+ 
+ def infer_unannotated_return_types(program: list[A.ASTNode]) -> None:
+     """Resolve unannotated ``def`` return types in place; raise on ambiguity."""
+--- a/source/transpiler/expr_calls.py
++++ b/source/transpiler/expr_calls.py
+@@ -257,6 +257,24 @@
+                     ) from None
+             arg_values.append(arg_value)
+ 
++        if is_variadic and len(provided_args) > expected_count:
++            for arg_node in provided_args[expected_count:]:
++                arg_value = self.generate_expr(arg_node)
++                # C varargs use the default argument promotions. LLVM IR does
++                # not apply them for us, so emit them explicitly at the ABI
++                # boundary: f32 -> f64 and integer types narrower than 32 bits
++                # -> i32. Wider integers, pointers, and aggregates keep their
++                # language/native representation.
++                if isinstance(arg_value.type, ir.FloatType):
++                    arg_value = self.builder.fpext(arg_value, ir.DoubleType())
++                elif isinstance(arg_value.type, ir.IntType) and arg_value.type.width < 32:
++                    target = ir.IntType(32)
++                    if self.codegen.is_unsigned_value(arg_value):
++                        arg_value = self.builder.zext(arg_value, target)
++                    else:
++                        arg_value = self.builder.sext(arg_value, target)
++                arg_values.append(arg_value)
++
+         result = self.codegen.call_or_invoke(func, arg_values, name=f"call_{node.name}")
+         # A function call creates a fresh SSA value.  LLVM's iN carries no
+         # signedness, so restore the language return contract at the call site
+--- a/source/transpiler/expr_gen_binary_impl.py
++++ b/source/transpiler/expr_gen_binary_impl.py
+@@ -69,7 +69,16 @@
+     turning valid u64 values above INT64_MAX into failures.
+     """
+     op = node.op
+-    li = info_for_c_fixed(self._infer_type(node.left))
++    left_type = self._infer_type(node.left)
++    right_type = self._infer_type(node.right)
++    # Keep the language-default signed 64-bit lane on the mature generic i64
++    # lowering path.  That path owns the range/literal proofs, optimizer-report
++    # accounting, and loop-specific check elision used by `int`/`i64`.  The
++    # fixed-width lane is for widths/signedness where the generic int64 path
++    # would lose representation fidelity (i8..i32, u8..u64, i128/u128).
++    if str(left_type).strip() == "int64_t" and str(right_type).strip() == "int64_t":
++        return None
++    li = info_for_c_fixed(left_type)
+     info = _fixed_binary_info(self, node)
+     if info is None or info.bits > 128:
+         return None
+--- a/source/transpiler/fixed_int_cast_codegen.py
++++ b/source/transpiler/fixed_int_cast_codegen.py
+@@ -7,6 +7,7 @@
+ """
+ from __future__ import annotations
+ 
++from parser import ast as A
+ from parser.ast import parsed_type_to_str
+ from transpiler.fixed_int_types import info_for_c_fixed, info_for_fixed_int
+ 
+@@ -28,6 +29,18 @@
+     if target is None or source is None:
+         return None
+     if source.bits == target.bits and source.unsigned == target.unsigned:
++        # Narrow fixed-width arithmetic is promoted by C before the call. Keep
++        # the AILang boundary contract explicit for expression arguments even
++        # when static inference says the source and target are the same iN/uN.
++        # This also avoids making call-boundary safety depend on an optimizer
++        # range proof that may change independently of ABI lowering.
++        if isinstance(value_node, A.BinaryOp) and target.bits < 64:
++            source_c = "uint64_t" if source.unsigned else "int64_t"
++            source_tag = "u" if source.unsigned else "s"
++            return (
++                f"ailang_cast_{target.canonical}_from_{source_tag}64"
++                f"(({source_c})({value_code}))"
++            )
+         return value_code
+ 
+     max_bits = max(source.bits, target.bits)
+--- a/source/transpiler/runtime_emit_string.py
++++ b/source/transpiler/runtime_emit_string.py
+@@ -338,9 +338,11 @@
+             self._output.append("    (void)input; return NULL;")
+             self._output.append("#endif")
+             self._output.append("}")
++            self._output.append("#ifndef AILANG_FREESTANDING")
+             self._output.append(f"AILANG_UNUSED static void ailang_write_hex_{prefix}(FILE *f, {ctype} v) {{ char *s=ailang_hex_{prefix}(v); if(s){{ fputs(s,f); ailang_safe_free(s); }} }}")
+             self._output.append(f"AILANG_UNUSED static void ailang_write_bin_{prefix}(FILE *f, {ctype} v) {{ char *s=ailang_bin_{prefix}(v); if(s){{ fputs(s,f); ailang_safe_free(s); }} }}")
+             self._output.append(f"AILANG_UNUSED static void ailang_write_oct_{prefix}(FILE *f, {ctype} v) {{ char *s=ailang_oct_{prefix}(v); if(s){{ fputs(s,f); ailang_safe_free(s); }} }}")
++            self._output.append("#endif")
+         self._output.append("#endif")
+         self._output.append("")
+ 
+--- a/source/transpiler/stmt_visit_class.py
++++ b/source/transpiler/stmt_visit_class.py
+@@ -4,6 +4,7 @@
+ 
+ from parser import ast as A
+ from parser.ast import parsed_type_to_str
++from parser.return_type_inference import body_terminates_with_value_or_throw
+ from typing import Any, Dict, List, Optional, Set, Tuple
+ 
+ from abi_symbols import explicit_c_abi_parts, has_export_decorator
+@@ -351,8 +352,10 @@
+     for stmt in node.body:
+         self.visit(stmt)
+ 
+-    # Implicit return for functions that don't end with a return statement
+-    if not node.body or not isinstance(node.body[-1], A.Return):
++    # Emit a fallthrough return only when control flow can actually reach the
++    # function end.  A trailing if/match/try may terminate on every branch
++    # even though the final AST node is not itself Return.
++    if not body_terminates_with_value_or_throw(node.body):
+         # Auto-cleanup of non-escaping class locals at function exit.
+         self._emit_class_cleanup(None)
+         # Unlock @synchronized mutex before implicit return
