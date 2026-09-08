@@ -11,9 +11,10 @@ from .control_loop_utils import (
     close_streams_if_outer_loop as _m__close_streams_if_outer_loop,
 )
 from .emit_statements_assignment import _emit_range_check as _m__emit_range_check
+from .emit_statements_assignment import visit_Assign as _m_visit_Assign
+from .emit_statements_assignment import visit_TupleAssign as _m_visit_TupleAssign
 from .emit_statements_basic import _evaluate_comptime as _m__evaluate_comptime
 from .emit_statements_basic import visit_Assert as _m_visit_Assert
-from .emit_statements_basic import visit_Assign as _m_visit_Assign
 from .emit_statements_basic import visit_BlockCall as _m_visit_BlockCall
 from .emit_statements_basic import visit_Break as _m_visit_Break
 from .emit_statements_basic import visit_Call as _m_visit_Call
@@ -25,7 +26,6 @@ from .emit_statements_basic import visit_InlineAsm as _m_visit_InlineAsm
 from .emit_statements_basic import visit_RangeVarDecl as _m_visit_RangeVarDecl
 from .emit_statements_basic import visit_Return as _m_visit_Return
 from .emit_statements_basic import visit_StaticAssert as _m_visit_StaticAssert
-from .emit_statements_basic import visit_TupleAssign as _m_visit_TupleAssign
 from .emit_statements_basic import visit_TypeAlias as _m_visit_TypeAlias
 from .emit_statements_basic import visit_VarDecl as _m_visit_VarDecl
 from .emit_statements_block_each import _block_each as _m__block_each
