@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Generate CODEMAP.md - a quick navigation index of every Python file in source/
-plus the top-level ailang.py launcher.
+Generate out/CODEMAP.md - a quick navigation index of every Python file in
+source/ plus the top-level ailang.py launcher.
 
 For each file: lists top-level classes (with base classes), their methods, and
 top-level functions, each with a line number. Lets us look up "where is X
-defined" without grepping a 10K-line file.
+defined" without grepping a large file.
 
 Usage:
     python tools/codemap.py
@@ -19,7 +19,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "source"
 LAUNCHER = ROOT / "ailang.py"
-OUTPUT = ROOT / "CODEMAP.md"
+OUTPUT = ROOT / "out" / "CODEMAP.md"
 
 EXCLUDE_DIRS = {"__pycache__", ".mypy_cache", ".ruff_cache", ".pytest_cache"}
 
@@ -72,7 +72,6 @@ def render_file(path: Path, rel: Path) -> list[str]:
 
     items = [n for n in tree.body if is_substantive(n)]
     if not items:
-        # Skip empty / docstring-only files (likely __init__.py)
         return []
 
     out = [f"### {rel.as_posix()}  ({line_count} lines)", ""]
@@ -104,15 +103,15 @@ def render_file(path: Path, rel: Path) -> list[str]:
 def main() -> int:
     files = collect_files()
     files_by_package: dict[str, list[Path]] = {}
-    for f in files:
-        rel = f.relative_to(ROOT)
+    for file_path in files:
+        rel = file_path.relative_to(ROOT)
         if rel == Path("ailang.py"):
             pkg = "(launcher)"
         elif len(rel.parts) >= 3:
-            pkg = rel.parts[1]  # source/<pkg>/file.py
+            pkg = rel.parts[1]
         else:
             pkg = "(source root)"
-        files_by_package.setdefault(pkg, []).append(f)
+        files_by_package.setdefault(pkg, []).append(file_path)
 
     lines: list[str] = [
         "# AILang Code Map",
@@ -131,11 +130,10 @@ def main() -> int:
     package_order = sorted(files_by_package.keys())
     for pkg in package_order:
         pkg_files = sorted(files_by_package[pkg])
-        # Package header with file count and total line count
         total_lines = 0
-        for f in pkg_files:
+        for file_path in pkg_files:
             try:
-                total_lines += f.read_text(encoding="utf-8").count("\n") + 1
+                total_lines += file_path.read_text(encoding="utf-8").count("\n") + 1
             except UnicodeDecodeError:
                 pass
         lines.append(f"- **`{pkg}`** - {len(pkg_files)} file(s), {total_lines:,} lines")
@@ -144,9 +142,10 @@ def main() -> int:
     for pkg in package_order:
         lines.append(f"## {pkg}")
         lines.append("")
-        for f in sorted(files_by_package[pkg]):
-            lines.extend(render_file(f, f.relative_to(ROOT)))
+        for file_path in sorted(files_by_package[pkg]):
+            lines.extend(render_file(file_path, file_path.relative_to(ROOT)))
 
+    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text("\n".join(lines), encoding="utf-8")
     size = OUTPUT.stat().st_size
     print(
