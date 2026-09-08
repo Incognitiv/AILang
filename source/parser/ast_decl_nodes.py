@@ -28,6 +28,8 @@ class Function(ASTNode):
         self.decorators: list[str] = decorators or []
         self.is_async: bool = is_async  # True for async def functions
         self.is_test: bool = is_test  # True for test functions
+        self.return_type_explicit: bool = True
+        self.return_type_inferred: bool = False
 
 
 class Block(ASTNode):

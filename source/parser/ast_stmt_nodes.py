@@ -41,6 +41,7 @@ class VarDecl(ASTNode):
         self.init_value: ASTNode = init_value
         self.is_const: bool = is_const
         self.is_public: bool = is_public
+        self.c_header_declared: bool = False
 
 
 class RangeType(ASTNode):

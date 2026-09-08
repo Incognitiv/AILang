@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
-from typing import Any, TypeGuard
-
 from parser import ast as A
+from typing import Any, TypeGuard
 
 from ast_access import body_at
 

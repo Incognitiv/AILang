@@ -419,38 +419,34 @@ def _infer_type(self, node: A.ASTNode) -> str:
             return promoted.c_name
         lf = info_for_c_fixed(left_type)
         rf = info_for_c_fixed(right_type)
-        # Source integer literals are adaptable to the other fixed operand
-        # when their mathematical value fits, matching LLVM literal narrowing.
+        # Source integer literals adapt to a fixed operand when they fit.
+        pf = promoted_fixed_info(lf, rf)
         if (
             lf is not None
             and isinstance(node.right, A.Number)
             and not isinstance(node.right.value, float)
         ):
             v = int(node.right.value)
-            if (
+            fits_left = (
                 (0 <= v <= (1 << lf.bits) - 1)
                 if lf.unsigned
                 else (-(1 << (lf.bits - 1)) <= v <= (1 << (lf.bits - 1)) - 1)
-            ):
+            )
+            if fits_left:
                 pf = lf
-            else:
-                pf = promoted_fixed_info(lf, rf)
         elif (
             rf is not None
             and isinstance(node.left, A.Number)
             and not isinstance(node.left.value, float)
         ):
             v = int(node.left.value)
-            if (
+            fits_right = (
                 (0 <= v <= (1 << rf.bits) - 1)
                 if rf.unsigned
                 else (-(1 << (rf.bits - 1)) <= v <= (1 << (rf.bits - 1)) - 1)
-            ):
+            )
+            if fits_right:
                 pf = rf
-            else:
-                pf = promoted_fixed_info(lf, rf)
-        else:
-            pf = promoted_fixed_info(lf, rf)
         if pf is not None:
             if node.op in ("==", "!=", "<", ">", "<=", ">=", "and", "or"):
                 return "bool"

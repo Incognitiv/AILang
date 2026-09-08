@@ -29,6 +29,12 @@ from pgo.paths import sanitize_stem as _pgo_sanitize_stem
 from pgo.paths import source_identity_tag as _pgo_source_identity_tag
 from target_info import os_from_platform
 
+from .link_flags import (
+    _extract_ailang_link_flags,
+    _merge_link_flags,
+    _normalize_native_toolchain,
+)
+
 LLVM_OPT_TIMEOUT_SECONDS = 30
 LLVM_CLANG_TIMEOUT_SECONDS = 120
 LLVM_LLC_TIMEOUT_SECONDS = 120
@@ -37,13 +43,6 @@ CBACKEND_COMPILE_TIMEOUT_SECONDS = 180
 REPO_ROOT = Path(__file__).resolve().parents[2]
 GENERATED_ROOT = REPO_ROOT / "out" / "generated"
 MINGW_TARGET_TRIPLE = "x86_64-w64-windows-gnu"
-
-
-from .link_flags import (
-    _extract_ailang_link_flags,
-    _merge_link_flags,
-    _normalize_native_toolchain,
-)
 
 
 def _normalize_mingw_vararg_symbols(ir_code: str) -> str:

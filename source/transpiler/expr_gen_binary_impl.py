@@ -89,75 +89,75 @@ def _fixed_binary_expr(self, node: A.BinaryOp, left: str, right: str):
         info = li
     ctype = c_name_for_fixed(info)
     suffix = info.canonical
-    l = f"(({ctype})({left}))"
-    r = f"(({ctype})({right}))"
+    left_value = f"(({ctype})({left}))"
+    right_value = f"(({ctype})({right}))"
 
     if op == "and":
-        return f"(({l}) && ({r}))"
+        return f"(({left_value}) && ({right_value}))"
     if op == "or":
-        return f"(({l}) || ({r}))"
+        return f"(({left_value}) || ({right_value}))"
     if op in ("AND", "OR", "XOR", "NAND", "NOR", "XNOR", "&", "|", "bxor"):
         mapped = {"AND": "&", "OR": "|", "XOR": "^", "&": "&", "|": "|", "bxor": "^"}
         c_op = mapped.get(op)
         if c_op is not None:
-            return f"({l} {c_op} {r})"
+            return f"({left_value} {c_op} {right_value})"
         inner = "&" if op == "NAND" else ("|" if op == "NOR" else "^")
-        return f"(~({l} {inner} {r}))"
+        return f"(~({left_value} {inner} {right_value}))"
     if op in ("==", "!=", "<", ">", "<=", ">="):
-        return f"({l} {op} {r})"
+        return f"({left_value} {op} {right_value})"
     if op in ("<<", "shl"):
         return (
-            f"({l} << (int64_t)({right}))"
+            f"({left_value} << (int64_t)({right}))"
             if self._unchecked_mode
-            else f"ailang_safe_shl_{suffix}({l}, (int64_t)({right}))"
+            else f"ailang_safe_shl_{suffix}({left_value}, (int64_t)({right}))"
         )
     if op in (">>", "shr", "ushr"):
         if op == "ushr" and not info.unsigned:
             uctype = c_name_for_fixed(type(info)(info.bits, True, f"u{info.bits}"))
             shifted = (
-                f"(({uctype})({l}) >> (int64_t)({right}))"
+                f"(({uctype})({left_value}) >> (int64_t)({right}))"
                 if self._unchecked_mode
-                else f"ailang_safe_shr_u{info.bits}(({uctype})({l}), (int64_t)({right}))"
+                else f"ailang_safe_shr_u{info.bits}(({uctype})({left_value}), (int64_t)({right}))"
             )
             return f"(({ctype})({shifted}))"
         return (
-            f"({l} >> (int64_t)({right}))"
+            f"({left_value} >> (int64_t)({right}))"
             if self._unchecked_mode
-            else f"ailang_safe_shr_{suffix}({l}, (int64_t)({right}))"
+            else f"ailang_safe_shr_{suffix}({left_value}, (int64_t)({right}))"
         )
     fixed_proven = _fixed_arithmetic_is_proven(self, node, info)
     if op in ("+", "plus"):
         return (
-            f"({l} + {r})"
+            f"({left_value} + {right_value})"
             if self._unchecked_mode or fixed_proven
-            else f"ailang_safe_add_{suffix}({l}, {r})"
+            else f"ailang_safe_add_{suffix}({left_value}, {right_value})"
         )
     if op in ("-", "minus"):
         return (
-            f"({l} - {r})"
+            f"({left_value} - {right_value})"
             if self._unchecked_mode or fixed_proven
-            else f"ailang_safe_sub_{suffix}({l}, {r})"
+            else f"ailang_safe_sub_{suffix}({left_value}, {right_value})"
         )
     if op in ("*", "star"):
         return (
-            f"({l} * {r})"
+            f"({left_value} * {right_value})"
             if self._unchecked_mode or fixed_proven
-            else f"ailang_safe_mul_{suffix}({l}, {r})"
+            else f"ailang_safe_mul_{suffix}({left_value}, {right_value})"
         )
     if op in ("/", "//"):
         return (
-            f"({l} / {r})"
+            f"({left_value} / {right_value})"
             if self._unchecked_mode
-            else f"ailang_safe_div_{suffix}({l}, {r})"
+            else f"ailang_safe_div_{suffix}({left_value}, {right_value})"
         )
     if op == "%":
         return (
-            f"({l} % {r})"
+            f"({left_value} % {right_value})"
             if self._unchecked_mode
-            else f"ailang_safe_mod_{suffix}({l}, {r})"
+            else f"ailang_safe_mod_{suffix}({left_value}, {right_value})"
         )
     if op in ("**", "^"):
-        return f"ailang_safe_pow_{suffix}({l}, (int64_t)({right}))"
+        return f"ailang_safe_pow_{suffix}({left_value}, (int64_t)({right}))"
     return None
 
 
@@ -170,73 +170,73 @@ def _wide_binary_expr(self, node: A.BinaryOp, left: str, right: str):
 
     ctype = info.c_name
     suffix = info.suffix
-    l = f"(({ctype})({left}))"
-    r = f"(({ctype})({right}))"
+    left_value = f"(({ctype})({left}))"
+    right_value = f"(({ctype})({right}))"
     op = node.op
 
     if op == "and":
-        return f"(({l}) && ({r}))"
+        return f"(({left_value}) && ({right_value}))"
     if op == "or":
-        return f"(({l}) || ({r}))"
+        return f"(({left_value}) || ({right_value}))"
     if op in ("AND", "OR", "XOR", "NAND", "NOR", "XNOR"):
         c_op = {"AND": "&", "OR": "|", "XOR": "^"}.get(op)
         if c_op is not None:
-            return f"({l} {c_op} {r})"
+            return f"({left_value} {c_op} {right_value})"
         inner = "&" if op == "NAND" else ("|" if op == "NOR" else "^")
-        return f"(~({l} {inner} {r}))"
+        return f"(~({left_value} {inner} {right_value}))"
     if op in ("==", "!=", "<", ">", "<=", ">="):
-        return f"({l} {op} {r})"
+        return f"({left_value} {op} {right_value})"
     if op in ("<<", "shl"):
         if self._unchecked_mode:
-            return f"({l} << ({right}))"
-        return f"ailang_safe_shl_{suffix}({l}, (int64_t)({right}))"
+            return f"({left_value} << ({right}))"
+        return f"ailang_safe_shl_{suffix}({left_value}, (int64_t)({right}))"
     if op in (">>", "shr", "ushr"):
         if op == "ushr" and not info.unsigned:
             unsigned_suffix = "u" + str(info.bits)
             unsigned_type = "ailang_" + unsigned_suffix
             shifted = (
-                f"(({unsigned_type})({l}) >> (int64_t)({right}))"
+                f"(({unsigned_type})({left_value}) >> (int64_t)({right}))"
                 if self._unchecked_mode
-                else f"ailang_safe_shr_{unsigned_suffix}(({unsigned_type})({l}), (int64_t)({right}))"
+                else f"ailang_safe_shr_{unsigned_suffix}(({unsigned_type})({left_value}), (int64_t)({right}))"
             )
             return f"(({ctype})({shifted}))"
         if self._unchecked_mode:
-            return f"({l} >> ({right}))"
-        return f"ailang_safe_shr_{suffix}({l}, (int64_t)({right}))"
+            return f"({left_value} >> ({right}))"
+        return f"ailang_safe_shr_{suffix}({left_value}, (int64_t)({right}))"
     if op in ("+", "plus"):
         return (
-            f"({l} + {r})"
+            f"({left_value} + {right_value})"
             if self._unchecked_mode
-            else f"ailang_safe_add_{suffix}({l}, {r})"
+            else f"ailang_safe_add_{suffix}({left_value}, {right_value})"
         )
     if op in ("-", "minus"):
         return (
-            f"({l} - {r})"
+            f"({left_value} - {right_value})"
             if self._unchecked_mode
-            else f"ailang_safe_sub_{suffix}({l}, {r})"
+            else f"ailang_safe_sub_{suffix}({left_value}, {right_value})"
         )
     if op in ("*", "star"):
         return (
-            f"({l} * {r})"
+            f"({left_value} * {right_value})"
             if self._unchecked_mode
-            else f"ailang_safe_mul_{suffix}({l}, {r})"
+            else f"ailang_safe_mul_{suffix}({left_value}, {right_value})"
         )
     if op in ("/", "//"):
         return (
-            f"({l} / {r})"
+            f"({left_value} / {right_value})"
             if self._unchecked_mode
-            else f"ailang_safe_div_{suffix}({l}, {r})"
+            else f"ailang_safe_div_{suffix}({left_value}, {right_value})"
         )
     if op == "%":
         return (
-            f"({l} % {r})"
+            f"({left_value} % {right_value})"
             if self._unchecked_mode
-            else f"ailang_safe_mod_{suffix}({l}, {r})"
+            else f"ailang_safe_mod_{suffix}({left_value}, {right_value})"
         )
     if op in ("**", "^"):
         if self._unchecked_mode:
-            return f"ailang_safe_pow_{suffix}({l}, (int64_t)({right}))"
-        return f"ailang_safe_pow_{suffix}({l}, (int64_t)({right}))"
+            return f"ailang_safe_pow_{suffix}({left_value}, (int64_t)({right}))"
+        return f"ailang_safe_pow_{suffix}({left_value}, (int64_t)({right}))"
     return None
 
 

@@ -723,7 +723,7 @@ class ImportResolver:
         if not filepath:
             return
         for node in nodes:
-            if not hasattr(node, "_source_file"):
+            if not node._source_file:
                 node._source_file = filepath
 
     @staticmethod

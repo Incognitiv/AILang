@@ -445,7 +445,7 @@ class _CodeGenFunctionMixin:
             return
         plans = getattr(self, "_stack_class_cleanup_plans", {})
         if plans:
-            from transpiler.emit_statements_control_data import (
+            from transpiler.emit_statements_cleanup import (
                 _emit_stack_class_cleanup,
             )
 

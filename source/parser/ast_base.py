@@ -64,6 +64,7 @@ class ASTNode:
     line: int
     col: int
     _source_path: str | None = None
+    _source_file: str | None = None
 
     def set_pos(self, line: int, col: int = 0) -> "ASTNode":
         """Set source position and return self for chaining."""

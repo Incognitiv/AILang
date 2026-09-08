@@ -19,13 +19,12 @@ from transpiler.expr_common import (
     ExprGenError,
 )
 
+from .expr_builtin_sql_column_mixin import ExprBuiltinSqlColumnMixin
+
 SQLITE_OPEN_READONLY = 0x00000001
 SQLITE_OPEN_READWRITE = 0x00000002
 SQLITE_OPEN_CREATE = 0x00000004
 SQLITE_OPEN_URI = 0x00000040
-
-
-from .expr_builtin_sql_column_mixin import ExprBuiltinSqlColumnMixin
 
 
 class ExprBuiltinSqlEmitter(ExprBuiltinSqlColumnMixin):
