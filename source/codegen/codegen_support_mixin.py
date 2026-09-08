@@ -67,23 +67,46 @@ class _CodeGenSupportMixin:
         one = ir.Constant(ir.IntType(64), 1)
         total_len = self.current_builder.add(left_len, right_len, name="concat_len")
         total_len = self.current_builder.add(total_len, one, name="total_len")
-        # Always use malloc for concat (arena would accumulate loop intermediates)
-        new_str = self.current_builder.call(
-            self.get_malloc(), [total_len], name="concat_str"
-        )
+        # Route through the same string allocator as str/substr/chr. With an
+        # active request arena the caller can reclaim the whole request with
+        # arena_reset(); without one this falls back to the existing heap/main
+        # arena policy.
+        new_str = self.string_alloc(total_len, "concat_str")
         # Copy left string
         self.current_builder.call(self.get_strcpy(), [new_str, left_str])
         # Concatenate right string
         self.current_builder.call(self.get_strcat(), [new_str, right_str])
-        # Free intermediate temporaries from prior concatenations
-        left_name = getattr(left_str, "name", "")
-        right_name = getattr(right_str, "name", "")
-        if left_name in self.temp_strings:
-            self.current_builder.call(self._get_free(), [left_str])
-            self.temp_strings.discard(left_name)
-        if right_name in self.temp_strings:
-            self.current_builder.call(self._get_free(), [right_str])
-            self.temp_strings.discard(right_name)
+        # Free heap intermediates, but never individually free pointers owned
+        # by the main/request arena. Request-arena temps are reclaimed by
+        # arena_reset() and main-arena temps by arena_destroy().
+        def release_temp_if_heap(value: Any) -> None:
+            name = getattr(value, "name", "")
+            if name not in self.temp_strings:
+                return
+            self.temp_strings.discard(name)
+            if self._string_arena is not None:
+                return
+            request_slot = getattr(self, "_request_arena_slot", None)
+            if request_slot is None:
+                self.current_builder.call(self._get_free(), [value])
+                return
+            i8_ptr = ir.IntType(8).as_pointer()
+            active = self.current_builder.load(
+                request_slot, name="concat_active_request_arena"
+            )
+            is_heap = self.current_builder.icmp_unsigned(
+                "==", active, ir.Constant(i8_ptr, None), name="concat_temp_is_heap"
+            )
+            free_block = self.current_function.append_basic_block("concat_temp_free")
+            done_block = self.current_function.append_basic_block("concat_temp_done")
+            self.current_builder.cbranch(is_heap, free_block, done_block)
+            self.current_builder.position_at_end(free_block)
+            self.current_builder.call(self._get_free(), [value])
+            self.current_builder.branch(done_block)
+            self.current_builder.position_at_end(done_block)
+
+        release_temp_if_heap(left_str)
+        release_temp_if_heap(right_str)
         # Track this result as a temporary for potential future cleanup
         result_name = getattr(new_str, "name", "")
         if result_name:

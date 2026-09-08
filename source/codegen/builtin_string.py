@@ -308,9 +308,7 @@ class BuiltinStringEmitter:
             total_len = self.current_builder.add(total_len, slen, name="concat_accum")
 
         alloc_size = self.current_builder.add(total_len, one64, name="concat_alloc")
-        result = self.current_builder.call(
-            self.get_malloc(), [alloc_size], name="concat_buf"
-        )
+        result = self.string_alloc(alloc_size, "concat_buf")
 
         current_pos = result
         for i, s in enumerate(str_vals):

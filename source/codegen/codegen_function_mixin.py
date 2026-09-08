@@ -265,10 +265,17 @@ class _CodeGenFunctionMixin:
         self.builder = ir.IRBuilder(block)
         if getattr(self, "_module_uses_string_arena", True):
             i8_ptr = ir.IntType(8).as_pointer()
-            self._request_arena_slot = self.builder.alloca(
-                i8_ptr, name="request_arena_slot"
-            )
-            self.builder.store(ir.Constant(i8_ptr, None), self._request_arena_slot)
+            # arena_use() is request context, not function-local state. Keep one
+            # module slot so ordinary callees observe the arena selected by the
+            # caller. This matches the C backend's single-threaded fast path.
+            slot = self.module.globals.get("__ailang_request_arena")
+            if slot is None:
+                slot = ir.GlobalVariable(
+                    self.module, i8_ptr, "__ailang_request_arena"
+                )
+                slot.linkage = "internal"
+                slot.initializer = ir.Constant(i8_ptr, None)
+            self._request_arena_slot = slot
         pending_sp = getattr(self, "_pending_di_sp", None)
         if pending_sp is not None:
             self.builder.debug_metadata = self._make_di_location(
