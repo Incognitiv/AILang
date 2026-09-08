@@ -426,8 +426,10 @@ def _generate_call(self, node: A.Call) -> str:
     ):
         source_arg = arg_at(node, 0)
         if isinstance(source_arg, A.Variable):
-            source_type = self._var_types.get(source_arg.name)
-            if source_type == "StringArray":
+            source_type = getattr(self, "_current_local_c_types", {}).get(
+                source_arg.name, self._var_types.get(source_arg.name)
+            )
+            if isinstance(source_type, str) and source_type.strip().lower() == "stringarray":
                 return f"ailang_str_array_free(&{call_args[0]})"
         return f"ailang_str_array_free_v2(&{call_args[0]})"
 
