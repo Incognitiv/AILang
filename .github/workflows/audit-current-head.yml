@@ -1,0 +1,199 @@
+name: Audit current AILang head
+
+on:
+  push:
+    branches: ["agent/audit-2026-09-08"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  full-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install toolchains
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends clang gcc llvm lld
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,llvm]" psutil
+      - name: Environment inventory
+        run: |
+          mkdir -p out/audit
+          {
+            echo "HEAD=$(git rev-parse HEAD)"
+            python --version
+            clang --version | head -1
+            gcc --version | head -1
+            rustc --version
+            python - <<'PY'
+          from pathlib import Path
+          print('python_source_files=', sum(1 for p in Path('source').rglob('*.py')))
+          print('ailang_stdlib_files=', sum(1 for p in Path('stdlib').rglob('*.ail')))
+          print('tests=', sum(1 for p in Path('tests').glob('test_*.py')))
+          print('benchmark_ail_files=', sum(1 for p in Path('benchmarks/ailang').glob('*.ail')))
+          PY
+          } | tee out/audit/environment.txt
+      - name: Full pytest suite
+        run: |
+          set -o pipefail
+          python -m pytest -q 2>&1 | tee out/audit/pytest.log
+      - name: Upload test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-full-tests
+          path: out/audit/
+
+  gates-and-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install toolchains
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends clang gcc llvm lld
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,llvm]" psutil
+      - name: Quickcheck
+        run: |
+          mkdir -p out/audit
+          set -o pipefail
+          python tools/quickcheck.py 2>&1 | tee out/audit/quickcheck.log
+      - name: Regression corpus
+        run: |
+          set -o pipefail
+          python tools/regression_check.py 2>&1 | tee out/audit/regression.log
+      - name: Hard gate
+        run: |
+          set -o pipefail
+          python tools/hard_gate.py --timeout 900 2>&1 | tee out/audit/hard_gate.log
+      - name: Upload gate artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-gates
+          path: |
+            out/audit/
+            out/codex_audit/
+            benchmarks/results/
+
+  backend-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install toolchains
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends clang gcc llvm lld
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,llvm]" psutil
+      - name: Exercise real AILang programs across AOT/JIT/C toolchains
+        run: |
+          set -euxo pipefail
+          mkdir -p out/audit/bin out/audit/ir
+          for src in \
+            benchmarks/ailang/loop_hash.ail \
+            benchmarks/ailang/fib_mix.ail \
+            benchmarks/ailang/records_bench.ail \
+            benchmarks/ailang/fixed_array_sum.ail \
+            benchmarks/ailang/recursive_traversal.ail \
+            benchmarks/ailang/gauntlet_numeric.ail \
+            benchmarks/ailang/gauntlet_ownership.ail \
+            benchmarks/ailang/gauntlet_protocol.ail
+          do
+            base=$(basename "$src" .ail)
+            python ailang.py "$src" --check
+
+            python ailang.py "$src" --backend=llvm --native-toolchain=clang -O3 -o "out/audit/bin/${base}_llvm"
+            "out/audit/bin/${base}_llvm" > "out/audit/${base}.llvm.out"
+
+            python ailang.py "$src" --backend=c --native-toolchain=clang -O3 -o "out/audit/bin/${base}_c_clang"
+            "out/audit/bin/${base}_c_clang" > "out/audit/${base}.c-clang.out"
+
+            python ailang.py "$src" --backend=c --native-toolchain=gcc -O3 -o "out/audit/bin/${base}_c_gcc"
+            "out/audit/bin/${base}_c_gcc" > "out/audit/${base}.c-gcc.out"
+
+            python ailang.py "$src" --jit-repeat 3 --jit-warmup 1 --jit-json --jit-opt=3 --jit-dump-ir="out/audit/ir/${base}.ll" > "out/audit/${base}.jit.out"
+
+            diff -u "out/audit/${base}.llvm.out" "out/audit/${base}.c-clang.out"
+            diff -u "out/audit/${base}.llvm.out" "out/audit/${base}.c-gcc.out"
+          done
+      - name: Durability mega compile surface
+        run: |
+          set -euxo pipefail
+          python ailang.py benchmarks/ailang/durability_mega.ail --check
+          python ailang.py benchmarks/ailang/durability_mega.ail --backend=llvm --native-toolchain=clang -O3 -o out/audit/bin/durability_mega_llvm
+          python ailang.py benchmarks/ailang/durability_mega.ail --backend=c --native-toolchain=gcc -O3 -o out/audit/bin/durability_mega_c_gcc
+      - name: Upload backend artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-backend-matrix
+          path: out/audit/
+
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install toolchains
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends clang gcc llvm lld
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,llvm]" psutil
+      - name: Cross-language benchmark
+        run: |
+          mkdir -p out/audit
+          set -o pipefail
+          python benchmarks/run_benchmarks.py \
+            --runs 3 \
+            --warmup 1 \
+            --check-output \
+            --sample-memory \
+            --check-leaks \
+            --leak-threshold 0 \
+            --output out/audit/benchmark_results.md \
+            2>&1 | tee out/audit/benchmark.log
+      - name: Fail on benchmark lane failures
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('out/audit/benchmark_results.json')
+          obj = json.loads(p.read_text())
+          bad = []
+          for case, impls in obj['results'].items():
+              for impl, row in impls.items():
+                  if row['status'] != 'ok':
+                      bad.append((case, impl, row['status'], row.get('note')))
+          if bad:
+              for row in bad:
+                  print('FAIL', *row)
+              raise SystemExit(1)
+          print('all benchmark lanes passed:', sum(len(x) for x in obj['results'].values()))
+          PY
+      - name: Upload benchmark artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-benchmarks
+          path: out/audit/
