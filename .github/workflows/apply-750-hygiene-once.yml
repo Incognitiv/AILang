@@ -1,4 +1,4 @@
-name: Normalize verified 750-line hygiene refactor
+name: Repair verified 750-line hygiene refactor
 
 on:
   push:
@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   normalize-and-diagnose:
-    if: github.event.head_commit.message == 'Normalize 750 refactor verifier debt'
+    if: github.event.head_commit.message == 'Repair 750 refactor strict contracts'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
@@ -49,6 +49,66 @@ jobs:
           git apply --check /tmp/refactor.patch
           git apply /tmp/refactor.patch
 
+      - name: Apply semantic split repairs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import ast
+          import re
+
+          field_file = Path('source/transpiler/stmt_visit_data_fields.py')
+          text = field_file.read_text()
+          old = 'from .stmt_visit_data import _emit_dyn_array_push_in_place'
+          new = 'from .stmt_visit_assignment_helpers import _emit_dyn_array_push_in_place'
+          assert text.count(old) == 1, 'unexpected dyn-array import state'
+          field_file.write_text(text.replace(old, new))
+
+          mixins = {
+              'source/transpiler/helper_scanner_detail_mixin.py': 12,
+              'source/transpiler/expr_ops_binary_mixin.py': 5,
+              'source/transpiler/expr_calls_object_mixin.py': 9,
+              'source/transpiler/prologue_header_mixin.py': 1,
+              'source/codegen/builtin_string_conversion_mixin.py': 9,
+              'source/transpiler/expr_gen_concurrency_mixin.py': 3,
+              'source/codegen/codegen_template_support_mixin.py': 1,
+              'source/transpiler/expr_builtin_sql_column_mixin.py': 2,
+          }
+          pattern = re.compile(r'(\bdef\s+[A-Za-z_]\w*\(\s*)self(?=[,\)])')
+          for filename, expected in mixins.items():
+              path = Path(filename)
+              source = path.read_text()
+              source, count = pattern.subn(r'\1self: Any', source)
+              assert count == expected, f'{filename}: expected {expected} self annotations, got {count}'
+              ast.parse(source)
+              path.write_text(source)
+
+          type_helpers = Path('source/transpiler/expr_type_helpers.py')
+          text = type_helpers.read_text()
+          if '\nimport sys\n' not in text:
+              marker = 'from __future__ import annotations\n'
+              assert marker in text
+              text = text.replace(marker, marker + '\nimport sys\n', 1)
+          type_helpers.write_text(text)
+
+          pyproject = Path('pyproject.toml')
+          text = pyproject.read_text()
+          black_block = '[tool.black]\nline-length = 88\n'
+          assert black_block in text
+          text = text.replace(
+              black_block,
+              black_block + 'target-version = ["py311"]\n',
+              1,
+          )
+          pyproject.write_text(text)
+          PY
+          PYTHONPATH=source python - <<'PY'
+          import transpiler.core
+          import codegen.fast_jit
+          print('core import smoke: PASS')
+          PY
+
       - name: Install deterministic verification stack
         run: |
           python -m pip install --upgrade pip
@@ -84,7 +144,7 @@ jobs:
         continue-on-error: true
         run: ruff check source verifier
 
-      - name: Show standalone mixin typing diagnostics
+      - name: Show standalone typing diagnostics
         shell: bash
         continue-on-error: true
         run: |
@@ -96,6 +156,8 @@ jobs:
             source/transpiler/prologue_header_mixin.py \
             source/codegen/builtin_string_conversion_mixin.py \
             source/transpiler/expr_gen_concurrency_mixin.py \
+            source/codegen/codegen_template_support_mixin.py \
+            source/transpiler/expr_builtin_sql_column_mixin.py \
             source/transpiler/import_resolver.py \
             source/transpiler/emit_statements_basic.py \
             source/parser/return_type_inference.py \
