@@ -11,13 +11,16 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 AILANG = REPO_ROOT / "ailang.py"
 
 
-def _write_transitive_program(root: Path) -> Path:
+def _write_transitive_program(
+    root: Path, *, selective_dependency: bool = False
+) -> Path:
     (root / "leaf.ail").write_text(
         "def answer():\n    return 42\nend\n",
         encoding="utf-8",
     )
+    dependency = "from leaf import answer" if selective_dependency else "import leaf"
     (root / "defs.ail").write_text(
-        "import leaf\n\ndef forwarded():\n    return answer()\nend\n",
+        f"{dependency}\n\ndef forwarded():\n    return answer()\nend\n",
         encoding="utf-8",
     )
     main = root / "main.ail"
@@ -30,8 +33,15 @@ def _write_transitive_program(root: Path) -> Path:
 
 
 @pytest.mark.parametrize("backend", ["c", "llvm"])
-def test_transitive_import_return_inference_aot(tmp_path: Path, backend: str) -> None:
-    main = _write_transitive_program(tmp_path)
+@pytest.mark.parametrize(
+    "selective_dependency", [False, True], ids=["import", "from-import"]
+)
+def test_transitive_import_return_inference_aot(
+    tmp_path: Path, backend: str, selective_dependency: bool
+) -> None:
+    main = _write_transitive_program(
+        tmp_path, selective_dependency=selective_dependency
+    )
     output = tmp_path / f"main-{backend}"
     compile_proc = subprocess.run(
         [
@@ -60,6 +70,13 @@ def test_transitive_import_return_inference_aot(tmp_path: Path, backend: str) ->
     assert run_proc.returncode == 42, run_proc.stdout + run_proc.stderr
 
 
-def test_transitive_import_return_inference_jit(tmp_path: Path) -> None:
-    main = _write_transitive_program(tmp_path)
+@pytest.mark.parametrize(
+    "selective_dependency", [False, True], ids=["import", "from-import"]
+)
+def test_transitive_import_return_inference_jit(
+    tmp_path: Path, selective_dependency: bool
+) -> None:
+    main = _write_transitive_program(
+        tmp_path, selective_dependency=selective_dependency
+    )
     assert fast_jit_file(str(main), optimize=False, jit_opt=0) == 42

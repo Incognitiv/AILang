@@ -282,31 +282,55 @@ class ModuleLoader:
         self.current_file = path
         try:
             for node in ast:
-                if isinstance(node, Import):
-                    try:
-                        imported_mod = self.load_module(node.module_path)
-                        # Add all exports from the imported module to this module's exports
-                        # (unless they conflict with local definitions)
-                        for exp_name, exp_node in imported_mod.exports.items():
-                            if exp_name not in module.exports:
-                                module.exports[exp_name] = exp_node
-                        for link_directive in imported_mod.link_directives:
-                            if not _has_link_directive(
-                                module.link_directives, link_directive
-                            ):
-                                module.link_directives.append(link_directive)
-                    except ImportError as e:
-                        # Don't silently swallow import errors - report them
-                        import sys
+                if not isinstance(node, (Import, FromImport)):
+                    continue
+                try:
+                    imported_mod = self.load_module(node.module_path)
+                    requested_names = (
+                        node.names if isinstance(node, FromImport) else None
+                    )
+                    self._merge_dependency_exports(
+                        module,
+                        imported_mod,
+                        node.module_path,
+                        requested_names=requested_names,
+                    )
+                except ImportError as exc:
+                    # A selective import names an explicit contract: a missing
+                    # symbol is an error, not an optional dependency. Preserve
+                    # the historical warning behavior for plain imports only.
+                    if isinstance(node, FromImport):
+                        raise
+                    import sys
 
-                        print(
-                            f"Warning: Failed to import '{node.module_path}': {e}",
-                            file=sys.stderr,
-                        )
+                    print(
+                        f"Warning: Failed to import '{node.module_path}': {exc}",
+                        file=sys.stderr,
+                    )
         finally:
             self.current_file = old_file
 
         return module
+
+    @staticmethod
+    def _merge_dependency_exports(
+        module: Module,
+        imported_module: Module,
+        module_path: str,
+        *,
+        requested_names: list[str] | None,
+    ) -> None:
+        """Merge the symbol closure required by a nested module import."""
+        exports = imported_module.exports
+        names = list(exports) if requested_names is None else requested_names
+        for name in names:
+            if name not in exports:
+                raise ImportError(f"Cannot import '{name}' from '{module_path}'")
+            if name not in module.exports:
+                module.exports[name] = exports[name]
+        for link_directive in imported_module.link_directives:
+            if not _has_link_directive(module.link_directives, link_directive):
+                module.link_directives.append(link_directive)
 
     def process_imports(
         self, ast: list[ASTNode]
