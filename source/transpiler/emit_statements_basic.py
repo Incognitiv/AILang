@@ -370,6 +370,7 @@ def _evaluate_comptime(self, expr):
 
 
 def visit_VarDecl(self, node: VarDecl):
+    init_value: ir.Value | None
     llvm_type = self.codegen.get_llvm_type(node.type_name)
     if is_unbounded_spec(self.codegen, node.type_name):
         var_ptr = self.codegen.alloca_in_entry_block(llvm_type, node.var_name)

@@ -60,7 +60,11 @@ class ExprTypeHelperEmitter:
         target_unsigned: bool | None = None,
     ) -> ir.Value:
         if value.type == target_type:
-            if isinstance(value.type, ir.IntType) and target_unsigned is not None:
+            if (
+                isinstance(value.type, ir.IntType)
+                and isinstance(target_type, ir.IntType)
+                and target_unsigned is not None
+            ):
                 source_unsigned = bool(
                     unsigned or self.codegen.is_unsigned_value(value)
                 )

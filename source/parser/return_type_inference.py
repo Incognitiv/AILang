@@ -104,7 +104,7 @@ def _join(a: str, b: str) -> str | None:
         bits = int(m.group(2)) - (1 if m.group(1) == "i" else 0)
         return a if bits <= floats[a] else None
     if b in floats and _INT_RE.match(a):
-        return _join(b, a)
+        return _join(a=b, b=a)
     return None
 
 
