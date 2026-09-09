@@ -1,0 +1,126 @@
+name: QSP public declaration audit
+
+on:
+  push:
+    branches:
+      - agent/qsp-public-declarations-audit
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/qsp-public-declarations-audit
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang gcc
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,llvm]"
+      - name: Audit public/private module contract
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import sys
+          import tempfile
+
+          from codegen.fast_jit import fast_jit_file
+
+          repo = Path.cwd()
+          ailang = repo / "ailang.py"
+          root = Path(tempfile.mkdtemp(prefix="ailang-qsp-public-"))
+          (root / "api.ail").write_text(
+              '''private def hidden():
+    return 7
+end
+
+public def exposed():
+    return hidden() + 35
+end
+
+record Pair:
+    int left
+    int right
+end
+
+class Box:
+    int base = 40
+    int value = 0
+
+    void init(int x):
+        this.value = x
+    end
+
+    int total():
+        return this.base + this.value
+    end
+end
+''', encoding="utf-8")
+          public_main = root / "public_main.ail"
+          public_main.write_text(
+              '''from api import exposed, Pair, Box
+
+int main():
+    Pair p = new Pair(40, 2)
+    Box b = new Box(2)
+    return (exposed() - 42) + (p.left + p.right - 42) + (b.total() - 42)
+end
+''', encoding="utf-8")
+          private_main = root / "private_main.ail"
+          private_main.write_text(
+              '''from api import hidden
+
+int main():
+    return hidden()
+end
+''', encoding="utf-8")
+
+          def compile_file(src: Path, backend: str) -> subprocess.CompletedProcess[str]:
+              return subprocess.run(
+                  [sys.executable, str(ailang), str(src), f"--backend={backend}", "-o", str(root / f"{src.stem}-{backend}")],
+                  cwd=repo, capture_output=True, text=True, timeout=180, check=False,
+              )
+
+          failures = []
+          for backend in ("c", "llvm"):
+              proc = compile_file(public_main, backend)
+              print(f"PUBLIC {backend} rc={proc.returncode}")
+              if proc.returncode != 0:
+                  print(proc.stdout)
+                  print(proc.stderr)
+                  failures.append(f"public declarations failed on {backend}")
+              else:
+                  run = subprocess.run([str(root / f"public_main-{backend}")], cwd=root, capture_output=True, text=True, timeout=30, check=False)
+                  print(f"PUBLIC-RUN {backend} rc={run.returncode}")
+                  if run.returncode != 0:
+                      failures.append(f"public declarations runtime failed on {backend}: {run.returncode}")
+
+              private_proc = compile_file(private_main, backend)
+              print(f"PRIVATE {backend} rc={private_proc.returncode}")
+              if private_proc.returncode == 0:
+                  failures.append(f"private function was importable on {backend}")
+              else:
+                  print((private_proc.stdout + private_proc.stderr)[-3000:])
+
+          try:
+              jit_rc = fast_jit_file(str(public_main), optimize=False, jit_opt=0)
+              print(f"PUBLIC JIT rc={jit_rc}")
+              if jit_rc != 0:
+                  failures.append(f"public declarations runtime failed on jit: {jit_rc}")
+          except Exception as exc:
+              print(f"PUBLIC JIT error={exc!r}")
+              failures.append(f"public declarations failed on jit: {exc}")
+
+          if failures:
+              print("QSP AUDIT FAILURES:")
+              for failure in failures:
+                  print(f"- {failure}")
+              raise SystemExit(1)
+          print("QSP PUBLIC DECLARATION CONTRACT PASS")
+          PY
