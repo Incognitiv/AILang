@@ -29,62 +29,61 @@ jobs:
           import subprocess
           import sys
           import tempfile
-
           from codegen.fast_jit import fast_jit_file
 
           repo = Path.cwd()
           ailang = repo / "ailang.py"
           root = Path(tempfile.mkdtemp(prefix="ailang-qsp-public-"))
-          (root / "api.ail").write_text(
-              '''private def hidden():
-    return 7
-end
-
-public def exposed():
-    return hidden() + 35
-end
-
-record Pair:
-    int left
-    int right
-end
-
-class Box:
-    int base = 40
-    int value = 0
-
-    void init(int x):
-        this.value = x
-    end
-
-    int total():
-        return this.base + this.value
-    end
-end
-''', encoding="utf-8")
+          api_code = (
+              "private def hidden():\n"
+              "    return 7\n"
+              "end\n\n"
+              "public def exposed():\n"
+              "    return hidden() + 35\n"
+              "end\n\n"
+              "record Pair:\n"
+              "    int left\n"
+              "    int right\n"
+              "end\n\n"
+              "class Box:\n"
+              "    int base = 40\n"
+              "    int value = 0\n\n"
+              "    void init(int x):\n"
+              "        this.value = x\n"
+              "    end\n\n"
+              "    int total():\n"
+              "        return this.base + this.value\n"
+              "    end\n"
+              "end\n"
+          )
+          public_code = (
+              "from api import exposed, Pair, Box\n\n"
+              "int main():\n"
+              "    Pair p = new Pair(40, 2)\n"
+              "    Box b = new Box(2)\n"
+              "    return (exposed() - 42) + (p.left + p.right - 42) + (b.total() - 42)\n"
+              "end\n"
+          )
+          private_code = (
+              "from api import hidden\n\n"
+              "int main():\n"
+              "    return hidden()\n"
+              "end\n"
+          )
+          (root / "api.ail").write_text(api_code, encoding="utf-8")
           public_main = root / "public_main.ail"
-          public_main.write_text(
-              '''from api import exposed, Pair, Box
-
-int main():
-    Pair p = new Pair(40, 2)
-    Box b = new Box(2)
-    return (exposed() - 42) + (p.left + p.right - 42) + (b.total() - 42)
-end
-''', encoding="utf-8")
+          public_main.write_text(public_code, encoding="utf-8")
           private_main = root / "private_main.ail"
-          private_main.write_text(
-              '''from api import hidden
-
-int main():
-    return hidden()
-end
-''', encoding="utf-8")
+          private_main.write_text(private_code, encoding="utf-8")
 
           def compile_file(src: Path, backend: str) -> subprocess.CompletedProcess[str]:
               return subprocess.run(
                   [sys.executable, str(ailang), str(src), f"--backend={backend}", "-o", str(root / f"{src.stem}-{backend}")],
-                  cwd=repo, capture_output=True, text=True, timeout=180, check=False,
+                  cwd=repo,
+                  capture_output=True,
+                  text=True,
+                  timeout=180,
+                  check=False,
               )
 
           failures = []
@@ -96,7 +95,14 @@ end
                   print(proc.stderr)
                   failures.append(f"public declarations failed on {backend}")
               else:
-                  run = subprocess.run([str(root / f"public_main-{backend}")], cwd=root, capture_output=True, text=True, timeout=30, check=False)
+                  run = subprocess.run(
+                      [str(root / f"public_main-{backend}")],
+                      cwd=root,
+                      capture_output=True,
+                      text=True,
+                      timeout=30,
+                      check=False,
+                  )
                   print(f"PUBLIC-RUN {backend} rc={run.returncode}")
                   if run.returncode != 0:
                       failures.append(f"public declarations runtime failed on {backend}: {run.returncode}")
