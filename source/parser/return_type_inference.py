@@ -338,6 +338,11 @@ def body_terminates_with_value_or_throw(body: list[A.ASTNode]) -> bool:
     return _body_terminates_with_value_or_throw(body)
 
 
+def _has_unresolved_language_imports(program: list[A.ASTNode]) -> bool:
+    """Return whether return inference must wait for module resolution."""
+    return any(isinstance(node, (A.Import, A.FromImport)) for node in program)
+
+
 def infer_unannotated_return_types(program: list[A.ASTNode]) -> None:
     """Resolve unannotated ``def`` return types in place; raise on ambiguity."""
     functions: list[tuple[A.Function, str | None]] = []
@@ -428,6 +433,8 @@ def infer_unannotated_return_types(program: list[A.ASTNode]) -> None:
         if not pending or not changed:
             break
     if pending:
+        if _has_unresolved_language_imports(program):
+            return
         names = ", ".join(f"{cls + '.' if cls else ''}{fn.name}" for fn, cls in pending)
         raise SyntaxError(
             f"Cannot infer return type for: {names}; add an explicit type prefix"
@@ -448,7 +455,14 @@ def validate_return_contracts(program: list[A.ASTNode]) -> None:
         elif isinstance(node, A.ClassDef):
             functions.extend((method, node.name) for method in node.methods)
 
+    defer_unresolved = _has_unresolved_language_imports(program)
     for fn, cls in functions:
+        if (
+            defer_unresolved
+            and not getattr(fn, "return_type_explicit", True)
+            and not getattr(fn, "return_type_inferred", False)
+        ):
+            continue
         ret_type = _canon(fn.return_type)
         rs = _returns(fn)
         valued = [r for r in rs if r.value is not None]

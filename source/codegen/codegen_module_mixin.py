@@ -250,6 +250,28 @@ class _CodeGenModuleMixin(_CodeGenModuleGlobalsMixin):
                 if key not in from_import_names:
                     from_import_names[key] = []
                 from_import_names[key].extend(node.names)
+
+        # Parser-level inference deliberately defers functions whose return
+        # values depend on imports.  At this point the LLVM module loader has
+        # the complete exported symbol closure, so infer on concrete nodes.
+        from parser.return_type_inference import (
+            infer_unannotated_return_types,
+            validate_return_contracts,
+        )
+
+        inference_nodes: list[ASTNode] = [
+            node for node in ast_nodes if not isinstance(node, FromImport)
+        ]
+        seen_inference_nodes = {id(node) for node in inference_nodes}
+        for imported_module in imported_modules.values():
+            for imported_node in imported_module.get_all_exports().values():
+                if id(imported_node) in seen_inference_nodes:
+                    continue
+                inference_nodes.append(imported_node)
+                seen_inference_nodes.add(id(imported_node))
+        infer_unannotated_return_types(inference_nodes)
+        validate_return_contracts(inference_nodes)
+
         # Aliases must be known before records/classes/functions are lowered.
         self._register_type_aliases_from_nodes(ast_nodes)
         for module in imported_modules.values():

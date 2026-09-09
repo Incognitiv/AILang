@@ -70,6 +70,16 @@ class ImportResolver:
         # declared after their first use site -- C compile error.
         result.sort(key=self._sort_key)
 
+        # Parsing a file cannot infer return types that depend on imported
+        # declarations.  Once imports are flattened, resolve and validate the
+        # complete program so the C backend sees the same contracts as LLVM.
+        from parser.return_type_inference import (
+            infer_unannotated_return_types,
+            validate_return_contracts,
+        )
+
+        infer_unannotated_return_types(result)
+        validate_return_contracts(result)
         return result
 
     # ==================== internals ====================
