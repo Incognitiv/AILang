@@ -13,8 +13,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install diagnostic tools
-        run: python -m pip install mypy==2.3.1 bandit==1.9.4 detect-secrets==1.5.0
+      - name: Install verification dependencies
+        run: python -m pip install -e ".[dev,llvm]"
       - name: Show exact mypy diagnostics
         shell: bash
         run: |
@@ -25,8 +25,8 @@ jobs:
           mypy source/transpiler/expr_type_helpers.py \
             --show-error-codes --explicit-package-bases --no-pretty --no-error-summary
           exit 0
-      - name: Show score-only diagnostics
+      - name: Show exact verifier result
         shell: bash
         run: |
-          bandit -f json -q --exit-zero source/parser/return_type_inference.py || true
-          detect-secrets scan source/parser/return_type_inference.py || true
+          python -m verifier.cli source/parser/return_type_inference.py \
+            --preset strict --check-imports --json --exit-zero
