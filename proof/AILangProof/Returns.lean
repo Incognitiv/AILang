@@ -159,7 +159,7 @@ theorem inferred_nonvoid_has_sound_shape
       · cases hb : summary.hasBare <;>
         cases hp : summary.allPathsValueOrThrow <;>
         cases hj : foldJoin join first rest <;>
-        simp [inferReturn, hv, hb, hp, hj] at h ⊢
+        simp [inferReturn, hb, hp, hj] at h ⊢
 
 theorem inferred_return_sound
     (join : Join) (summary : ReturnSummary) (ret : ReturnTy)
