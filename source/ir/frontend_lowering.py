@@ -73,16 +73,22 @@ def _constant_type(expr: A.Number, context_type: str | None) -> str:
     return "f64"
 
 
-def _constant_text(expr: A.Number, type_name: str) -> str:
-    if not expr.is_float:
-        return str(int(expr.value))
-    if type_name == "f128":
-        raise IRLoweringError(
-            "typed IR cannot preserve an f128 literal yet because the parser "
-            "currently stores floating literals as Python float; use an f128 "
-            "value from a parameter/expression until exact literal lexemes are retained"
-        )
-    return repr(float(expr.value))
+def _constant_text(expr: A.Number) -> str:
+    """Return the exact numeric token payload without a type suffix.
+
+    ``Number.value`` is intentionally not consulted here. In particular, an
+    f128/quad literal must not round through Python's binary64 ``float`` before
+    it reaches Typed IR. Integer base spelling and floating exponent spelling
+    are preserved exactly; only the source-level precision/long suffix is
+    removed because the IR result type already records that information.
+    """
+
+    source_text = expr.source_text
+    if expr.is_float and expr.precision_explicit:
+        return source_text[:-1]
+    if not expr.is_float and expr.is_long:
+        return source_text[:-1]
+    return source_text
 
 
 def _emit_constant(
@@ -96,7 +102,7 @@ def _emit_constant(
     instructions.append(
         Constant(
             literal_kind=literal_kind,
-            value_text=_constant_text(expr, type_name),
+            value_text=_constant_text(expr),
             result=result,
         )
     )
