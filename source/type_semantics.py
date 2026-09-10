@@ -65,8 +65,10 @@ def classify_conversion(source_type: str, target_type: str) -> ConversionKind:
     """Classify one language-level conversion without consulting a backend.
 
     Fixed-integer conversions that are not total remain implicitly legal only
-    through the existing checked semantics.  Floating narrowing and mixed
+    through the existing checked semantics. Floating narrowing and mixed
     numeric conversions that can lose precision require an explicit cast.
+    ``bool`` may widen to every fixed integer because its complete value domain
+    is exactly {0, 1}; the reverse conversion is value-collapsing and explicit.
     """
 
     source = canonical_type_name(source_type)
@@ -78,6 +80,12 @@ def classify_conversion(source_type: str, target_type: str) -> ConversionKind:
 
     source_int = _int_shape(source)
     target_int = _int_shape(target)
+
+    if source == "bool" and target_int is not None:
+        return ConversionKind.LOSSLESS_WIDEN
+    if source_int is not None and target == "bool":
+        return ConversionKind.EXPLICIT_LOSSY
+
     if source_int is not None and target_int is not None:
         if _int_target_represents_source(source_int, target_int):
             return ConversionKind.LOSSLESS_WIDEN
