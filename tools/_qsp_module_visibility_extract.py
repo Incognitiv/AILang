@@ -10,6 +10,15 @@ def replace_one(path: str, old: str, new: str) -> None:
     target.write_text(text.replace(old, new), encoding="utf-8")
 
 
+def replace_exact(path: str, old: str, new: str, expected: int) -> None:
+    target = Path(path)
+    text = target.read_text(encoding="utf-8")
+    count = text.count(old)
+    if count != expected:
+        raise RuntimeError(f"{path}: expected {expected} sites, found {count}")
+    target.write_text(text.replace(old, new), encoding="utf-8")
+
+
 path = "source/transpiler/import_resolver.py"
 replace_one(
     path,
@@ -18,6 +27,7 @@ replace_one(
     "from transpiler.import_visibility import (\n"
     "    import_sort_key,\n"
     "    reject_private_selective_imports,\n"
+    "    tag_source_file,\n"
     "    validate_private_function_boundaries,\n"
     ")\n",
 )
@@ -37,6 +47,7 @@ replace_one(
     "                    imported_nodes, set(node.names), import_file_str\n"
     "                )\n",
 )
+replace_exact(path, "self._tag_source_file(", "tag_source_file(", expected=2)
 replace_one(
     path,
     '''    @staticmethod
@@ -88,6 +99,20 @@ replace_one(
                     raise ValueError(
                         f"Private function '{child.name}' is not visible outside its module"
                     )
+
+''',
+    "",
+)
+replace_one(
+    path,
+    '''    @staticmethod
+    def _tag_source_file(nodes: list[A.ASTNode], filepath: str) -> None:
+        """Attach source path metadata to parsed nodes for diagnostics/reports."""
+        if not filepath:
+            return
+        for node in nodes:
+            if not node._source_file:
+                node._source_file = filepath
 
 ''',
     "",
