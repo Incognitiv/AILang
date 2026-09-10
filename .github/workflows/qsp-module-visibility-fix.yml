@@ -28,8 +28,10 @@ jobs:
       - name: Apply module visibility repair
         run: |
           python tools/_qsp_module_visibility_patch.py
-          python -m black source/compiler/modules.py source/codegen/codegen_module_mixin.py source/transpiler/expr_calls.py source/transpiler/import_resolver.py source/diagnostics/diagnostics_engine_symbols.py tests/test_module_visibility.py
-          python -m isort source/compiler/modules.py source/codegen/codegen_module_mixin.py source/transpiler/expr_calls.py source/transpiler/import_resolver.py source/diagnostics/diagnostics_engine_symbols.py tests/test_module_visibility.py
+          python tools/_qsp_module_visibility_extract.py
+          python -m black source/compiler/modules.py source/codegen/codegen_module_mixin.py source/transpiler/expr_calls.py source/transpiler/import_resolver.py source/transpiler/import_visibility.py source/diagnostics/diagnostics_engine_symbols.py tests/test_module_visibility.py
+          python -m isort source/compiler/modules.py source/codegen/codegen_module_mixin.py source/transpiler/expr_calls.py source/transpiler/import_resolver.py source/transpiler/import_visibility.py source/diagnostics/diagnostics_engine_symbols.py tests/test_module_visibility.py
+          test "$(wc -l < source/transpiler/import_resolver.py)" -le 750
       - name: Source strict
         run: python -m verifier.cli -d source --preset strict --check-imports --fail-on-debt -j 0
       - name: QSP regressions
@@ -40,7 +42,7 @@ jobs:
         run: |
           git config user.name "Incognitiv"
           git config user.email "2427796+Incognitiv@users.noreply.github.com"
-          git rm .github/workflows/qsp-module-visibility-fix.yml tools/_qsp_module_visibility_patch.py
-          git add source/compiler/modules.py source/codegen/codegen_module_mixin.py source/transpiler/expr_calls.py source/transpiler/import_resolver.py source/diagnostics/diagnostics_engine_symbols.py tests/test_module_visibility.py
+          git rm .github/workflows/qsp-module-visibility-fix.yml tools/_qsp_module_visibility_patch.py tools/_qsp_module_visibility_extract.py
+          git add source/compiler/modules.py source/codegen/codegen_module_mixin.py source/transpiler/expr_calls.py source/transpiler/import_resolver.py source/transpiler/import_visibility.py source/diagnostics/diagnostics_engine_symbols.py tests/test_module_visibility.py
           git commit -m "Enforce module visibility across backends"
           git push origin HEAD:agent/qsp-module-visibility-fix
