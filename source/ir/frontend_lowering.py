@@ -56,11 +56,7 @@ def _parameter_values(
 
 
 def _is_contextual_float(expr: A.ASTNode) -> bool:
-    return (
-        isinstance(expr, A.Number)
-        and expr.is_float
-        and not expr.precision_explicit
-    )
+    return isinstance(expr, A.Number) and expr.is_float and not expr.precision_explicit
 
 
 def _constant_type(expr: A.Number, context_type: str | None) -> str:
