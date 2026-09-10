@@ -5,6 +5,9 @@ on:
     branches: ["agent/typed-ir-core-stage2"]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   python-gate:
     runs-on: ubuntu-latest
@@ -25,6 +28,12 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -e ".[dev,llvm]"
+
+      - name: Delegate parser numeric joins to canonical semantics
+        run: |
+          python tools/_typed_ir_stage2_patch.py
+          python -m black source/type_semantics.py source/ir source/parser/return_type_inference.py tests/test_typed_ir_core.py tests/test_numeric_join_semantics.py
+          python -m isort source/type_semantics.py source/ir source/parser/return_type_inference.py tests/test_typed_ir_core.py tests/test_numeric_join_semantics.py
 
       - name: Run typed IR regressions
         run: |
@@ -59,3 +68,31 @@ jobs:
 
       - name: Verify canonical Python Lean conformance
         run: python proof/check_python_conformance.py
+
+  materialize:
+    needs: [python-gate, lean-conformance]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/typed-ir-core-stage2
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install formatting tools
+        run: python -m pip install black==26.5.1 isort==9.0.1
+
+      - name: Materialize tested parser delegation
+        run: |
+          python tools/_typed_ir_stage2_patch.py
+          python -m black source/type_semantics.py source/ir source/parser/return_type_inference.py tests/test_typed_ir_core.py tests/test_numeric_join_semantics.py
+          python -m isort source/type_semantics.py source/ir source/parser/return_type_inference.py tests/test_typed_ir_core.py tests/test_numeric_join_semantics.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add source/type_semantics.py source/ir source/parser/return_type_inference.py proof/check_python_conformance.py tests/test_typed_ir_core.py tests/test_numeric_join_semantics.py
+          git rm .github/workflows/typed-ir-stage2.yml tools/_typed_ir_stage2_patch.py
+          git commit -m "Establish typed IR numeric core"
+          git push origin HEAD:agent/typed-ir-core-stage2
