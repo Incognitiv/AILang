@@ -54,6 +54,7 @@ class Number(ASTNode):
     is_float: bool
     is_long: bool
     precision: str
+    precision_explicit: bool
 
     def __init__(
         self, value: str, is_long: bool = False, is_float: bool = False
@@ -61,8 +62,11 @@ class Number(ASTNode):
         if is_float:
             self.value = float(value.rstrip("fFdDqQ"))
             self.is_float = True
-            # Determine precision from suffix
-            suffix = value[-1].lower() if value and value[-1].isalpha() else "d"
+            # Keep whether the source chose a precision explicitly. Unsuffixed
+            # floating literals are contextual even though their standalone
+            # fallback representation remains f64.
+            self.precision_explicit = bool(value and value[-1].isalpha())
+            suffix = value[-1].lower() if self.precision_explicit else "d"
             self.precision = suffix  # 'f', 'd', or 'q'
             self.is_long = False
         else:
@@ -71,6 +75,7 @@ class Number(ASTNode):
             self.is_long = is_long
             self.is_float = False
             self.precision = ""
+            self.precision_explicit = False
 
 
 class Bool(ASTNode):

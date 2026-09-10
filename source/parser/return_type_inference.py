@@ -10,6 +10,13 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from type_semantics import (
+    ConversionKind,
+    canonical_type_name,
+    classify_conversion,
+    is_implicit_conversion,
+)
+
 from . import ast as A
 from .ast import parsed_type_to_str
 
@@ -57,15 +64,7 @@ def _canon(t: Any) -> str:
     if t is None:
         return ""
     s = parsed_type_to_str(t) if not isinstance(t, str) else t
-    aliases = {
-        "int": "i64",
-        "uint": "u64",
-        "float": "f32",
-        "double": "f64",
-        "quad": "f128",
-        "pointer": "ptr",
-    }
-    return aliases.get(s.lower(), s)
+    return canonical_type_name(s)
 
 
 def _join_ints(a: str, b: str) -> str | None:
@@ -222,6 +221,24 @@ def _expr_type(
         rt = _expr_type(
             expr.right, env, fn_returns, class_fields, class_methods, current_class
         )
+        # An unsuffixed floating literal is contextual. `float x; x / 2.0`
+        # stays f32, while `x / 2.0d` deliberately introduces f64. Preserve
+        # the distinction in the AST so typed IR can make it explicit later.
+        floats = {"f32", "f64", "f128"}
+        if (
+            isinstance(expr.left, A.Number)
+            and expr.left.is_float
+            and not getattr(expr.left, "precision_explicit", True)
+            and rt in floats
+        ):
+            lt = rt
+        if (
+            isinstance(expr.right, A.Number)
+            and expr.right.is_float
+            and not getattr(expr.right, "precision_explicit", True)
+            and lt in floats
+        ):
+            rt = lt
         if expr.op == "+" and (lt == "string" or rt == "string"):
             return "string"
         return _join(lt or "", rt or "")
@@ -442,18 +459,31 @@ def infer_unannotated_return_types(program: list[A.ASTNode]) -> None:
 
 
 def validate_return_contracts(program: list[A.ASTNode]) -> None:
-    """Enforce value-vs-void return semantics for every concrete function.
+    """Enforce control-flow and type contracts at every return boundary.
 
-    A bare ``return`` is only an early-exit from a void procedure.  It never
-    supplies a value.  Conversely, a non-void function must return a value (or
-    throw) on every terminating path.
+    The parser owns the language-level decision about whether a returned value
+    may flow into the declared function result. Backends therefore receive a
+    resolved contract instead of silently inventing narrowing conversions.
     """
     functions: list[tuple[A.Function, str | None]] = []
+    class_fields: dict[str, dict[str, str]] = {}
     for node in program:
         if isinstance(node, A.Function):
             functions.append((node, None))
         elif isinstance(node, A.ClassDef):
+            class_fields[node.name] = {f[1]: _canon(f[2]) for f in node.fields}
             functions.extend((method, node.name) for method in node.methods)
+        elif isinstance(node, A.RecordDef):
+            class_fields[node.name] = {name: _canon(t) for name, t in node.fields}
+
+    fn_returns: dict[str, str] = {}
+    class_methods: dict[tuple[str, str], str] = {}
+    for fn, cls in functions:
+        resolved = _canon(fn.return_type)
+        if cls:
+            class_methods[(cls, fn.name)] = resolved
+        else:
+            fn_returns[fn.name] = resolved
 
     defer_unresolved = _has_unresolved_language_imports(program)
     for fn, cls in functions:
@@ -486,4 +516,29 @@ def validate_return_contracts(program: list[A.ASTNode]) -> None:
             raise SyntaxError(
                 f"Non-void function '{display}' does not return a value or throw "
                 "on every control-flow path"
+            )
+
+        env = _collect_env(fn, cls, fn_returns, class_fields, class_methods)
+        for ret in valued:
+            if ret.value is None:
+                continue
+            source_type = _expr_type(
+                ret.value, env, fn_returns, class_fields, class_methods, cls
+            )
+            if not source_type:
+                # Some expression families are still resolved after module or
+                # backend-specific analysis. Stage 1 rejects only conversions
+                # whose source type the frontend can establish here.
+                continue
+            conversion = classify_conversion(source_type, ret_type)
+            if is_implicit_conversion(conversion):
+                continue
+            if conversion is ConversionKind.EXPLICIT_LOSSY:
+                raise SyntaxError(
+                    f"Return in function '{display}' requires explicit lossy "
+                    f"conversion from {source_type} to {ret_type}"
+                )
+            raise SyntaxError(
+                f"Return in function '{display}' cannot convert "
+                f"{source_type} to {ret_type}"
             )
