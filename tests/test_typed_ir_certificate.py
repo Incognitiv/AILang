@@ -57,3 +57,17 @@ end
     assert "K\t%t2\tf32\tfloat\t4.0" in certificate
     assert "B\tmul\t%t1\tf32\t%t2\tf32\t%t3\tf32" in certificate
     assert certificate.endswith("R\t%t3\tf32\n")
+
+
+def test_certificate_preserves_exact_f128_literal_text() -> None:
+    certificate = _certificate("""
+quad exact_quad():
+    return 1.234567890123456789012345678901234q
+end
+""")
+
+    assert (
+        "K\t%t0\tf128\tfloat\t1.234567890123456789012345678901234\n"
+        in certificate
+    )
+    assert certificate.endswith("R\t%t0\tf128\n")
