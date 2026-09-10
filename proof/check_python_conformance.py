@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exhaustively compare AILang's Python semantics with the Lean model."""
+"""Exhaustively compare AILang's canonical Python semantics with Lean."""
 
 from __future__ import annotations
 
@@ -13,12 +13,15 @@ PROOF = ROOT / "proof"
 
 sys.path.insert(0, str(SOURCE))
 
-from parser.return_type_inference import _INT_WIDTHS, _join  # noqa: E402
-from type_semantics import classify_conversion  # noqa: E402
+from type_semantics import (  # noqa: E402
+    INT_WIDTHS,
+    classify_conversion,
+    join_numeric_types,
+)
 
 
 def _numeric_types() -> list[str]:
-    ints = [f"{sign}{width}" for sign in ("i", "u") for width in _INT_WIDTHS]
+    ints = [f"{sign}{width}" for sign in ("i", "u") for width in INT_WIDTHS]
     return ints + ["f32", "f64", "f128"]
 
 
@@ -102,13 +105,16 @@ def main() -> int:
 
     join_mismatches: list[tuple[str, str, str | None, str | None]] = []
     for left, right in sorted(join_keys):
-        python_result = _join(left, right)
+        python_result = join_numeric_types(left, right)
         lean_result = lean_joins[(left, right)]
         if python_result != lean_result:
             join_mismatches.append((left, right, python_result, lean_result))
 
     if join_mismatches:
-        print(f"Lean/Python fixed-numeric join mismatches: {len(join_mismatches)}", file=sys.stderr)
+        print(
+            f"Lean/Python fixed-numeric join mismatches: {len(join_mismatches)}",
+            file=sys.stderr,
+        )
         for left, right, python_result, lean_result in join_mismatches[:20]:
             print(
                 f"  {left} + {right}: Python={python_result!r}, Lean={lean_result!r}",

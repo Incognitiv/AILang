@@ -1,10 +1,9 @@
-"""Canonical AILang type conversion semantics shared by frontend and IR.
+"""Canonical AILang scalar type semantics shared by frontend and typed IR.
 
-This module deliberately contains no parser or backend dependencies.  It is the
-language-level contract for deciding whether a conversion is identity,
-lossless, checked at runtime, explicitly lossy, or forbidden.  Backends may
-implement an accepted conversion differently, but they must not silently widen
-the language contract.
+This module deliberately contains no parser or backend dependencies. It owns
+fixed-numeric joins and source-to-destination conversion classification so a
+backend can implement an accepted operation but cannot silently widen the
+language contract.
 """
 
 from __future__ import annotations
@@ -59,6 +58,49 @@ def _int_target_represents_source(
     if target_sign == "i" and source_sign == "u":
         return target_width > source_width
     return False
+
+
+def _join_fixed_ints(left: tuple[str, int], right: tuple[str, int]) -> str | None:
+    left_sign, left_width = left
+    right_sign, right_width = right
+    if left_sign == right_sign:
+        return f"{left_sign}{max(left_width, right_width)}"
+
+    signed_width = left_width if left_sign == "i" else right_width
+    unsigned_width = left_width if left_sign == "u" else right_width
+    needed = max(signed_width, unsigned_width + 1)
+    width = next((candidate for candidate in INT_WIDTHS if candidate >= needed), None)
+    return f"i{width}" if width is not None else None
+
+
+def join_numeric_types(left_type: str, right_type: str) -> str | None:
+    """Find a fixed numeric type that represents both operand domains exactly.
+
+    ``None`` means there is no lossless fixed-numeric join. In particular,
+    mixed integer/float joins are accepted only when every value of the integer
+    type is exactly representable by the selected floating type.
+    """
+
+    left = canonical_type_name(left_type)
+    right = canonical_type_name(right_type)
+    if left == right and (INT_RE.match(left) or left in FLOAT_PRECISION_BITS):
+        return left
+
+    left_int = _int_shape(left)
+    right_int = _int_shape(right)
+    if left_int is not None and right_int is not None:
+        return _join_fixed_ints(left_int, right_int)
+
+    if left in FLOAT_RANK and right in FLOAT_RANK:
+        return left if FLOAT_RANK[left] >= FLOAT_RANK[right] else right
+
+    if left in FLOAT_PRECISION_BITS and right_int is not None:
+        sign, width = right_int
+        exact_bits = width - 1 if sign == "i" else width
+        return left if exact_bits <= FLOAT_PRECISION_BITS[left] else None
+    if right in FLOAT_PRECISION_BITS and left_int is not None:
+        return join_numeric_types(right, left)
+    return None
 
 
 def classify_conversion(source_type: str, target_type: str) -> ConversionKind:
