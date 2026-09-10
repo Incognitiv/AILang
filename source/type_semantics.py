@@ -60,9 +60,7 @@ def _int_target_represents_source(
     return False
 
 
-def _join_fixed_ints(
-    left: tuple[str, int], right: tuple[str, int]
-) -> str | None:
+def _join_fixed_ints(left: tuple[str, int], right: tuple[str, int]) -> str | None:
     left_sign, left_width = left
     right_sign, right_width = right
     if left_sign == right_sign:

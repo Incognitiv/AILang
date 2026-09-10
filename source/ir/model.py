@@ -89,4 +89,6 @@ def render_instruction(instruction: Instruction) -> str:
 def render_block(block: Block) -> str:
     """Render one instruction per line."""
 
-    return "\n".join(render_instruction(instruction) for instruction in block.instructions)
+    return "\n".join(
+        render_instruction(instruction) for instruction in block.instructions
+    )

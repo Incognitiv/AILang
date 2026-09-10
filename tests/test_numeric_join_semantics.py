@@ -1,6 +1,7 @@
 """Conformance tests while numeric joins move from parser logic into semantics."""
 
 from parser.return_type_inference import _join
+
 from type_semantics import INT_WIDTHS, join_numeric_types
 
 

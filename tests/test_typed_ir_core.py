@@ -1,7 +1,6 @@
 """Golden tests for the first backend-neutral typed IR slice."""
 
 import pytest
-
 from ir import (
     Binary,
     Convert,
