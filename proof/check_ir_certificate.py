@@ -14,9 +14,10 @@ PROOF = ROOT / "proof"
 
 sys.path.insert(0, str(SOURCE))
 
+from parser.parser import Parser  # noqa: E402
+
 from ir import lower_program, serialize_function_certificate  # noqa: E402
 from lexer.scan import tokenize  # noqa: E402
-from parser.parser import Parser  # noqa: E402
 
 
 def _lower(source: str) -> str:
