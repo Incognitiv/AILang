@@ -1,10 +1,19 @@
-"""Source-level visibility checks shared by import lowering."""
+"""Source-level visibility and metadata helpers for import lowering."""
 
 from __future__ import annotations
 
 from collections.abc import Iterator
 from parser import ast as A
 from typing import Any
+
+
+def tag_source_file(nodes: list[A.ASTNode], filepath: str) -> None:
+    """Attach source path metadata used by module-boundary checks."""
+    if not filepath:
+        return
+    for node in nodes:
+        if not node._source_file:
+            node._source_file = filepath
 
 
 def reject_private_selective_imports(
