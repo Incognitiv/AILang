@@ -1,8 +1,9 @@
 """Tests for the stable data-only Typed IR certificate format."""
 
+from parser.parser import Parser
+
 from ir import lower_program, serialize_function_certificate
 from lexer.scan import tokenize
-from parser.parser import Parser
 
 
 def _certificate(source: str) -> str:
