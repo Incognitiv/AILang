@@ -113,8 +113,8 @@ class StringLit(ASTNode):
 class InterpolatedString(ASTNode):
     """String with embedded expressions: "Hello #{name}, count: #{count}"
     parts is a list of either:
-      - str: literal text portions
-      - ASTNode: expressions to be evaluated and converted to string
+      - str: literal text portions (str)
+      - ASTNode: expressions inside #{...} (parsed as AST nodes)
     """
 
     def __init__(self, parts: list[Any]) -> None:
