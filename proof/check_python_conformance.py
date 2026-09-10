@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exhaustively compare AILang's fixed numeric join with the Lean model."""
+"""Exhaustively compare AILang's Python semantics with the Lean model."""
 
 from __future__ import annotations
 
@@ -14,14 +14,21 @@ PROOF = ROOT / "proof"
 sys.path.insert(0, str(SOURCE))
 
 from parser.return_type_inference import _INT_WIDTHS, _join  # noqa: E402
+from type_semantics import classify_conversion  # noqa: E402
 
 
-def _ailang_types() -> list[str]:
+def _numeric_types() -> list[str]:
     ints = [f"{sign}{width}" for sign in ("i", "u") for width in _INT_WIDTHS]
     return ints + ["f32", "f64", "f128"]
 
 
-def _lean_rows() -> dict[tuple[str, str], str | None]:
+def _scalar_types() -> list[str]:
+    return ["bool", *_numeric_types()]
+
+
+def _lean_rows() -> tuple[
+    dict[tuple[str, str], str | None], dict[tuple[str, str], str]
+]:
     proc = subprocess.run(
         ["lake", "exe", "ailangProofConformance"],
         cwd=PROOF,
@@ -36,59 +43,105 @@ def _lean_rows() -> dict[tuple[str, str], str | None]:
             print(proc.stderr, file=sys.stderr, end="")
         raise SystemExit(f"Lean conformance executable failed with exit {proc.returncode}")
 
-    rows: dict[tuple[str, str], str | None] = {}
+    joins: dict[tuple[str, str], str | None] = {}
+    conversions: dict[tuple[str, str], str] = {}
     for line_no, line in enumerate(proc.stdout.splitlines(), start=1):
         if not line:
             continue
         parts = line.split("\t")
-        if len(parts) != 3:
+        if len(parts) != 4:
             raise SystemExit(f"unexpected Lean output at line {line_no}: {line!r}")
-        left, right, result = parts
+        kind, left, right, result = parts
         key = (left, right)
-        if key in rows:
-            raise SystemExit(f"duplicate Lean conformance row: {left}, {right}")
-        rows[key] = None if result == "none" else result
-    return rows
+        if kind == "J":
+            if key in joins:
+                raise SystemExit(f"duplicate Lean join row: {left}, {right}")
+            joins[key] = None if result == "none" else result
+        elif kind == "C":
+            if key in conversions:
+                raise SystemExit(f"duplicate Lean conversion row: {left}, {right}")
+            conversions[key] = result
+        else:
+            raise SystemExit(f"unknown Lean row kind at line {line_no}: {kind!r}")
+    return joins, conversions
+
+
+def _check_domain(
+    label: str,
+    actual: set[tuple[str, str]],
+    expected: set[tuple[str, str]],
+) -> bool:
+    if actual == expected:
+        return True
+    missing = sorted(expected - actual)
+    extra = sorted(actual - expected)
+    print(
+        f"Lean/Python {label} domain mismatch: missing={len(missing)} extra={len(extra)}",
+        file=sys.stderr,
+    )
+    for key in missing[:10]:
+        print(f"  missing: {key[0]} -> {key[1]}", file=sys.stderr)
+    for key in extra[:10]:
+        print(f"  extra: {key[0]} -> {key[1]}", file=sys.stderr)
+    return False
 
 
 def main() -> int:
-    types = _ailang_types()
-    expected_keys = {(left, right) for left in types for right in types}
-    lean = _lean_rows()
+    numeric_types = _numeric_types()
+    scalar_types = _scalar_types()
+    join_keys = {(left, right) for left in numeric_types for right in numeric_types}
+    conversion_keys = {
+        (source, target) for source in scalar_types for target in scalar_types
+    }
+    lean_joins, lean_conversions = _lean_rows()
 
-    lean_keys = set(lean)
-    if lean_keys != expected_keys:
-        missing = sorted(expected_keys - lean_keys)
-        extra = sorted(lean_keys - expected_keys)
-        print(
-            f"Lean/Python domain mismatch: missing={len(missing)} extra={len(extra)}",
-            file=sys.stderr,
-        )
-        for key in missing[:10]:
-            print(f"  missing: {key[0]} + {key[1]}", file=sys.stderr)
-        for key in extra[:10]:
-            print(f"  extra: {key[0]} + {key[1]}", file=sys.stderr)
+    if not _check_domain("join", set(lean_joins), join_keys):
+        return 1
+    if not _check_domain("conversion", set(lean_conversions), conversion_keys):
         return 1
 
-    mismatches: list[tuple[str, str, str | None, str | None]] = []
-    for left, right in sorted(expected_keys):
+    join_mismatches: list[tuple[str, str, str | None, str | None]] = []
+    for left, right in sorted(join_keys):
         python_result = _join(left, right)
-        lean_result = lean[(left, right)]
+        lean_result = lean_joins[(left, right)]
         if python_result != lean_result:
-            mismatches.append((left, right, python_result, lean_result))
+            join_mismatches.append((left, right, python_result, lean_result))
 
-    if mismatches:
-        print(f"Lean/Python fixed-numeric mismatches: {len(mismatches)}", file=sys.stderr)
-        for left, right, python_result, lean_result in mismatches[:20]:
+    if join_mismatches:
+        print(f"Lean/Python fixed-numeric join mismatches: {len(join_mismatches)}", file=sys.stderr)
+        for left, right, python_result, lean_result in join_mismatches[:20]:
             print(
                 f"  {left} + {right}: Python={python_result!r}, Lean={lean_result!r}",
                 file=sys.stderr,
             )
         return 1
 
+    conversion_mismatches: list[tuple[str, str, str, str]] = []
+    for source, target in sorted(conversion_keys):
+        python_result = classify_conversion(source, target).value
+        lean_result = lean_conversions[(source, target)]
+        if python_result != lean_result:
+            conversion_mismatches.append((source, target, python_result, lean_result))
+
+    if conversion_mismatches:
+        print(
+            f"Lean/Python conversion-classifier mismatches: {len(conversion_mismatches)}",
+            file=sys.stderr,
+        )
+        for source, target, python_result, lean_result in conversion_mismatches[:20]:
+            print(
+                f"  {source} -> {target}: Python={python_result!r}, Lean={lean_result!r}",
+                file=sys.stderr,
+            )
+        return 1
+
     print(
-        "Lean/Python fixed-numeric conformance: "
-        f"{len(expected_keys)}/{len(expected_keys)} pairs matched"
+        "Lean/Python fixed-numeric join conformance: "
+        f"{len(join_keys)}/{len(join_keys)} pairs matched"
+    )
+    print(
+        "Lean/Python conversion conformance: "
+        f"{len(conversion_keys)}/{len(conversion_keys)} pairs matched"
     )
     return 0
 
