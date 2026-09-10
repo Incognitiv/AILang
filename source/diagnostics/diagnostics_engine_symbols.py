@@ -264,6 +264,22 @@ def _resolve_imports(self, tokens: list[tuple]) -> None:
 
     current_dir = os.path.dirname(self.filepath)
 
+    # Selective imports introduce the explicitly named declarations into the
+    # namespace. The compiler still validates existence and visibility.
+    for i, (ttype, _tval, _, _) in enumerate(tokens):
+        if ttype != "FROM":
+            continue
+        j = i + 1
+        while j < len(tokens) and token_type_at(tokens, j) != "IMPORT":
+            j += 1
+        if j >= len(tokens):
+            continue
+        j += 1
+        while j < len(tokens) and token_type_at(tokens, j) != "NEWLINE":
+            if token_type_at(tokens, j) == "IDENT":
+                self.user_symbols.add(token_text_at(tokens, j))
+            j += 1
+
     for i, (ttype, _tval, _, _) in enumerate(tokens):
         if ttype != "IMPORT":
             continue
