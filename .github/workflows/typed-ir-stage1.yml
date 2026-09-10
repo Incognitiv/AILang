@@ -1,0 +1,59 @@
+name: Typed IR Conversion Stage 1
+
+on:
+  push:
+    branches: ["agent/typed-ir-conversions-stage1"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  validate-and-materialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: agent/typed-ir-conversions-stage1
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install native toolchains
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang gcc
+
+      - name: Install AILang and verification dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,llvm]"
+
+      - name: Apply return conversion enforcement
+        run: |
+          python tools/_typed_ir_stage1_patch.py
+          python -m black source/type_semantics.py source/parser/return_type_inference.py tests/test_type_semantics.py tests/test_return_conversion_contracts.py
+          python -m isort source/type_semantics.py source/parser/return_type_inference.py tests/test_type_semantics.py tests/test_return_conversion_contracts.py
+
+      - name: Run conversion contract regressions
+        run: python -m pytest -q tests/test_type_semantics.py tests/test_return_conversion_contracts.py
+
+      - name: Run source strict verifier
+        run: python -m verifier.cli -d source --preset strict
+
+      - name: Run full pytest suite
+        run: python -m pytest -q
+
+      - name: Commit tested repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add source/type_semantics.py source/parser/return_type_inference.py tests/test_type_semantics.py tests/test_return_conversion_contracts.py
+          git rm .github/workflows/typed-ir-stage1.yml tools/_typed_ir_stage1_patch.py
+          git commit -m "Enforce canonical return conversion semantics"
+          git push origin HEAD:agent/typed-ir-conversions-stage1
