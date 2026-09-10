@@ -129,11 +129,22 @@ i8 narrow_local(i256 a, i256 b):
     return value
 end
 """,
+        "exact-f128-literal": """
+quad exact_quad():
+    return 1.234567890123456789012345678901234q
+end
+""",
     }
 
     certificates = {label: _lower(source) for label, source in sources.items()}
     for label, certificate in certificates.items():
         _require_accept(label, certificate)
+
+    exact_quad = certificates["exact-f128-literal"]
+    exact_row = "K\t%t0\tf128\tfloat\t1.234567890123456789012345678901234\n"
+    if exact_row not in exact_quad:
+        print("exact f128 literal text did not survive into the certificate", file=sys.stderr)
+        return 1
 
     golden = certificates["float-double-quad"]
     contextual = certificates["contextual-f32-literal"]
@@ -144,7 +155,7 @@ end
     print(
         "Lean typed IR certificate bridge: "
         f"{len(certificates)}/{len(certificates)} real certificates accepted, "
-        "3/3 forged certificates rejected"
+        "3/3 forged certificates rejected; exact f128 literal preserved"
     )
     return 0
 
