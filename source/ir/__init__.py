@@ -1,5 +1,6 @@
 """Backend-neutral typed intermediate representation."""
 
+from .certificate import serialize_function_certificate
 from .frontend_lowering import lower_function, lower_program
 from .model import (
     Binary,
@@ -31,4 +32,5 @@ __all__ = [
     "lower_program",
     "render_block",
     "render_function",
+    "serialize_function_certificate",
 ]
