@@ -28,7 +28,7 @@ jobs:
 
       - name: Check typed IR certificate Python surface
         run: |
-          python -m black --check source/ir tests/test_typed_ir_certificate.py proof/check_ir_certificate.py
+          python -m black --diff --check source/ir tests/test_typed_ir_certificate.py proof/check_ir_certificate.py
           python -m isort --check-only source/ir tests/test_typed_ir_certificate.py proof/check_ir_certificate.py
           python -m pytest -q tests/test_typed_ir_core.py tests/test_typed_ir_frontend.py tests/test_typed_ir_certificate.py tests/test_numeric_join_semantics.py tests/test_type_semantics.py tests/test_return_conversion_contracts.py
 
