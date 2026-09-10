@@ -36,8 +36,10 @@ def _parameter_values(
         for index, (_, param_type, _) in enumerate(function.params)
     )
     by_name = {
-        param_name: parameters[index]
-        for index, (param_name, _, _) in enumerate(function.params)
+        param_name: parameter
+        for (param_name, _, _), parameter in zip(
+            function.params, parameters, strict=True
+        )
     }
     return parameters, by_name
 
@@ -56,11 +58,15 @@ def _parameter_operand(expr: A.ASTNode, values: dict[str, Value]) -> Value:
 def lower_function(function: A.Function) -> FunctionIR:
     """Lower the first supported validated-function shape into typed IR."""
 
-    if len(function.body) != 1 or not isinstance(function.body[0], A.Return):
+    if len(function.body) != 1:
         raise IRLoweringError(
             "typed IR frontend currently requires one straight-line return"
         )
-    returned = function.body[0]
+    (returned,) = function.body
+    if not isinstance(returned, A.Return):
+        raise IRLoweringError(
+            "typed IR frontend currently requires one straight-line return"
+        )
     if returned.value is None:
         raise IRLoweringError("typed IR frontend requires a valued return")
     if not isinstance(returned.value, A.BinaryOp):
