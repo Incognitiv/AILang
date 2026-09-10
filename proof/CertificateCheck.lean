@@ -163,8 +163,7 @@ end AILangProof.CertificateCheck
 
 open AILangProof.CertificateCheck
 
-def main : IO UInt32 := do
-  let args ← IO.getArgs
+def main (args : List String) : IO UInt32 := do
   match args with
   | [path] =>
       let content ← IO.FS.readFile (System.FilePath.mk path)
