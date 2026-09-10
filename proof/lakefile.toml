@@ -1,0 +1,10 @@
+name = "ailang-proof"
+version = "0.1.0"
+defaultTargets = ["AILangProof", "ailang-proof-report"]
+
+[[lean_lib]]
+name = "AILangProof"
+
+[[lean_exe]]
+name = "ailang-proof-report"
+root = "Main"

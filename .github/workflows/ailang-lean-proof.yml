@@ -1,0 +1,34 @@
+name: AILang Lean Proof
+
+on:
+  push:
+    branches:
+      - agent/unbounded-field-semantics
+    paths:
+      - "proof/**"
+      - ".github/workflows/ailang-lean-proof.yml"
+  pull_request:
+    paths:
+      - "proof/**"
+      - ".github/workflows/ailang-lean-proof.yml"
+  workflow_dispatch:
+
+jobs:
+  lean-proof:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and independently check Lean proofs
+        uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: proof
+          build: true
+          leanchecker: true
+          nanoda: true
+          nanoda-allow-sorry: false
+          use-mathlib-cache: false
+
+      - name: Run AILang proof-model report
+        working-directory: proof
+        run: lake exe ailang-proof-report
