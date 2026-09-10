@@ -28,9 +28,7 @@ def serialize_function_certificate(function: FunctionIR) -> str:
     """
 
     lines = [f"{_CERTIFICATE_TAG}\t{_CERTIFICATE_VERSION}"]
-    lines.append(
-        "\t".join(("F", _field(function.name), _field(function.return_type)))
-    )
+    lines.append("\t".join(("F", _field(function.name), _field(function.return_type))))
 
     for parameter in function.parameters:
         lines.append(
@@ -69,7 +67,11 @@ def serialize_function_certificate(function: FunctionIR) -> str:
         elif isinstance(instruction, Return):
             lines.append(
                 "\t".join(
-                    ("R", _field(instruction.value.name), _field(instruction.value.type_name))
+                    (
+                        "R",
+                        _field(instruction.value.name),
+                        _field(instruction.value.type_name),
+                    )
                 )
             )
         else:  # pragma: no cover - the union is closed, keep serialization fail-closed.
