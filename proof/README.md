@@ -16,12 +16,6 @@ The proof project is intentionally dependency-light: Lean + Std only, pinned by
 the bundled `leanchecker`, and runs an axiom audit that rejects undeclared trust
 shortcuts such as `sorry`/`admit`, `native_decide`, or project-defined axioms.
 
-`nanoda` is intentionally not a release gate at the moment. The current
-`leanprover/lean-action` integration has a known upstream export-format failure
-(`leanprover/lean-action#169`) that produces `invalid digit found in string` on
-recent Lean versions before project declarations are checked. It can be restored
-once that checker/exporter combination supports the pinned Lean toolchain.
-
 ## What is proved in v1
 
 - `void` is structurally not a value-return type;
