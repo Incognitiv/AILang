@@ -23,7 +23,10 @@ jobs:
         uses: leanprover/lean-action@v1
         with:
           lake-package-directory: proof
+          auto-config: false
           build: true
+          test: false
+          lint: false
           leanchecker: true
           nanoda: true
           nanoda-allow-sorry: false
