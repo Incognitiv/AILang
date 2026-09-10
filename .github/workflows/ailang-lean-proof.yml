@@ -38,5 +38,5 @@ jobs:
         working-directory: proof
         run: lake exe ailangProofReport
 
-      - name: Verify Python/Lean fixed-int conformance
+      - name: Verify Python/Lean fixed-numeric conformance
         run: python proof/check_python_conformance.py
