@@ -7,13 +7,17 @@ on:
     paths:
       - "proof/**"
       - "source/type_semantics.py"
-      - "source/parser/return_type_inference.py"
+      - "source/ir/**"
+      - "source/parser/**"
+      - "source/lexer/**"
       - ".github/workflows/ailang-lean-proof.yml"
   pull_request:
     paths:
       - "proof/**"
       - "source/type_semantics.py"
-      - "source/parser/return_type_inference.py"
+      - "source/ir/**"
+      - "source/parser/**"
+      - "source/lexer/**"
       - ".github/workflows/ailang-lean-proof.yml"
   workflow_dispatch:
 
@@ -33,6 +37,7 @@ jobs:
           lint: false
           leanchecker: true
           leanchecker-args: AILangProof
+          nanoda: false
           axiom-audit: true
           axiom-audit-root: AILangProof
           axiom-audit-allow: propext,Classical.choice,Quot.sound
@@ -44,3 +49,6 @@ jobs:
 
       - name: Verify Python/Lean semantic conformance
         run: python proof/check_python_conformance.py
+
+      - name: Verify real Typed IR certificates with Lean
+        run: python proof/check_ir_certificate.py
