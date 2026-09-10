@@ -1,16 +1,16 @@
 """Stable data-only certificate format for external Typed IR verification.
 
-The certificate intentionally contains no executable code.  It is a compact,
+The certificate intentionally contains no executable code. It is a compact,
 versioned serialization of one ``FunctionIR`` that an independent checker can
 parse and validate without trusting Python's IR constructors.
 """
 
 from __future__ import annotations
 
-from .model import Binary, Convert, FunctionIR, Return
+from .model import Binary, Constant, Convert, FunctionIR, Return
 
 _CERTIFICATE_TAG = "AILANG_TYPED_IR_CERTIFICATE"
-_CERTIFICATE_VERSION = "1"
+_CERTIFICATE_VERSION = "2"
 
 
 def _field(value: str) -> str:
@@ -22,7 +22,7 @@ def _field(value: str) -> str:
 def serialize_function_certificate(function: FunctionIR) -> str:
     """Serialize one function into the data format consumed by Lean.
 
-    Types are repeated on instruction operands deliberately.  The Lean checker
+    Types are repeated on instruction operands deliberately. The Lean checker
     validates those repetitions against its own SSA environment, so tampering
     with either a name or a type cannot silently change the graph being checked.
     """
@@ -36,7 +36,19 @@ def serialize_function_certificate(function: FunctionIR) -> str:
         )
 
     for instruction in function.entry.instructions:
-        if isinstance(instruction, Convert):
+        if isinstance(instruction, Constant):
+            lines.append(
+                "\t".join(
+                    (
+                        "K",
+                        _field(instruction.result.name),
+                        _field(instruction.result.type_name),
+                        _field(instruction.literal_kind),
+                        _field(instruction.value_text),
+                    )
+                )
+            )
+        elif isinstance(instruction, Convert):
             lines.append(
                 "\t".join(
                     (

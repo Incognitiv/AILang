@@ -64,6 +64,17 @@ def _forge_undefined_operand(certificate: str) -> str:
     raise AssertionError("test certificate contains no binary instruction to forge")
 
 
+def _forge_constant_kind(certificate: str) -> str:
+    lines = certificate.splitlines()
+    for index, line in enumerate(lines):
+        fields = line.split("\t")
+        if fields and fields[0] == "K":
+            fields[3] = "int" if fields[3] == "float" else "float"
+            lines[index] = "\t".join(fields)
+            return "\n".join(lines) + "\n"
+    raise AssertionError("test certificate contains no constant instruction to forge")
+
+
 def _require_accept(label: str, certificate: str) -> None:
     result = _run_lean(certificate)
     if result.returncode == 0:
@@ -100,20 +111,51 @@ i8 narrow(i256 a, i256 b):
     return a + b
 end
 """,
+        "contextual-f32-literal": """
+float half(float x):
+    return x / 2.0
+end
+""",
+        "typed-local-nested-expression": """
+double compute(float a, double b):
+    float half = a / 2.0
+    double mixed = (half + b) * 4.0
+    return mixed + b
+end
+""",
+        "checked-local-boundary": """
+i8 narrow_local(i256 a, i256 b):
+    i8 value = a + b
+    return value
+end
+""",
+        "exact-f128-literal": """
+quad exact_quad():
+    return 1.234567890123456789012345678901234q
+end
+""",
     }
 
     certificates = {label: _lower(source) for label, source in sources.items()}
     for label, certificate in certificates.items():
         _require_accept(label, certificate)
 
+    exact_quad = certificates["exact-f128-literal"]
+    exact_row = "K\t%t0\tf128\tfloat\t1.234567890123456789012345678901234\n"
+    if exact_row not in exact_quad:
+        print("exact f128 literal text did not survive into the certificate", file=sys.stderr)
+        return 1
+
     golden = certificates["float-double-quad"]
+    contextual = certificates["contextual-f32-literal"]
     _require_reject("forged-conversion-kind", _forge_conversion_kind(golden))
     _require_reject("undefined-ssa-operand", _forge_undefined_operand(golden))
+    _require_reject("forged-constant-kind", _forge_constant_kind(contextual))
 
     print(
         "Lean typed IR certificate bridge: "
         f"{len(certificates)}/{len(certificates)} real certificates accepted, "
-        "2/2 forged certificates rejected"
+        "3/3 forged certificates rejected; exact f128 literal preserved"
     )
     return 0
 
