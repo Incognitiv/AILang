@@ -47,7 +47,7 @@ replace_one(
     "                    imported_nodes, set(node.names), import_file_str\n"
     "                )\n",
 )
-replace_exact(path, "self._tag_source_file(", "tag_source_file(", expected=2)
+replace_exact(path, "self._tag_source_file(", "tag_source_file(", expected=3)
 replace_one(
     path,
     '''    @staticmethod
