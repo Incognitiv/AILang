@@ -4,12 +4,17 @@ on:
   push:
     branches:
       - agent/unbounded-field-semantics
+      - agent/typed-ir-conversions-stage1
     paths:
       - "proof/**"
+      - "source/type_semantics.py"
+      - "source/parser/return_type_inference.py"
       - ".github/workflows/ailang-lean-proof.yml"
   pull_request:
     paths:
       - "proof/**"
+      - "source/type_semantics.py"
+      - "source/parser/return_type_inference.py"
       - ".github/workflows/ailang-lean-proof.yml"
   workflow_dispatch:
 
@@ -38,5 +43,5 @@ jobs:
         working-directory: proof
         run: lake exe ailangProofReport
 
-      - name: Verify Python/Lean fixed-numeric conformance
+      - name: Verify Python/Lean semantic conformance
         run: python proof/check_python_conformance.py
