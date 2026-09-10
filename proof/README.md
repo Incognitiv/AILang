@@ -91,10 +91,14 @@ other things:
 - absence of rows after the terminating return.
 
 `check_ir_certificate.py` generates certificates from real AILang source through
-lexer -> parser -> AST -> Typed IR and invokes the Lean executable. Stage 5 adds
-real examples for contextual `f32` literals, typed local bindings, nested
-expressions, and checked local integer boundaries. The negative side also
-forges a constant-kind row and requires Lean to reject it.
+lexer -> parser -> AST -> Typed IR and invokes the Lean executable. Stage 5
+covers seven real certificates, including contextual `f32` literals, typed local
+bindings, nested expressions, checked local integer boundaries, and an explicit
+`f128` literal whose decimal spelling is intentionally longer than binary64 can
+preserve. The bridge asserts that this exact spelling survives into the
+certificate before asking Lean to validate its typed SSA structure. The negative
+side forges conversion metadata, an SSA operand, and a constant-kind row and
+requires Lean to reject all three.
 
 ## Stage 5 frontend boundary
 
@@ -103,7 +107,7 @@ zero or more typed local declarations followed by one valued return. Within
 those declarations and the return expression it recursively lowers:
 
 - fixed numeric function parameters and local bindings;
-- integer and floating literals;
+- integer and floating literals, including explicit `f128`/`quad` literals;
 - nested `+`, `-`, `*`, and `/`;
 - every implicit widening or checked conversion as an explicit IR `Convert`.
 
@@ -111,13 +115,13 @@ Unsuffixed floating literals preserve the existing frontend rule: when an
 immediate binary sibling already has `f32`, `f64`, or `f128`, the literal uses
 that sibling type. An explicit `f`, `d`, or `q` suffix chooses its own precision.
 
-There is one deliberate fail-closed exception. The current parser stores a
-floating literal as a Python `float` and does not retain its exact source lexeme.
-That is sufficient for the existing `f32`/`f64` path, but it cannot faithfully
-represent an arbitrary IEEE binary128 literal. Therefore Stage 5 refuses to
-materialize an `f128` constant rather than silently certifying a value that has
-already been rounded through Python binary64. `f128` values from parameters and
-non-literal expressions remain supported.
+`Number` retains both its existing convenience Python value and the exact source
+numeric token in `source_text`. Typed IR deliberately ignores the convenience
+value when materializing constants. It copies the exact token spelling and
+removes only the source-level precision/long suffix because the IR result type
+already carries that information. Consequently an explicit `q` literal no
+longer passes through Python binary64 before entering Typed IR or its
+certificate.
 
 Mutation (`Assign`), calls, control flow, and non-numeric expressions remain
 outside this Stage 5 slice and fail closed.
@@ -130,10 +134,14 @@ implementation itself. Python is still trusted to serialize the `FunctionIR`
 object it produced; Lean independently validates the serialized semantic facts
 and SSA structure it receives.
 
-For constants, Lean validates the constant family and typed SSA structure. It
-does not independently parse AILang numeric literal spelling or prove the
-source-text-to-AST numeric conversion. The `f128` fail-closed rule above avoids
-claiming exactness where the current parser cannot provide it.
+For constants, Lean currently validates the constant family, result type, SSA
+freshness, and surrounding use/return structure. It does not independently parse
+AILang decimal spelling into a mathematical real or prove IEEE rounding. Exact
+literal preservation is instead guarded end-to-end by Python golden tests and by
+the real certificate bridge, which compares the long `f128` source spelling with
+the emitted certificate byte-for-byte before Lean checks the certificate. This
+is an explicit remaining trust boundary, not a claim that Lean has proved
+binary128 decimal conversion.
 
 Likewise, the return-shape theorems currently prove properties of the Lean model
 and are not yet an exhaustive equivalence proof for arbitrary Python AST/control
