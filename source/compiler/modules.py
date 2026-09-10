@@ -95,6 +95,8 @@ class Module:
         self.path = path
         self.ast = ast
         self.exports: dict[str, ASTNode] = {}
+        # Public interface and implementation closure are separate.
+        self.implementation: dict[str, ASTNode] = {}
         self.link_directives: list[LinkDirective] = []
         self.is_library = False
         self.library_name: str | None = None
@@ -116,25 +118,29 @@ class Module:
             elif isinstance(node, Function):
                 # Stamp source path for the profiler's func -> file:line map.
                 node._source_path = self.path
-                # Export all non-private functions
-                if not node.name.startswith("_"):
+                self.implementation[node.name] = node
+                if getattr(node, "is_public", True) and not node.name.startswith("_"):
                     self.exports[node.name] = node
             elif isinstance(node, (RecordDef, EnumDef)):
+                self.implementation[node.name] = node
                 self.exports[node.name] = node
             elif isinstance(node, ClassDef):
                 # ClassDef methods get tagged too — they're emitted as
                 # functions and end up in the same instrumentation path.
                 node._source_path = self.path
+                self.implementation[node.name] = node
                 self.exports[node.name] = node
             elif isinstance(node, VarDecl):
+                self.implementation[node.var_name] = node
                 # Export all variables from library modules so imported functions
                 # can reference their module's mutable state (e.g. counters, tables).
                 # Non-library modules still only export const/public variables.
                 if self.is_library or node.is_const or node.is_public:
                     self.exports[node.var_name] = node
             # Export bare assignments from library modules (e.g. _count = 0)
-            # so imported functions can reference and mutate their module globals
+            # so imported functions can reference and mutate their module globals.
             elif isinstance(node, Assign) and self.is_library:
+                self.implementation[node.var_name] = node
                 self.exports[node.var_name] = node
             elif isinstance(node, LinkDirective):
                 self.link_directives.append(node)
@@ -144,8 +150,12 @@ class Module:
         return self.exports.get(name)
 
     def get_all_exports(self) -> dict[str, ASTNode]:
-        """Get all exported symbols"""
+        """Get the public source-level interface of this module."""
         return self.exports.copy()
+
+    def get_all_implementation(self) -> dict[str, ASTNode]:
+        """Get declarations required to lower this module's implementation."""
+        return self.implementation.copy()
 
 
 def _has_link_directive(
@@ -322,6 +332,9 @@ class ModuleLoader:
     ) -> None:
         """Merge the symbol closure required by a nested module import."""
         exports = imported_module.exports
+        for name, node in imported_module.implementation.items():
+            if name not in module.implementation:
+                module.implementation[name] = node
         names = list(exports) if requested_names is None else requested_names
         for name in names:
             if name not in exports:

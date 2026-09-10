@@ -83,28 +83,27 @@ class _CodeGenModuleMixin(_CodeGenModuleGlobalsMixin):
     ) -> list[Function]:
         """Collect and declare imported functions from a module."""
         result: list[Function] = []
-        seen = set()  # Track already-collected function names
+        seen: set[str] = set()
         if module_name.startswith("__from__"):
             requested_names = from_import_names.get(module_name, [])
             exports = module.get_all_exports()
-            for name in requested_names:
-                if name not in exports:
-                    continue
-                node = exports[name]
-                if (
-                    isinstance(node, Function) and node.name not in self.functions
-                ) and (node.name not in seen):
-                    seen.add(node.name)
-                    result.append(node)
-                    self.declare_function(node)
+            ordered_nodes = [
+                exports[name] for name in requested_names if name in exports
+            ]
         else:
-            for node in module.get_all_exports().values():
-                if (
-                    isinstance(node, Function) and node.name not in self.functions
-                ) and (node.name not in seen):
-                    seen.add(node.name)
-                    result.append(node)
-                    self.declare_function(node)
+            ordered_nodes = list(module.get_all_exports().values())
+
+        # Backend lowering needs the implementation closure as well as the public
+        # interface. Source-level visibility is enforced independently.
+        ordered_nodes.extend(module.get_all_implementation().values())
+        for node in ordered_nodes:
+            if not isinstance(node, Function):
+                continue
+            if node.name in self.functions or node.name in seen:
+                continue
+            seen.add(node.name)
+            result.append(node)
+            self.declare_function(node)
         return result
 
     def _register_type_aliases_from_nodes(self: Any, nodes: Any) -> None:
@@ -251,6 +250,22 @@ class _CodeGenModuleMixin(_CodeGenModuleGlobalsMixin):
                     from_import_names[key] = []
                 from_import_names[key].extend(node.names)
 
+        # Names callable by functions in the entry source. Implementation-only
+        # declarations can be emitted without becoming source-visible.
+        entry_visible = {node.name for node in ast_nodes if isinstance(node, Function)}
+        for module_name, module in imported_modules.items():
+            exports = module.get_all_exports()
+            if module_name.startswith("__from__"):
+                visible_names = from_import_names.get(module_name, [])
+            else:
+                visible_names = list(exports)
+            entry_visible.update(
+                name
+                for name in visible_names
+                if isinstance(exports.get(name), Function)
+            )
+        self._entry_visible_function_names = entry_visible
+
         # Parser-level inference deliberately defers functions whose return
         # values depend on imports.  At this point the LLVM module loader has
         # the complete exported symbol closure, so infer on concrete nodes.
@@ -264,7 +279,7 @@ class _CodeGenModuleMixin(_CodeGenModuleGlobalsMixin):
         ]
         seen_inference_nodes = {id(node) for node in inference_nodes}
         for imported_module in imported_modules.values():
-            for imported_node in imported_module.get_all_exports().values():
+            for imported_node in imported_module.get_all_implementation().values():
                 if id(imported_node) in seen_inference_nodes:
                     continue
                 inference_nodes.append(imported_node)

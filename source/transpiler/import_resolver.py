@@ -31,6 +31,12 @@ from typing import Any
 from lexer.scan import tokenize
 from target_info import os_from_platform, target_matches
 from transpiler.cbind_flags import headers_from_cflags
+from transpiler.import_visibility import (
+    import_sort_key,
+    reject_private_selective_imports,
+    tag_source_file,
+    validate_private_function_boundaries,
+)
 
 
 class ImportResolver:
@@ -51,7 +57,7 @@ class ImportResolver:
         imported_funcs: set[str] = set()
         base_dir = Path(source_file).parent if source_file else Path(".")
         processed_files: set[str] = set()
-        self._tag_source_file(nodes, source_file)
+        tag_source_file(nodes, source_file)
 
         self._process_file_imports(
             nodes, base_dir, result, imported_funcs, processed_files
@@ -68,7 +74,8 @@ class ImportResolver:
         # Order so type definitions and constants precede function bodies
         # that reference them. Without this, static globals would be
         # declared after their first use site -- C compile error.
-        result.sort(key=self._sort_key)
+        result.sort(key=import_sort_key)
+        validate_private_function_boundaries(result)
 
         # Parsing a file cannot infer return types that depend on imported
         # declarations.  Once imports are flattened, resolve and validate the
@@ -116,6 +123,10 @@ class ImportResolver:
                 imported_nodes = self._parse_probe_import_file(import_file_str)
             else:
                 imported_nodes = self._parse_import_file(import_file_str)
+            if isinstance(node, A.FromImport):
+                reject_private_selective_imports(
+                    imported_nodes, set(node.names), import_file_str
+                )
             # Recurse into the imported file's own imports first so its
             # dependencies are inlined before its definitions.
             self._process_file_imports(
@@ -252,7 +263,11 @@ class ImportResolver:
             # in one TU. Only the top-level file's main belongs in output.
             if imp_node.name == "main":
                 return
-            if filter_names is not None and imp_node.name not in filter_names:
+            if (
+                filter_names is not None
+                and imp_node.name not in filter_names
+                and getattr(imp_node, "is_public", True)
+            ):
                 return
             if imp_node.name in imported_funcs:
                 return
@@ -309,7 +324,7 @@ class ImportResolver:
             tokens = tokenize(code)
             p = Parser(tokens)
             nodes = p.parse_program()
-            self._tag_source_file(nodes, filepath)
+            tag_source_file(nodes, filepath)
             return nodes
         except SyntaxError as exc:
             raise SyntaxError(
@@ -379,7 +394,7 @@ class ImportResolver:
             if c_unit:
                 nodes.append(A.TemplateBlock("ansi_c", c_unit))
 
-            self._tag_source_file(nodes, filepath)
+            tag_source_file(nodes, filepath)
             return nodes
         except (OSError, ValueError, TypeError):
             return []
@@ -726,25 +741,3 @@ class ImportResolver:
             fn_decorators.append("header_declared")
         fn.decorators = fn_decorators
         return fn
-
-    @staticmethod
-    def _tag_source_file(nodes: list[A.ASTNode], filepath: str) -> None:
-        """Attach source path metadata to parsed nodes for diagnostics/reports."""
-        if not filepath:
-            return
-        for node in nodes:
-            if not node._source_file:
-                node._source_file = filepath
-
-    @staticmethod
-    def _sort_key(node: A.ASTNode) -> int:
-        """Order so type defs / constants come before functions that
-        reference them. Stable sort preserves the within-bucket order
-        from the splice walk."""
-        if isinstance(node, (A.RecordDef, A.EnumDef, A.ExternRecordDef)):
-            return 0
-        if isinstance(node, A.VarDecl):
-            return 1
-        if isinstance(node, A.ClassDef):
-            return 2
-        return 3

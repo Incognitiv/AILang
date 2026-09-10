@@ -89,7 +89,31 @@ class ExprCallEmitter(ExprCallObjectMixin):
             param_index,
         ) in getattr(self.codegen, "_virtual_string_elidable_params", set())
 
+    def _check_module_function_visibility(self, node: Call) -> None:
+        function_nodes = getattr(self.codegen, "_function_nodes", {})
+        target_node = function_nodes.get(node.name)
+        if target_node is None:
+            return
+        target_source = getattr(target_node, "_source_path", "")
+        entry_source = getattr(self.codegen, "_compile_source_file", "")
+        caller_name = getattr(self.codegen, "_current_function_name", None)
+        caller_node = function_nodes.get(caller_name) if caller_name else None
+        caller_source = getattr(caller_node, "_source_path", "") or entry_source
+        if not target_source or target_source == caller_source:
+            return
+        if not getattr(target_node, "is_public", True):
+            raise ExprGenError(
+                f"Private function '{node.name}' is not visible outside its module"
+            )
+        if caller_source == entry_source and node.name not in getattr(
+            self.codegen, "_entry_visible_function_names", set()
+        ):
+            raise ExprGenError(
+                f"Function '{node.name}' is not imported into this module"
+            )
+
     def visit_Call(self, node: Call):
+        self._check_module_function_visibility(node)
         func_name = node.name.lower()
         # Correctness phase: do not pure-fold user functions before their
         # parameter/return contracts have been applied.  The old fast path
