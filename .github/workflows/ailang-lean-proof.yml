@@ -29,8 +29,9 @@ jobs:
           lint: false
           leanchecker: true
           leanchecker-args: AILangProof
-          nanoda: true
-          nanoda-allow-sorry: false
+          # nanoda currently rejects recent Lean export streams before checking
+          # declarations; tracked upstream as leanprover/lean-action#169.
+          nanoda: false
           axiom-audit: true
           axiom-audit-root: AILangProof
           axiom-audit-allow: propext,Classical.choice,Quot.sound
