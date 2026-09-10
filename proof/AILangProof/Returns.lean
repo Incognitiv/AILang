@@ -154,19 +154,18 @@ theorem inferred_nonvoid_has_sound_shape
   | nil =>
       simp [inferReturn, hv] at h
   | cons first rest =>
-      have hnonempty : summary.values ≠ [] := by
-        simp
-      have hbare : summary.hasBare = false := by
-        cases hb : summary.hasBare with
-        | false => exact hb
+      constructor
+      · simp
+      · cases hb : summary.hasBare with
         | true =>
             simp [inferReturn, hv, hb] at h
-      have hpaths : summary.allPathsValueOrThrow = true := by
-        cases hp : summary.allPathsValueOrThrow with
         | false =>
-            simp [inferReturn, hv, hbare, hp] at h
-        | true => exact hp
-      exact ⟨hnonempty, hbare, hpaths⟩
+            constructor
+            · rfl
+            · cases hp : summary.allPathsValueOrThrow with
+              | false =>
+                  simp [inferReturn, hv, hb, hp] at h
+              | true => rfl
 
 theorem inferred_return_sound
     (join : Join) (summary : ReturnSummary) (ret : ReturnTy)
