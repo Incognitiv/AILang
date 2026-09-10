@@ -34,4 +34,4 @@ jobs:
 
       - name: Run AILang proof-model report
         working-directory: proof
-        run: lake exe ailang-proof-report
+        run: lake exe ailangProofReport
