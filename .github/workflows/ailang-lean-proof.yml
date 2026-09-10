@@ -40,3 +40,6 @@ jobs:
       - name: Run AILang proof-model report
         working-directory: proof
         run: lake exe ailangProofReport
+
+      - name: Verify Python/Lean fixed-int conformance
+        run: python proof/check_python_conformance.py

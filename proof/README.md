@@ -37,14 +37,27 @@ once that checker/exporter combination supports the pinned Lean toolchain.
 - `i32 + u32 -> i64`, `i64 + u64 -> i128`, while `i8192 + u8192` has no fixed
   lossless join because the next required signed width would exceed 8192.
 
+## Implementation conformance
+
+The fixed-integer proof is connected back to the actual Python frontend rather
+than being left as an isolated specification. `check_python_conformance.py`
+runs the Lean model and the real `_join_ints` implementation over the complete
+fixed-integer domain: 22 supported signed/unsigned types, or 484 ordered input
+pairs. CI fails on a missing row, an unexpected row, or any result mismatch.
+
+This is exhaustive extensional conformance for the current fixed-integer join
+domain, not sampling. Combined with the Lean theorem that a successful model
+join can represent both operands, it gives a checked bridge from that theorem to
+the current Python `_join_ints` behaviour for every supported fixed-width pair.
+
 ## Trust boundary
 
-These theorems prove properties of the Lean model. They do **not yet prove that
-the Python implementation is extensionally identical to the model**. The next
-useful step is a generated conformance bridge: emit the compiler's return/join
-facts for a finite corpus and compare them with the executable Lean model, then
-gradually move from sampled conformance toward a verified translation or a much
-smaller formally specified compiler core.
+The return-shape theorems currently prove properties of the Lean model; they do
+**not yet prove that the full Python return-inference implementation is
+extensionally identical to that model**. The fixed-integer join is stronger: its
+finite input domain is exhaustively compared against the real Python function in
+CI. The next useful bridge is to extract return summaries from real parsed AILang
+functions and compare those frontend decisions with the Lean return model.
 
 ## Local use
 
@@ -55,6 +68,8 @@ cd proof
 lake build
 lake exe ailangProofReport
 lake env leanchecker AILangProof
+cd ..
+python proof/check_python_conformance.py
 ```
 
 `lean` is the compiler/elaborator, `lake` is the build tool, and `elan` selects
