@@ -1,6 +1,5 @@
 """Backend-neutral typed intermediate representation."""
 
-from .frontend_lowering import lower_function, lower_program
 from .model import (
     Binary,
     Block,
@@ -16,6 +15,7 @@ from .numeric_lowering import (
     lower_numeric_binary_return,
     lower_numeric_binary_values,
 )
+from .frontend_lowering import lower_function, lower_program
 
 __all__ = [
     "Binary",
