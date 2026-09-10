@@ -17,6 +17,12 @@ def test_integer_conversion_policy_preserves_checked_narrowing() -> None:
     assert classify_conversion("i8", "u64") is ConversionKind.CHECKED
 
 
+def test_bool_to_integer_is_lossless_but_reverse_is_explicit() -> None:
+    assert classify_conversion("bool", "i8") is ConversionKind.LOSSLESS_WIDEN
+    assert classify_conversion("bool", "u8192") is ConversionKind.LOSSLESS_WIDEN
+    assert classify_conversion("i8", "bool") is ConversionKind.EXPLICIT_LOSSY
+
+
 def test_mixed_numeric_precision_policy() -> None:
     assert classify_conversion("i32", "double") is ConversionKind.LOSSLESS_WIDEN
     assert classify_conversion("i64", "double") is ConversionKind.EXPLICIT_LOSSY
@@ -26,7 +32,7 @@ def test_mixed_numeric_precision_policy() -> None:
 
 def test_non_numeric_cross_family_conversion_is_forbidden() -> None:
     assert classify_conversion("string", "i64") is ConversionKind.FORBIDDEN
-    assert classify_conversion("bool", "i8") is ConversionKind.FORBIDDEN
+    assert classify_conversion("bool", "string") is ConversionKind.FORBIDDEN
     assert classify_conversion("pointer", "ptr") is ConversionKind.IDENTITY
 
 
