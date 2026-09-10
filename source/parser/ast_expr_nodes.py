@@ -51,6 +51,7 @@ class Library(ASTNode):
 # ============================================================================
 class Number(ASTNode):
     value: Any  # Can be int or float
+    source_text: str
     is_float: bool
     is_long: bool
     precision: str
@@ -59,6 +60,10 @@ class Number(ASTNode):
     def __init__(
         self, value: str, is_long: bool = False, is_float: bool = False
     ) -> None:
+        # Keep the exact token spelling alongside the convenience Python value.
+        # Typed IR and future high-precision backends must not reconstruct a
+        # source literal from a value that may already have been rounded.
+        self.source_text = value
         if is_float:
             self.value = float(value.rstrip("fFdDqQ"))
             self.is_float = True
@@ -108,8 +113,8 @@ class StringLit(ASTNode):
 class InterpolatedString(ASTNode):
     """String with embedded expressions: "Hello #{name}, count: #{count}"
     parts is a list of either:
-      - str: literal text portions
-      - ASTNode: expressions to be evaluated and converted to string
+      - str: literal text portions (str)
+      - ASTNode: expressions inside #{...} (parsed as AST nodes)
     """
 
     def __init__(self, parts: list[Any]) -> None:

@@ -9,7 +9,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from type_semantics import ConversionKind, canonical_type_name, classify_conversion
+from type_semantics import (
+    FLOAT_PRECISION_BITS,
+    INT_RE,
+    ConversionKind,
+    canonical_type_name,
+    classify_conversion,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,6 +32,31 @@ class Value:
         if not canonical:
             raise ValueError("IR value type cannot be empty")
         object.__setattr__(self, "type_name", canonical)
+
+
+@dataclass(frozen=True, slots=True)
+class Constant:
+    """A fixed numeric literal materialized as one typed SSA value."""
+
+    literal_kind: str
+    value_text: str
+    result: Value
+
+    def __post_init__(self) -> None:
+        if self.literal_kind not in {"int", "float"}:
+            raise ValueError(f"unsupported IR constant kind {self.literal_kind!r}")
+        if not self.value_text or any(ch in self.value_text for ch in "\t\n\r"):
+            raise ValueError("IR constant text must be a non-empty single-line value")
+        if self.literal_kind == "int":
+            if INT_RE.match(self.result.type_name) is None:
+                raise ValueError(
+                    "integer IR constant requires a fixed integer result type"
+                )
+            return
+        if self.result.type_name not in FLOAT_PRECISION_BITS:
+            raise ValueError(
+                "floating IR constant requires an f32/f64/f128 result type"
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,12 +101,12 @@ class Return:
     value: Value
 
 
-Instruction = Convert | Binary | Return
+Instruction = Constant | Convert | Binary | Return
 
 
 @dataclass(frozen=True, slots=True)
 class Block:
-    """Straight-line typed IR block used by the first lowering slice."""
+    """Straight-line typed IR block used by the first lowering slices."""
 
     instructions: tuple[Instruction, ...]
 
@@ -114,6 +145,11 @@ class FunctionIR:
 def render_instruction(instruction: Instruction) -> str:
     """Render deterministic human-readable IR for golden tests and diagnostics."""
 
+    if isinstance(instruction, Constant):
+        return (
+            f"{instruction.result.name}:{instruction.result.type_name} = "
+            f"const.{instruction.literal_kind} {instruction.value_text}"
+        )
     if isinstance(instruction, Convert):
         return (
             f"{instruction.result.name}:{instruction.result.type_name} = "

@@ -13,7 +13,9 @@ The current proof surface covers:
 - scalar conversion classification;
 - structural invariants of the backend-neutral Typed IR;
 - a data-only certificate emitted from real Python-generated Typed IR and parsed
-  and checked independently by Lean.
+  and checked independently by Lean;
+- Stage 5 straight-line numeric constants, typed local SSA bindings, and nested
+  arithmetic expressions on that same certificate-checked path.
 
 The proof project is intentionally dependency-light: Lean + Std only, pinned by
 `lean-toolchain`. CI builds the project, checks the resulting environment with
@@ -69,9 +71,11 @@ fuzzing.
 ## Real Typed IR certificate bridge
 
 `source/ir/certificate.py` serializes an actual `FunctionIR` produced by the
-Python frontend into a versioned, data-only certificate. The certificate repeats
-SSA names and types deliberately so the Lean checker can validate them against
-its own environment instead of trusting Python object invariants.
+Python frontend into a versioned, data-only certificate. Certificate version 2
+adds typed numeric constant rows to the Stage 4 conversion/binary/return rows.
+The certificate repeats SSA names and types deliberately so the Lean checker can
+validate them against its own environment instead of trusting Python object
+invariants.
 
 `CertificateCheck.lean` parses the certificate and independently checks, among
 other things:
@@ -79,6 +83,7 @@ other things:
 - certificate version and row structure;
 - unique/fresh SSA names;
 - operand definition-before-use and repeated type consistency;
+- constant literal family (`int` versus `float`) against its IR result type;
 - formal conversion classification and implicit-conversion legality;
 - numeric binary type uniformity;
 - supported binary operators;
@@ -86,10 +91,40 @@ other things:
 - absence of rows after the terminating return.
 
 `check_ir_certificate.py` generates certificates from real AILang source through
-lexer -> parser -> AST -> Typed IR and invokes the Lean executable. The gate
-currently requires three real certificates to be accepted and two deliberately
-forged certificates to be rejected. This tests both positive and negative sides
-of the bridge.
+lexer -> parser -> AST -> Typed IR and invokes the Lean executable. Stage 5
+covers seven real certificates, including contextual `f32` literals, typed local
+bindings, nested expressions, checked local integer boundaries, and an explicit
+`f128` literal whose decimal spelling is intentionally longer than binary64 can
+preserve. The bridge asserts that this exact spelling survives into the
+certificate before asking Lean to validate its typed SSA structure. The negative
+side forges conversion metadata, an SSA operand, and a constant-kind row and
+requires Lean to reject all three.
+
+## Stage 5 frontend boundary
+
+The current Typed IR frontend accepts one straight-line function body containing
+zero or more typed local declarations followed by one valued return. Within
+those declarations and the return expression it recursively lowers:
+
+- fixed numeric function parameters and local bindings;
+- integer and floating literals, including explicit `f128`/`quad` literals;
+- nested `+`, `-`, `*`, and `/`;
+- every implicit widening or checked conversion as an explicit IR `Convert`.
+
+Unsuffixed floating literals preserve the existing frontend rule: when an
+immediate binary sibling already has `f32`, `f64`, or `f128`, the literal uses
+that sibling type. An explicit `f`, `d`, or `q` suffix chooses its own precision.
+
+`Number` retains both its existing convenience Python value and the exact source
+numeric token in `source_text`. Typed IR deliberately ignores the convenience
+value when materializing constants. It copies the exact token spelling and
+removes only the source-level precision/long suffix because the IR result type
+already carries that information. Consequently an explicit `q` literal no
+longer passes through Python binary64 before entering Typed IR or its
+certificate.
+
+Mutation (`Assign`), calls, control flow, and non-numeric expressions remain
+outside this Stage 5 slice and fail closed.
 
 ## Trust boundary
 
@@ -99,16 +134,23 @@ implementation itself. Python is still trusted to serialize the `FunctionIR`
 object it produced; Lean independently validates the serialized semantic facts
 and SSA structure it receives.
 
+For constants, Lean currently validates the constant family, result type, SSA
+freshness, and surrounding use/return structure. It does not independently parse
+AILang decimal spelling into a mathematical real or prove IEEE rounding. Exact
+literal preservation is instead guarded end-to-end by Python golden tests and by
+the real certificate bridge, which compares the long `f128` source spelling with
+the emitted certificate byte-for-byte before Lean checks the certificate. This
+is an explicit remaining trust boundary, not a claim that Lean has proved
+binary128 decimal conversion.
+
 Likewise, the return-shape theorems currently prove properties of the Lean model
 and are not yet an exhaustive equivalence proof for arbitrary Python AST/control
 flow. The fixed numeric join and scalar conversion domains are stronger because
 they are exhaustively compared against the real canonical Python functions.
 
-The current Typed IR frontend is intentionally narrow and fail-closed. It covers
-straight-line numeric binary returns over function parameters. The next useful
-boundary is to extend this same certificate-checked path to constants, local SSA
-bindings, nested expressions, and then control-flow blocks, without allowing
-backends to re-infer language semantics.
+The next natural Typed IR boundary after Stage 5 is explicit control-flow
+blocks and joins/phi semantics, followed by moving backends to consume Typed IR
+instead of re-inferring language semantics from AST nodes.
 
 ## Local use
 
