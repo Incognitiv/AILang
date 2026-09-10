@@ -12,7 +12,7 @@ The first proof surface mirrors two current compiler rules:
 - the fixed-width signed/unsigned join algorithm used by return inference.
 
 The proof project is intentionally dependency-light: Lean + Std only, pinned by
-`lean-toolchain`.  CI builds the project, runs the executable report, and also
+`lean-toolchain`. CI builds the project, runs the executable report, and also
 runs independent Lean artifact checking with `leanchecker`/`nanoda` while
 forbidding `sorry`.
 
@@ -33,8 +33,8 @@ forbidding `sorry`.
 
 ## Trust boundary
 
-These theorems prove properties of the Lean model.  They do **not yet prove that
-the Python implementation is extensionally identical to the model**.  The next
+These theorems prove properties of the Lean model. They do **not yet prove that
+the Python implementation is extensionally identical to the model**. The next
 useful step is a generated conformance bridge: emit the compiler's return/join
 facts for a finite corpus and compare them with the executable Lean model, then
 gradually move from sampled conformance toward a verified translation or a much
@@ -47,7 +47,7 @@ Install Lean via `elan`, then run:
 ```text
 cd proof
 lake build
-lake exe ailang-proof-report
+lake exe ailangProofReport
 ```
 
 `lean` is the compiler/elaborator, `lake` is the build tool, and `elan` selects

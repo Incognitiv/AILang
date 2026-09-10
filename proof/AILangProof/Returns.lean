@@ -125,7 +125,7 @@ theorem inferred_void_has_no_values
     (h : inferReturn join summary = .ok .void) :
     summary.values = [] := by
   cases hv : summary.values with
-  | nil => exact hv
+  | nil => rfl
   | cons first rest =>
       cases hb : summary.hasBare <;>
       cases hp : summary.allPathsValueOrThrow <;>
@@ -143,7 +143,7 @@ theorem inferred_nonvoid_has_sound_shape
       simp [inferReturn, hv] at h
   | cons first rest =>
       constructor
-      · simp [hv]
+      · simp
       · cases hb : summary.hasBare <;>
         cases hp : summary.allPathsValueOrThrow <;>
         cases hj : foldJoin join first rest <;>
