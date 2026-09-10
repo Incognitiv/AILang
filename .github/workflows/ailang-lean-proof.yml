@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - agent/unbounded-field-semantics
-      - agent/typed-ir-conversions-stage1
     paths:
       - "proof/**"
       - "source/type_semantics.py"
