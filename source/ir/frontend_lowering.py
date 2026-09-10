@@ -1,9 +1,9 @@
 """Lower validated AILang AST into backend-neutral typed IR.
 
-This first frontend slice is intentionally narrow and fail-closed: one function,
-one valued return, and one numeric binary expression over function parameters.
-Unsupported syntax is rejected rather than being silently reinterpreted by a
-backend.
+Stage 5 remains deliberately fail-closed. It accepts straight-line fixed-numeric
+functions with typed local declarations, numeric literals, nested arithmetic,
+and one final valued return. Mutation, calls, control flow, and non-numeric
+expressions remain outside this slice.
 """
 
 from __future__ import annotations
@@ -11,16 +11,27 @@ from __future__ import annotations
 from parser import ast as A
 from parser.ast import parsed_type_to_str
 
-from type_semantics import canonical_type_name
+from type_semantics import FLOAT_PRECISION_BITS, canonical_type_name
 
-from .model import FunctionIR, Value
-from .numeric_lowering import IRLoweringError, lower_numeric_binary_values
+from .model import Block, Constant, FunctionIR, Instruction, Return, Value
+from .numeric_lowering import (
+    IRLoweringError,
+    coerce_value,
+    emit_numeric_binary,
+    fresh_value,
+)
 
 _BINARY_OPERATORS = {
     "+": "add",
     "-": "sub",
     "*": "mul",
     "/": "div",
+}
+
+_FLOAT_LITERAL_TYPES = {
+    "f": "f32",
+    "d": "f64",
+    "q": "f128",
 }
 
 
@@ -44,9 +55,55 @@ def _parameter_values(
     return parameters, by_name
 
 
-def _parameter_operand(expr: A.ASTNode, values: dict[str, Value]) -> Value:
-    if not isinstance(expr, A.Variable):
-        raise IRLoweringError("typed IR frontend currently requires parameter operands")
+def _is_contextual_float(expr: A.ASTNode) -> bool:
+    return (
+        isinstance(expr, A.Number)
+        and expr.is_float
+        and not expr.precision_explicit
+    )
+
+
+def _constant_type(expr: A.Number, context_type: str | None) -> str:
+    if not expr.is_float:
+        return "i64"
+    if expr.precision_explicit:
+        return _FLOAT_LITERAL_TYPES.get(expr.precision, "f64")
+    if context_type in FLOAT_PRECISION_BITS:
+        return str(context_type)
+    return "f64"
+
+
+def _constant_text(expr: A.Number, type_name: str) -> str:
+    if not expr.is_float:
+        return str(int(expr.value))
+    if type_name == "f128":
+        raise IRLoweringError(
+            "typed IR cannot preserve an f128 literal yet because the parser "
+            "currently stores floating literals as Python float; use an f128 "
+            "value from a parameter/expression until exact literal lexemes are retained"
+        )
+    return repr(float(expr.value))
+
+
+def _emit_constant(
+    expr: A.Number,
+    instructions: list[Instruction],
+    context_type: str | None = None,
+) -> Value:
+    type_name = _constant_type(expr, context_type)
+    result = fresh_value(instructions, type_name)
+    literal_kind = "float" if expr.is_float else "int"
+    instructions.append(
+        Constant(
+            literal_kind=literal_kind,
+            value_text=_constant_text(expr, type_name),
+            result=result,
+        )
+    )
+    return result
+
+
+def _lookup_variable(expr: A.Variable, values: dict[str, Value]) -> Value:
     try:
         return values[expr.name]
     except KeyError as exc:
@@ -55,39 +112,105 @@ def _parameter_operand(expr: A.ASTNode, values: dict[str, Value]) -> Value:
         ) from exc
 
 
-def lower_function(function: A.Function) -> FunctionIR:
-    """Lower the first supported validated-function shape into typed IR."""
-
-    if len(function.body) != 1:
-        raise IRLoweringError(
-            "typed IR frontend currently requires one straight-line return"
-        )
-    (returned,) = function.body
-    if not isinstance(returned, A.Return):
-        raise IRLoweringError(
-            "typed IR frontend currently requires one straight-line return"
-        )
-    if returned.value is None:
-        raise IRLoweringError("typed IR frontend requires a valued return")
-    if not isinstance(returned.value, A.BinaryOp):
-        raise IRLoweringError("typed IR frontend currently requires a binary return")
-
-    operator = _BINARY_OPERATORS.get(returned.value.op)
+def _lower_binary(
+    expr: A.BinaryOp,
+    values: dict[str, Value],
+    instructions: list[Instruction],
+) -> Value:
+    operator = _BINARY_OPERATORS.get(expr.op)
     if operator is None:
         raise IRLoweringError(
-            f"typed IR frontend does not support binary operator {returned.value.op!r}"
+            f"typed IR frontend does not support binary operator {expr.op!r}"
         )
 
+    left_is_contextual = _is_contextual_float(expr.left)
+    right_is_contextual = _is_contextual_float(expr.right)
+
+    if left_is_contextual and not right_is_contextual:
+        right = _lower_expr(expr.right, values, instructions)
+        context = right.type_name if right.type_name in FLOAT_PRECISION_BITS else None
+        left = _lower_expr(expr.left, values, instructions, context_type=context)
+    else:
+        left = _lower_expr(expr.left, values, instructions)
+        context = (
+            left.type_name
+            if right_is_contextual and left.type_name in FLOAT_PRECISION_BITS
+            else None
+        )
+        right = _lower_expr(expr.right, values, instructions, context_type=context)
+
+    return emit_numeric_binary(operator, left, right, instructions)
+
+
+def _lower_expr(
+    expr: A.ASTNode,
+    values: dict[str, Value],
+    instructions: list[Instruction],
+    context_type: str | None = None,
+) -> Value:
+    if isinstance(expr, A.Variable):
+        return _lookup_variable(expr, values)
+    if isinstance(expr, A.Number):
+        return _emit_constant(expr, instructions, context_type)
+    if isinstance(expr, A.BinaryOp):
+        return _lower_binary(expr, values, instructions)
+    raise IRLoweringError(
+        f"typed IR frontend does not support expression {type(expr).__name__}"
+    )
+
+
+def _bind_local(
+    declaration: A.VarDecl,
+    values: dict[str, Value],
+    instructions: list[Instruction],
+) -> None:
+    if declaration.var_name in values:
+        raise IRLoweringError(
+            f"typed IR frontend does not allow local shadowing for "
+            f"'{declaration.var_name}'"
+        )
+    if declaration.init_value is None:
+        raise IRLoweringError(
+            f"typed IR local '{declaration.var_name}' requires an initializer"
+        )
+
+    initialized = _lower_expr(declaration.init_value, values, instructions)
+    declared_type = _type_name(declaration.type_name)
+    values[declaration.var_name] = coerce_value(
+        initialized, declared_type, instructions
+    )
+
+
+def lower_function(function: A.Function) -> FunctionIR:
+    """Lower one supported straight-line fixed-numeric function."""
+
+    if not function.body:
+        raise IRLoweringError("typed IR frontend requires a final valued return")
+
+    *statements, returned = function.body
+    if not isinstance(returned, A.Return) or returned.value is None:
+        raise IRLoweringError("typed IR frontend requires one final valued return")
+
     parameters, values = _parameter_values(function)
-    left = _parameter_operand(returned.value.left, values)
-    right = _parameter_operand(returned.value.right, values)
+    instructions: list[Instruction] = []
+
+    for statement in statements:
+        if not isinstance(statement, A.VarDecl):
+            raise IRLoweringError(
+                "typed IR frontend accepts typed local declarations before return only"
+            )
+        _bind_local(statement, values, instructions)
+
+    result = _lower_expr(returned.value, values, instructions)
     return_type = _type_name(function.return_type)
-    entry = lower_numeric_binary_values(operator, left, right, return_type)
+    result = coerce_value(result, return_type, instructions)
+    instructions.append(Return(value=result))
+
     return FunctionIR(
         name=function.name,
         parameters=parameters,
         return_type=return_type,
-        entry=entry,
+        entry=Block(instructions=tuple(instructions)),
     )
 
 
@@ -97,6 +220,6 @@ def lower_program(program: list[A.ASTNode]) -> tuple[FunctionIR, ...]:
     functions = [node for node in program if isinstance(node, A.Function)]
     if len(functions) != len(program):
         raise IRLoweringError(
-            "typed IR frontend stage 3 accepts top-level functions only"
+            "typed IR frontend stage 5 accepts top-level functions only"
         )
     return tuple(lower_function(function) for function in functions)

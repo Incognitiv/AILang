@@ -62,6 +62,12 @@ def asNumeric : ScalarTy → Except String NumericTy
 def validOperator (operator : String) : Bool :=
   operator == "add" || operator == "sub" || operator == "mul" || operator == "div"
 
+def validConstant (literalKind : String) (ty : ScalarTy) : Bool :=
+  match literalKind, ty with
+  | "int", .numeric (.int _) => true
+  | "float", .numeric (.float _) => true
+  | _, _ => false
+
 structure CertState where
   env : Env
   returnType : ScalarTy
@@ -84,6 +90,19 @@ def validateRows : CertState → List String → Except String Unit
             throw s!"duplicate SSA name: {name}"
           validateRows
             { state with env := (name, ty) :: state.env }
+            rest
+      | ["K", resultName, resultTypeText, literalKind, valueText] =>
+          let resultType ← parseScalarTy resultTypeText
+          if valueText.isEmpty then
+            throw "constant literal text cannot be empty"
+          if !isFresh resultName state.env then
+            throw s!"constant result is not fresh: {resultName}"
+          if !validConstant literalKind resultType then
+            throw s!"constant literal kind {literalKind} does not match {resultTypeText}"
+          validateRows
+            { state with
+                env := (resultName, resultType) :: state.env
+                startedInstructions := true }
             rest
       | ["C", sourceName, sourceTypeText, resultName, resultTypeText, kindText] =>
           let sourceType ← parseScalarTy sourceTypeText
@@ -143,7 +162,7 @@ def validateCertificate (content : String) : Except String Unit := do
   let lines := (content.splitOn "\n").filter (fun line => !line.isEmpty)
   match lines with
   | header :: functionRow :: rest =>
-      if header.splitOn "\t" != ["AILANG_TYPED_IR_CERTIFICATE", "1"] then
+      if header.splitOn "\t" != ["AILANG_TYPED_IR_CERTIFICATE", "2"] then
         throw "unsupported or malformed typed IR certificate header"
       match functionRow.splitOn "\t" with
       | ["F", functionName, returnTypeText] =>

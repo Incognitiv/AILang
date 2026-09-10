@@ -1,4 +1,4 @@
-"""Typed-IR lowering for fixed numeric binary return expressions."""
+"""Typed-IR lowering primitives for fixed numeric values."""
 
 from __future__ import annotations
 
@@ -17,11 +17,19 @@ class IRLoweringError(TypeError):
     """The frontend contract cannot be represented by this typed-IR slice."""
 
 
-def _coerce(
+def fresh_value(instructions: list[Instruction], type_name: str) -> Value:
+    """Allocate the next deterministic SSA temporary."""
+
+    return Value(f"%t{len(instructions)}", canonical_type_name(type_name))
+
+
+def coerce_value(
     value: Value,
     target_type: str,
     instructions: list[Instruction],
 ) -> Value:
+    """Materialize one canonical implicit conversion, or fail closed."""
+
     target = canonical_type_name(target_type)
     kind = classify_conversion(value.type_name, target)
     if kind is ConversionKind.IDENTITY:
@@ -32,8 +40,31 @@ def _coerce(
             f"{value.type_name} to {target}"
         )
 
-    result = Value(f"%t{len(instructions)}", target)
+    result = fresh_value(instructions, target)
     instructions.append(Convert(source=value, result=result, kind=kind))
+    return result
+
+
+def emit_numeric_binary(
+    operator: str,
+    left: Value,
+    right: Value,
+    instructions: list[Instruction],
+) -> Value:
+    """Emit one numeric binary instruction after lossless operand joining."""
+
+    joined = join_numeric_types(left.type_name, right.type_name)
+    if joined is None:
+        raise IRLoweringError(
+            f"no lossless numeric join for {left.type_name} and {right.type_name}"
+        )
+
+    typed_left = coerce_value(left, joined, instructions)
+    typed_right = coerce_value(right, joined, instructions)
+    result = fresh_value(instructions, joined)
+    instructions.append(
+        Binary(operator=operator, left=typed_left, right=typed_right, result=result)
+    )
     return result
 
 
@@ -45,20 +76,9 @@ def lower_numeric_binary_values(
 ) -> Block:
     """Lower typed operands, preserving their actual SSA/source identities."""
 
-    joined = join_numeric_types(left.type_name, right.type_name)
-    if joined is None:
-        raise IRLoweringError(
-            f"no lossless numeric join for {left.type_name} and {right.type_name}"
-        )
-
     instructions: list[Instruction] = []
-    typed_left = _coerce(left, joined, instructions)
-    typed_right = _coerce(right, joined, instructions)
-    result = Value(f"%t{len(instructions)}", joined)
-    instructions.append(
-        Binary(operator=operator, left=typed_left, right=typed_right, result=result)
-    )
-    returned = _coerce(result, return_type, instructions)
+    result = emit_numeric_binary(operator, left, right, instructions)
+    returned = coerce_value(result, return_type, instructions)
     instructions.append(Return(value=returned))
     return Block(instructions=tuple(instructions))
 
