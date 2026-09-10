@@ -46,7 +46,9 @@ def _run_lean(certificate: str) -> subprocess.CompletedProcess[str]:
 def _forge_conversion_kind(certificate: str) -> str:
     marker = "\tlossless_widen\n"
     if marker not in certificate:
-        raise AssertionError("test certificate contains no lossless conversion to forge")
+        raise AssertionError(
+            "test certificate contains no lossless conversion to forge"
+        )
     return certificate.replace(marker, "\tchecked\n", 1)
 
 
