@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from parser import ast as A
 from parser.ast import parsed_type_to_str
+
 from type_semantics import canonical_type_name
 
 from .model import FunctionIR, Value
@@ -27,7 +28,9 @@ def _type_name(parsed_type: object) -> str:
     return canonical_type_name(parsed_type_to_str(parsed_type))
 
 
-def _parameter_values(function: A.Function) -> tuple[tuple[Value, ...], dict[str, Value]]:
+def _parameter_values(
+    function: A.Function,
+) -> tuple[tuple[Value, ...], dict[str, Value]]:
     parameters = tuple(
         Value(f"%arg{index}", _type_name(param_type))
         for index, (_, param_type, _) in enumerate(function.params)

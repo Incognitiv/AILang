@@ -1,7 +1,8 @@
 """End-to-end tests from real AILang source through parser into typed IR."""
 
-import pytest
+from parser.parser import Parser
 
+import pytest
 from ir import (
     Convert,
     FunctionIR,
@@ -11,7 +12,6 @@ from ir import (
     render_function,
 )
 from lexer.scan import tokenize
-from parser.parser import Parser
 from type_semantics import ConversionKind
 
 
@@ -23,13 +23,11 @@ def _lower(source: str) -> FunctionIR:
 
 
 def test_real_ailang_float_double_to_quad_lowers_to_golden_ir() -> None:
-    function = _lower(
-        """
+    function = _lower("""
 quad funkcja(float a, double b):
     return a + b
 end
-"""
-    )
+""")
 
     assert render_function(function) == "\n".join(
         [
@@ -43,13 +41,11 @@ end
 
 
 def test_ast_operand_order_survives_typed_ir_lowering() -> None:
-    function = _lower(
-        """
+    function = _lower("""
 double swapped(double a, float b):
     return b + a
 end
-"""
-    )
+""")
 
     assert render_function(function) == "\n".join(
         [
@@ -62,15 +58,11 @@ end
 
 
 def test_frontend_fails_closed_on_unsupported_expression_shape() -> None:
-    program = Parser(
-        tokenize(
-            """
+    program = Parser(tokenize("""
 double identity(double x):
     return x
 end
-"""
-        )
-    ).parse_program()
+""")).parse_program()
 
     with pytest.raises(IRLoweringError, match="requires a binary return"):
         lower_program(program)
