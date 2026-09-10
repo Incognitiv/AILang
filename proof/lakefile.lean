@@ -13,3 +13,7 @@ lean_exe ailangProofReport where
 @[default_target]
 lean_exe ailangProofConformance where
   root := `Conformance
+
+@[default_target]
+lean_exe ailangProofCertificateCheck where
+  root := `CertificateCheck
