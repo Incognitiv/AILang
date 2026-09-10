@@ -10,6 +10,7 @@ inductive ValueTy where
   | string
   | ptr
   | int (ty : IntTy)
+  | float (ty : FloatTy)
   deriving Repr, DecidableEq
 
 inductive ReturnTy where
@@ -38,12 +39,23 @@ structure FunctionSpec where
 
 abbrev Join := ValueTy → ValueTy → Option ValueTy
 
+def numericValue : NumericTy → ValueTy
+  | .int ty => .int ty
+  | .float ty => .float ty
+
+def valueNumeric? : ValueTy → Option NumericTy
+  | .int ty => some (.int ty)
+  | .float ty => some (.float ty)
+  | _ => none
+
 def joinValue : Join
   | .bool, .bool => some .bool
   | .string, .string => some .string
   | .ptr, .ptr => some .ptr
-  | .int a, .int b => (joinInt a b).map .int
-  | _, _ => none
+  | a, b =>
+      match valueNumeric? a, valueNumeric? b with
+      | some na, some nb => (joinNumeric na nb).map numericValue
+      | _, _ => none
 
 def foldJoin (join : Join) (acc : ValueTy) : List ValueTy → Option ValueTy
   | [] => some acc
@@ -143,7 +155,7 @@ theorem inferred_nonvoid_has_sound_shape
       simp [inferReturn, hv] at h
   | cons first rest =>
       constructor
-      · simp
+      · simp [hv]
       · cases hb : summary.hasBare <;>
         cases hp : summary.allPathsValueOrThrow <;>
         cases hj : foldJoin join first rest <;>
