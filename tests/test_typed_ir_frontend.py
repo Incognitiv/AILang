@@ -93,6 +93,22 @@ end
     )
 
 
+def test_exact_f128_literal_lexeme_survives_parser_and_typed_ir() -> None:
+    function = _lower("""
+quad exact_quad():
+    return 1.234567890123456789012345678901234q
+end
+""")
+
+    assert render_function(function) == "\n".join(
+        [
+            "func exact_quad() -> f128",
+            "%t0:f128 = const.float 1.234567890123456789012345678901234",
+            "ret %t0:f128",
+        ]
+    )
+
+
 def test_typed_locals_and_nested_expressions_lower_to_ssa() -> None:
     function = _lower("""
 double compute(float a, double b):
@@ -144,17 +160,6 @@ end
 """)).parse_program()
 
     with pytest.raises(IRLoweringError, match="does not allow local shadowing"):
-        lower_program(program)
-
-
-def test_f128_literal_fails_closed_until_parser_retains_exact_lexeme() -> None:
-    program = Parser(tokenize("""
-quad exact_quad():
-    return 1.25q
-end
-""")).parse_program()
-
-    with pytest.raises(IRLoweringError, match="cannot preserve an f128 literal yet"):
         lower_program(program)
 
 
