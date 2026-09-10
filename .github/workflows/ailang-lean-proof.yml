@@ -37,7 +37,6 @@ jobs:
           lint: false
           leanchecker: true
           leanchecker-args: AILangProof
-          nanoda: false
           axiom-audit: true
           axiom-audit-root: AILangProof
           axiom-audit-allow: propext,Classical.choice,Quot.sound
