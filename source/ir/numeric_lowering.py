@@ -1,4 +1,4 @@
-"""Typed-IR planning for fixed numeric binary return expressions."""
+"""Typed-IR lowering for fixed numeric binary return expressions."""
 
 from __future__ import annotations
 
@@ -37,21 +37,14 @@ def _coerce(
     return result
 
 
-def lower_numeric_binary_return(
+def lower_numeric_binary_values(
     operator: str,
-    left_type: str,
-    right_type: str,
+    left: Value,
+    right: Value,
     return_type: str,
 ) -> Block:
-    """Lower one numeric binary expression followed by a typed return.
+    """Lower typed operands, preserving their actual SSA/source identities."""
 
-    Every implicit conversion is materialized as an IR node. This makes the
-    binary instruction itself type-uniform and leaves no narrowing/widening
-    decision for C, LLVM, JIT, or future native backends to invent.
-    """
-
-    left = Value("%arg0", canonical_type_name(left_type))
-    right = Value("%arg1", canonical_type_name(right_type))
     joined = join_numeric_types(left.type_name, right.type_name)
     if joined is None:
         raise IRLoweringError(
@@ -68,3 +61,16 @@ def lower_numeric_binary_return(
     returned = _coerce(result, return_type, instructions)
     instructions.append(Return(value=returned))
     return Block(instructions=tuple(instructions))
+
+
+def lower_numeric_binary_return(
+    operator: str,
+    left_type: str,
+    right_type: str,
+    return_type: str,
+) -> Block:
+    """Convenience wrapper for tests and callers that only have operand types."""
+
+    left = Value("%arg0", canonical_type_name(left_type))
+    right = Value("%arg1", canonical_type_name(right_type))
+    return lower_numeric_binary_values(operator, left, right, return_type)
