@@ -16,6 +16,7 @@ TEXT_SUFFIXES = {
     ".cpp",
     ".cxx",
     ".h",
+    ".inc",
     ".hpp",
     ".js",
     ".json",
@@ -70,22 +71,11 @@ LINE_LIMIT_EXCLUDED_PATH_PREFIXES = {
 }
 
 LINE_LIMIT_EXCLUDED_FILE_PATTERNS = (
+    # cbind specifications/probe snapshots are generated ABI data, not
+    # hand-maintained implementation source.
     "*.cbind.json",
     "*.cbind.probe.json",
     "*.cbind.bindings.c",
-    # Platform UI backends are intentionally kept as single ABI units until
-    # the UI import/split contract is stable enough to refactor safely.
-    "examples/ui/backends/ail_ui_win32_min.c",
-    "examples/ui/backends/win32_pure.ail",
-    "source/ui/wayland_pure.ail",
-    "source/ui/win32_pure.ail",
-    "stdlib/ui/paint.ail",
-    # Benchmark orchestration is an internal release tool, not public API.
-    "benchmarks/run_benchmarks.py",
-    # Runtime helper emitters are generated C fragments grouped by contract;
-    # splitting them is a separate compiler-maintenance task.
-    "source/transpiler/runtime_emit_safety.py",
-    "tests/corpus/*",
 )
 
 LOCAL_PATH_RE = re.compile(

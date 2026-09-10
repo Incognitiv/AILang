@@ -144,7 +144,7 @@ int64_t exported_answer(NativePacket packet) {
     )
 
     proc = subprocess.run(
-        [cc, "-std=gnu23", "-c", str(consumer), "-o", str(obj)],
+        [cc, "-std=gnu2x", "-c", str(consumer), "-o", str(obj)],
         cwd=tmp_path,
         capture_output=True,
         text=True,

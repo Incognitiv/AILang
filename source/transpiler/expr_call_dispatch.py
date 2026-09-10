@@ -135,6 +135,7 @@ class ExprBuiltinCallDispatcher:
             "startswith": lambda n: cg.builtin_startswith(n),
             "endswith": lambda n: cg.builtin_endswith(n),
             "str_replace": lambda n: cg.builtin_str_replace(n),
+            "str_escape_json": lambda n: cg.builtin_str_escape_json(n),
             "streq": self._builtin_streq,
             "parse_int": self._builtin_parse_int,
             "split": self._builtin_split,

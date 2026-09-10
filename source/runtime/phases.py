@@ -27,7 +27,6 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
@@ -87,10 +86,10 @@ class PhaseProfile:
         return "\n".join(lines)
 
 
-_PROFILE: Optional[PhaseProfile] = None
+_PROFILE: PhaseProfile | None = None
 
 
-def get_profile() -> Optional[PhaseProfile]:
+def get_profile() -> PhaseProfile | None:
     """Return the active profile, or None if profiling is disabled."""
     return _PROFILE
 
@@ -121,7 +120,7 @@ class Phase:
     def __init__(self, name: str) -> None:
         self.name = name
 
-    def __enter__(self) -> "Phase":
+    def __enter__(self) -> Phase:
         if _PROFILE is not None:
             _PROFILE.enter(self.name)
         return self

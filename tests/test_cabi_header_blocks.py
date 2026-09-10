@@ -178,7 +178,7 @@ int main(void) {
     )
 
     proc = subprocess.run(
-        [cc, "-std=gnu23", "-I", str(out), "-c", str(consumer), "-o", str(obj)],
+        [cc, "-std=gnu2x", "-I", str(out), "-c", str(consumer), "-o", str(obj)],
         cwd=tmp_path,
         capture_output=True,
         text=True,

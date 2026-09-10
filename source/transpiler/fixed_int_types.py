@@ -4,6 +4,7 @@ This module is intentionally backend-neutral.  A declared integer type must
 carry the same width and signedness through LLVM and C lowering; keeping the
 aliases in one table prevents the backends from silently disagreeing.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -19,7 +20,9 @@ class FixedIntInfo:
 _ALIASES: dict[str, FixedIntInfo] = {}
 
 
-def _add(bits: int, signed_names: tuple[str, ...], unsigned_names: tuple[str, ...]) -> None:
+def _add(
+    bits: int, signed_names: tuple[str, ...], unsigned_names: tuple[str, ...]
+) -> None:
     signed = FixedIntInfo(bits, False, f"i{bits}")
     unsigned = FixedIntInfo(bits, True, f"u{bits}")
     for name in signed_names:
@@ -67,7 +70,9 @@ def info_for_c_fixed(c_type: object) -> FixedIntInfo | None:
     return _C_NAMES.get(str(c_type).strip())
 
 
-def promoted_fixed_info(a: FixedIntInfo | None, b: FixedIntInfo | None) -> FixedIntInfo | None:
+def promoted_fixed_info(
+    a: FixedIntInfo | None, b: FixedIntInfo | None
+) -> FixedIntInfo | None:
     """Lossless common fixed-integer type for backend expression lowering.
 
     This mirrors AILang's return-type join: mixed signed/unsigned values need

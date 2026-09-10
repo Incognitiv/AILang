@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 from parser.ast import ASTNode, ParsedType
-from typing import Optional
 
 from token_access import token_line_at, token_type_at
 
 
-def _parse_single_param(self) -> tuple[str, ParsedType, Optional[ASTNode]]:
+def _parse_single_param(self) -> tuple[str, ParsedType, ASTNode | None]:
     """Parse a single function parameter with optional default value.
 
     Supports:
@@ -20,7 +19,7 @@ def _parse_single_param(self) -> tuple[str, ParsedType, Optional[ASTNode]]:
     """
     param_type: ParsedType = "i64"
     param_name: str
-    default_value: Optional[ASTNode] = None
+    default_value: ASTNode | None = None
 
     # Check if type comes first (builtin types or custom type identifiers)
     is_type_first = self.peek_type() in (
@@ -498,9 +497,11 @@ def parse_type(self) -> ParsedType:
         if is_unsigned:
             if base.startswith("i"):
                 base = "u" + base[1:]
-            elif base.startswith("u") or base.startswith("f"):
-                pass
-            elif base in ("string", "void", "ptr", "ptrptr", "array"):
+            elif (
+                base.startswith("u")
+                or base.startswith("f")
+                or base in ("string", "void", "ptr", "ptrptr", "array")
+            ):
                 pass
             else:
                 base = "u" + base

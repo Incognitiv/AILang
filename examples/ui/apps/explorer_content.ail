@@ -2,6 +2,7 @@
 
 import stdlib.ui.layout
 import stdlib.ui.paint
+import stdlib.ui.paint_caption
 import stdlib.ui.platform
 
 // File Explorer-style content layer. It is intentionally drawn with the same

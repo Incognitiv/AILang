@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 from token_access import token_type_at
 
 from .ast import (
@@ -575,7 +573,7 @@ _CALLABLE_TOKENS = frozenset(
 
 def parse_statement(
     self,
-) -> Optional[ASTNode]:
+) -> ASTNode | None:
     """Parse a statement using dispatch to specialized methods"""
     # Check depth limit to prevent stack overflow from deeply nested statements
     self._parse_depth += 1
@@ -593,7 +591,7 @@ def parse_statement(
         self._parse_depth -= 1
 
 
-def _parse_statement_impl(self) -> Optional[ASTNode]:
+def _parse_statement_impl(self) -> ASTNode | None:
     """Internal implementation of parse_statement."""
     token_type = self.peek_type()
     if not token_type:

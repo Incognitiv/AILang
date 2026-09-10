@@ -30,14 +30,20 @@ def emit_typed_writer_helpers(self) -> None:
     self._output.append("")
 
     self._output.append("#if defined(__SIZEOF_INT128__)")
-    self._output.append("static void ailang_write_u128(FILE *out, unsigned __int128 n) {")
+    self._output.append(
+        "static void ailang_write_u128(FILE *out, unsigned __int128 n) {"
+    )
     self._output.append("    char tmp[48]; int i = 0;")
-    self._output.append("    do { tmp[i++] = (char)('0' + (unsigned)(n % 10)); n /= 10; } while (n != 0);")
+    self._output.append(
+        "    do { tmp[i++] = (char)('0' + (unsigned)(n % 10)); n /= 10; } while (n != 0);"
+    )
     self._output.append("    while (i > 0) fputc(tmp[--i], out);")
     self._output.append("}")
     self._output.append("static void ailang_write_i128(FILE *out, __int128 n) {")
     self._output.append("    unsigned __int128 u;")
-    self._output.append("    if (n < 0) { fputc('-', out); u = (unsigned __int128)(-(n + 1)); u += 1; } else u = (unsigned __int128)n;")
+    self._output.append(
+        "    if (n < 0) { fputc('-', out); u = (unsigned __int128)(-(n + 1)); u += 1; } else u = (unsigned __int128)n;"
+    )
     self._output.append("    ailang_write_u128(out, u);")
     self._output.append("}")
     self._output.append("#endif")

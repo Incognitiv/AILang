@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from parser import ast as A
-from typing import Any, List, Optional
+from typing import Any
 
 from abi_symbols import c_symbol_for_function
 from callback_types import callback_parts, resolve_callback_alias
@@ -22,9 +22,9 @@ class _CTranspilerEmitDriverMixin:
         self._check_summary: dict[str, int] = {}
         self._format_decisions: list[dict[str, object]] = []
         self._format_summary: dict[str, int] = {}
-        self._array_len_hints: dict[tuple[Optional[str], str], int] = {}
+        self._array_len_hints: dict[tuple[str | None, str], int] = {}
         self._array_literal_value_hints: dict[
-            tuple[Optional[str], str], tuple[int, ...]
+            tuple[str | None, str], tuple[int, ...]
         ] = {}
         self._type_aliases: dict[str, Any] = {}
         self._function_nodes: dict[str, A.Function] = {}
@@ -71,7 +71,7 @@ class _CTranspilerEmitDriverMixin:
         """Emit a line without indentation."""
         self.output.append(line)
 
-    def transpile(self: Any, nodes: List[A.ASTNode], source_file: str = "") -> str:
+    def transpile(self: Any, nodes: list[A.ASTNode], source_file: str = "") -> str:
         """Transpile AST nodes to C code."""
         from runtime.phases import Phase
 
@@ -86,6 +86,7 @@ class _CTranspilerEmitDriverMixin:
         self._source_file = source_file
         # Select pure-AIL language runtime modules before imports are inlined.
         from compiler.runtime_modules import ensure_language_runtime_imports
+
         nodes = ensure_language_runtime_imports(nodes)
         # Process imports first - inline imported modules via the
         # ImportResolver service.

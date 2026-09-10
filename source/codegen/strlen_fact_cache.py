@@ -43,7 +43,7 @@ def maybe_register_strlen_fact(cg: Any, node: Assign, value: ir.Value) -> None:
     cache = getattr(cg, "_llvm_strlen_cache", None)
     if not isinstance(cache, dict):
         cache = {}
-        setattr(cg, "_llvm_strlen_cache", cache)
+        cg._llvm_strlen_cache = cache
     cache[source.name] = (node.var_name, value)
 
 
@@ -51,7 +51,7 @@ def register_strlen_fact(cg: Any, source_name: str, value: ir.Value) -> None:
     cache = getattr(cg, "_llvm_strlen_cache", None)
     if not isinstance(cache, dict):
         cache = {}
-        setattr(cg, "_llvm_strlen_cache", cache)
+        cg._llvm_strlen_cache = cache
     cache[source_name] = ("", value)
 
 
@@ -72,7 +72,7 @@ def register_value_strlen_fact(cg: Any, value: ir.Value, length: ir.Value) -> No
     cache = getattr(cg, "_llvm_value_strlen_cache", None)
     if not isinstance(cache, dict):
         cache = {}
-        setattr(cg, "_llvm_value_strlen_cache", cache)
+        cg._llvm_value_strlen_cache = cache
     cache[id(value)] = length
 
 

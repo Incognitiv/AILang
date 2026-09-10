@@ -6,9 +6,10 @@ private C storage when range facts prove the value set fits a narrower type.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from parser import ast as A
 from parser.ast import parsed_type_to_str
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any
 
 from abi_symbols import explicit_c_abi_parts, has_export_decorator
 
@@ -17,15 +18,15 @@ I32_HIGH = (1 << 31) - 1
 
 
 def apply_proven_i32_narrowing(
-    owner: Any, node: A.Function, all_vars: Dict[str, str]
-) -> Dict[str, str]:
+    owner: Any, node: A.Function, all_vars: dict[str, str]
+) -> dict[str, str]:
     """Narrow private i64 params/locals to i32 where range facts prove safety."""
 
     facts = getattr(owner, "range_facts", None)
     if facts is None:
         return {}
 
-    param_overrides: Dict[str, str] = {}
+    param_overrides: dict[str, str] = {}
     if _can_narrow_function(owner, node):
         param_overrides = _narrow_params(owner, node, facts)
 
@@ -67,14 +68,14 @@ def _can_narrow_function(owner: Any, node: A.Function) -> bool:
 
 def _narrow_params(
     owner: Any, node: A.Function, facts: Any, mutate_ast: bool = False
-) -> Dict[str, str]:
+) -> dict[str, str]:
     hints = getattr(facts, "call_arg_ranges", {}).get(node.name, {})
     if not hints:
         return {}
     scope_ranges = getattr(facts, "scope_ranges", {}).get(node.name, {})
     assigned = _assigned_names(node.body)
-    overrides: Dict[str, str] = {}
-    param_types: List[str] = []
+    overrides: dict[str, str] = {}
+    param_types: list[str] = []
     current = getattr(owner, "functions", {}).get(node.name)
     if current is not None:
         param_types = list(current[0])
@@ -106,8 +107,8 @@ def _narrow_params(
 
 
 def _narrow_locals(
-    owner: Any, node: A.Function, facts: Any, all_vars: Dict[str, str]
-) -> Tuple[str, ...]:
+    owner: Any, node: A.Function, facts: Any, all_vars: dict[str, str]
+) -> tuple[str, ...]:
     """Keep default integer locals at their language-level storage width.
 
     Stored-value ranges do not prove that all uses fit i32, and taking a
@@ -118,7 +119,7 @@ def _narrow_locals(
     return ()
 
 
-def _param_name_type(param: Any) -> Tuple[Optional[str], str]:
+def _param_name_type(param: Any) -> tuple[str | None, str]:
     if isinstance(param, tuple):
         if not param:
             return None, ""
@@ -157,17 +158,17 @@ def _fits_i32_interval(interval: object) -> bool:
 def _assigned_names(body: Iterable[A.ASTNode]) -> set[str]:
     assigned: set[str] = set()
     for node in _walk_nodes(body):
-        if isinstance(node, A.Assign):
-            assigned.add(node.var_name)
-        elif isinstance(node, A.VarDecl):
-            assigned.add(node.var_name)
-        elif isinstance(node, A.RangeVarDecl):
+        if (
+            isinstance(node, A.Assign)
+            or isinstance(node, A.VarDecl)
+            or isinstance(node, A.RangeVarDecl)
+        ):
             assigned.add(node.var_name)
     return assigned
 
 
-def _assignment_values_for(name: str, body: Iterable[A.ASTNode]) -> List[A.ASTNode]:
-    values: List[A.ASTNode] = []
+def _assignment_values_for(name: str, body: Iterable[A.ASTNode]) -> list[A.ASTNode]:
+    values: list[A.ASTNode] = []
     for node in _walk_nodes(body):
         if isinstance(node, A.Assign) and node.var_name == name:
             values.append(node.value)

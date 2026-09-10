@@ -1,26 +1,26 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from parser import ast as A
-from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 from transpiler.array_literal_hints import get_array_literal_values
 
 INT64_MIN = -(1 << 63)
 INT64_MAX = (1 << 63) - 1
-IntRange = Tuple[int, int]
-FieldKey = Tuple[str, str]
+IntRange = tuple[int, int]
+FieldKey = tuple[str, str]
 
 
 @dataclass(frozen=True)
 class RangeSnapshot:
-    int_ranges: Dict[str, IntRange]
-    field_ranges: Dict[FieldKey, IntRange]
-    fixed_dict_ranges: Dict[str, Dict[str, IntRange]]
-    string_length_ranges: Dict[str, IntRange]
+    int_ranges: dict[str, IntRange]
+    field_ranges: dict[FieldKey, IntRange]
+    fixed_dict_ranges: dict[str, dict[str, IntRange]]
+    string_length_ranges: dict[str, IntRange]
 
 
-def _literal_key(node: A.ASTNode) -> Optional[str]:
+def _literal_key(node: A.ASTNode) -> str | None:
     if isinstance(node, A.StringLit):
         return node.value
     return None
@@ -44,11 +44,11 @@ def _range_mul(left: IntRange, right: IntRange) -> IntRange:
     return (min(vals), max(vals))
 
 
-def range_fits_int64(rng: Optional[IntRange]) -> bool:
+def range_fits_int64(rng: IntRange | None) -> bool:
     return rng is not None and INT64_MIN <= rng[0] and rng[1] <= INT64_MAX
 
 
-def range_fits_signed_width(rng: Optional[IntRange], width: int) -> bool:
+def range_fits_signed_width(rng: IntRange | None, width: int) -> bool:
     if rng is None or width <= 0:
         return False
     low = -(1 << (width - 1))
@@ -56,7 +56,7 @@ def range_fits_signed_width(rng: Optional[IntRange], width: int) -> bool:
     return low <= rng[0] and rng[1] <= high
 
 
-def range_is_positive(rng: Optional[IntRange]) -> bool:
+def range_is_positive(rng: IntRange | None) -> bool:
     return rng is not None and rng[0] > 0
 
 
@@ -133,7 +133,7 @@ def _value_contains_call(value: object) -> bool:
     return False
 
 
-def _parse_c_int_literal(text: str) -> Optional[int]:
+def _parse_c_int_literal(text: str) -> int | None:
     value = text.strip()
     while value.startswith("(") and value.endswith(")"):
         value = value[1:-1].strip()
@@ -145,7 +145,7 @@ def _parse_c_int_literal(text: str) -> Optional[int]:
         return None
 
 
-def _decimal_len_range(rng: Optional[IntRange]) -> Optional[IntRange]:
+def _decimal_len_range(rng: IntRange | None) -> IntRange | None:
     if rng is None:
         return None
     low, high = rng
@@ -157,7 +157,7 @@ def _decimal_len_range(rng: Optional[IntRange]) -> Optional[IntRange]:
     return (1, len(str(max_abs)) + 1)
 
 
-def _single_call_arg(call: A.Call) -> Optional[A.ASTNode]:
+def _single_call_arg(call: A.Call) -> A.ASTNode | None:
     if len(call.args) != 1:
         return None
     for arg in call.args:
@@ -165,7 +165,7 @@ def _single_call_arg(call: A.Call) -> Optional[A.ASTNode]:
     return None
 
 
-def expr_string_length_range(self, expr: A.ASTNode) -> Optional[IntRange]:
+def expr_string_length_range(self, expr: A.ASTNode) -> IntRange | None:
     if isinstance(expr, A.Variable):
         return getattr(self, "_codegen_string_length_ranges", {}).get(expr.name)
     if isinstance(expr, A.StringLit):
@@ -180,7 +180,7 @@ def expr_string_length_range(self, expr: A.ASTNode) -> Optional[IntRange]:
     if isinstance(expr, A.InterpolatedString):
         total: IntRange = (0, 0)
         for part in expr.parts:
-            part_range: Optional[IntRange]
+            part_range: IntRange | None
             if isinstance(part, str):
                 length = len(part.encode("utf-8"))
                 part_range = (length, length)
@@ -202,7 +202,7 @@ def expr_string_length_range(self, expr: A.ASTNode) -> Optional[IntRange]:
     return None
 
 
-def expr_int_range(self, expr: A.ASTNode) -> Optional[IntRange]:
+def expr_int_range(self, expr: A.ASTNode) -> IntRange | None:
     if isinstance(expr, A.Number) and isinstance(expr.value, int):
         return (int(expr.value), int(expr.value))
     if isinstance(expr, A.Variable):
@@ -253,7 +253,7 @@ def range_assignment_proven(
     return rng is not None and low <= rng[0] and rng[1] <= high_limit
 
 
-def _fixed_dict_range(self, var_name: str, key: Optional[str]) -> Optional[IntRange]:
+def _fixed_dict_range(self, var_name: str, key: str | None) -> IntRange | None:
     if key is None:
         return None
     ranges = getattr(self, "_fixed_dict_value_ranges", {})
@@ -262,7 +262,7 @@ def _fixed_dict_range(self, var_name: str, key: Optional[str]) -> Optional[IntRa
 
 def _array_access_range(
     self, array_name: str, index_expr: A.ASTNode
-) -> Optional[IntRange]:
+) -> IntRange | None:
     index_rng = expr_int_range(self, index_expr)
     values = get_array_literal_values(self, array_name)
     if (
@@ -300,7 +300,7 @@ def _array_access_range(
     return _interval_to_range(elem_interval)
 
 
-def _interval_to_range(interval: object) -> Optional[IntRange]:
+def _interval_to_range(interval: object) -> IntRange | None:
     low = getattr(interval, "low", None)
     high = getattr(interval, "high", None)
     if low is None or high is None:
@@ -310,7 +310,7 @@ def _interval_to_range(interval: object) -> Optional[IntRange]:
 
 def remember_assign_range(self, var_name: str, expr: A.ASTNode) -> None:
     remember_string_length_range(self, var_name, expr)
-    ranges: Dict[str, IntRange] = getattr(self, "_codegen_int_ranges", {})
+    ranges: dict[str, IntRange] = getattr(self, "_codegen_int_ranges", {})
     rng = expr_int_range(self, expr)
     if rng is None:
         ranges.pop(var_name, None)
@@ -322,7 +322,7 @@ def remember_assign_range(self, var_name: str, expr: A.ASTNode) -> None:
 
 
 def remember_string_length_range(self, var_name: str, expr: A.ASTNode | None) -> None:
-    ranges: Dict[str, IntRange] = getattr(self, "_codegen_string_length_ranges", {})
+    ranges: dict[str, IntRange] = getattr(self, "_codegen_string_length_ranges", {})
     rng = expr_string_length_range(self, expr) if expr is not None else None
     if rng is None:
         ranges.pop(var_name, None)
@@ -336,7 +336,7 @@ def remember_field_assign_range(
 ) -> None:
     if not isinstance(object_expr, A.Variable):
         return
-    ranges: Dict[FieldKey, IntRange] = getattr(self, "_codegen_field_int_ranges", {})
+    ranges: dict[FieldKey, IntRange] = getattr(self, "_codegen_field_int_ranges", {})
     key = (object_expr.name, field_name)
     rng = expr_int_range(self, expr)
     if rng is None:
@@ -361,7 +361,7 @@ def remember_fixed_dict_range(self, dict_name: str, key: str, expr: A.ASTNode) -
     self._fixed_dict_value_ranges = ranges
 
 
-def clear_loop_variant_ranges(self, body: List[A.ASTNode]) -> None:
+def clear_loop_variant_ranges(self, body: list[A.ASTNode]) -> None:
     _clear_loop_variant_ranges(self, body, set())
 
 
@@ -392,7 +392,7 @@ def restore_codegen_ranges(self, snapshot: RangeSnapshot) -> None:
 
 
 def merge_codegen_ranges(
-    self, left: RangeSnapshot, right: RangeSnapshot, *, source_if: Optional[A.If] = None
+    self, left: RangeSnapshot, right: RangeSnapshot, *, source_if: A.If | None = None
 ) -> None:
     self._codegen_int_ranges = _join_range_map(left.int_ranges, right.int_ranges)
     self._codegen_field_int_ranges = _join_range_map(
@@ -408,7 +408,7 @@ def merge_codegen_ranges(
         _apply_post_if_refinements(self, source_if, left)
 
 
-def _join_range_map(left: Dict, right: Dict) -> Dict:
+def _join_range_map(left: dict, right: dict) -> dict:
     joined = {}
     for key, left_range in left.items():
         right_range = right.get(key)
@@ -422,9 +422,9 @@ def _join_range_map(left: Dict, right: Dict) -> Dict:
 
 
 def _join_fixed_dict_ranges(
-    left: Dict[str, Dict[str, IntRange]], right: Dict[str, Dict[str, IntRange]]
-) -> Dict[str, Dict[str, IntRange]]:
-    joined: Dict[str, Dict[str, IntRange]] = {}
+    left: dict[str, dict[str, IntRange]], right: dict[str, dict[str, IntRange]]
+) -> dict[str, dict[str, IntRange]]:
+    joined: dict[str, dict[str, IntRange]] = {}
     for dict_name, left_values in left.items():
         right_values = right.get(dict_name)
         if right_values is None:
@@ -447,7 +447,7 @@ def _apply_post_if_refinements(
             and before_range[0] >= 0
             and before_range[1] <= (limit * 2)
         ):
-            ranges: Dict[str, IntRange] = getattr(self, "_codegen_int_ranges", {})
+            ranges: dict[str, IntRange] = getattr(self, "_codegen_int_ranges", {})
             ranges[var_name] = (0, limit)
             self._codegen_int_ranges = ranges
     _apply_exiting_guard_refinement(self, node, before_snapshot)
@@ -464,20 +464,20 @@ def _apply_exiting_guard_refinement(
     if refinement is None:
         return
     var_name, refined = refinement
-    ranges: Dict[str, IntRange] = getattr(self, "_codegen_int_ranges", {})
+    ranges: dict[str, IntRange] = getattr(self, "_codegen_int_ranges", {})
     ranges[var_name] = refined
     self._codegen_int_ranges = ranges
 
 
-def _body_exits_current_path(body: List[A.ASTNode]) -> bool:
+def _body_exits_current_path(body: list[A.ASTNode]) -> bool:
     if not body:
         return False
     return isinstance(body[-1], (A.Break, A.Continue, A.Return, A.Throw))
 
 
 def _false_eq_refinement(
-    self, cond: A.ASTNode, before_ranges: Dict[str, IntRange]
-) -> Optional[Tuple[str, IntRange]]:
+    self, cond: A.ASTNode, before_ranges: dict[str, IntRange]
+) -> tuple[str, IntRange] | None:
     if not isinstance(cond, A.BinaryOp) or cond.op != "==":
         return None
     left = cond.left
@@ -505,7 +505,7 @@ def _false_eq_refinement(
     return None
 
 
-def _declared_range_var_bounds(self, var_name: str) -> Optional[IntRange]:
+def _declared_range_var_bounds(self, var_name: str) -> IntRange | None:
     range_vars = getattr(self, "_range_vars", {})
     target = range_vars.get(var_name)
     if target is None:
@@ -518,7 +518,7 @@ def _declared_range_var_bounds(self, var_name: str) -> Optional[IntRange]:
     return (low, high - 1 if exclusive else high)
 
 
-def _clamp_if_pattern(node: A.ASTNode) -> Optional[Tuple[str, int]]:
+def _clamp_if_pattern(node: A.ASTNode) -> tuple[str, int] | None:
     if not isinstance(node, A.If) or node.else_body:
         return None
     if getattr(node, "elsif_branches", None):
@@ -554,7 +554,7 @@ def _clamp_if_pattern(node: A.ASTNode) -> Optional[Tuple[str, int]]:
 
 
 def _clear_loop_variant_ranges(
-    self, body: List[A.ASTNode], preserved: Set[str]
+    self, body: list[A.ASTNode], preserved: set[str]
 ) -> None:
     assigned = _assigned_vars(body)
     ranges = getattr(self, "_codegen_int_ranges", {})
@@ -570,8 +570,8 @@ def _clear_loop_variant_ranges(
     _merge_loop_field_ranges(self, body)
 
 
-def _assigned_vars(body: Iterable[A.ASTNode]) -> Set[str]:
-    assigned: Set[str] = set()
+def _assigned_vars(body: Iterable[A.ASTNode]) -> set[str]:
+    assigned: set[str] = set()
 
     def walk(node: A.ASTNode) -> None:
         if node is None:
@@ -603,14 +603,14 @@ def _assigned_vars(body: Iterable[A.ASTNode]) -> Set[str]:
     return assigned
 
 
-def _field_key(node: A.FieldAccess) -> Optional[FieldKey]:
+def _field_key(node: A.FieldAccess) -> FieldKey | None:
     if isinstance(node.object_expr, A.Variable):
         return (node.object_expr.name, node.field_name)
     return None
 
 
 def _clear_field_ranges_for_var(self, var_name: str) -> None:
-    ranges: Dict[FieldKey, IntRange] = getattr(self, "_codegen_field_int_ranges", {})
+    ranges: dict[FieldKey, IntRange] = getattr(self, "_codegen_field_int_ranges", {})
     if ranges:
         self._codegen_field_int_ranges = {
             key: rng for key, rng in ranges.items() if key[0] != var_name
@@ -623,7 +623,7 @@ def _remember_record_init_ranges(self, var_name: str, expr: A.ASTNode) -> None:
     fields = getattr(self, "record_fields", {}).get(expr.type_name)
     if not fields:
         return
-    ranges: Dict[FieldKey, IntRange] = getattr(self, "_codegen_field_int_ranges", {})
+    ranges: dict[FieldKey, IntRange] = getattr(self, "_codegen_field_int_ranges", {})
     for field_info, arg in zip(fields, expr.args):
         field_name = str(field_info[0])
         rng = expr_int_range(self, arg)
@@ -636,7 +636,7 @@ def _merge_loop_field_ranges(self, body: Iterable[A.ASTNode]) -> None:
     field_assigns = _assigned_field_exprs(body)
     if not field_assigns:
         return
-    ranges: Dict[FieldKey, IntRange] = getattr(self, "_codegen_field_int_ranges", {})
+    ranges: dict[FieldKey, IntRange] = getattr(self, "_codegen_field_int_ranges", {})
     for key, exprs in field_assigns.items():
         if key not in ranges:
             continue
@@ -655,8 +655,8 @@ def _merge_loop_field_ranges(self, body: Iterable[A.ASTNode]) -> None:
     self._codegen_field_int_ranges = ranges
 
 
-def _assigned_field_exprs(body: Iterable[A.ASTNode]) -> Dict[FieldKey, List[A.ASTNode]]:
-    assigned: Dict[FieldKey, List[A.ASTNode]] = {}
+def _assigned_field_exprs(body: Iterable[A.ASTNode]) -> dict[FieldKey, list[A.ASTNode]]:
+    assigned: dict[FieldKey, list[A.ASTNode]] = {}
 
     def walk(node: A.ASTNode) -> None:
         if node is None:

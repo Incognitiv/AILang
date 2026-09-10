@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import importlib.util
 import os
-from typing import Any, Callable, List, Optional, Tuple
+from collections.abc import Callable
+from typing import Any
 
 # Import AILang lexer - handle both package and direct execution
-TokenList = List[Tuple[Any, ...]]
+TokenList = list[tuple[Any, ...]]
 TokenizeFunc = Callable[[str], TokenList]
 
 _tokenize_func: TokenizeFunc
@@ -60,7 +61,7 @@ def levenshtein(s1: str, s2: str) -> int:
     return prev_row[-1]
 
 
-def find_closest(name: str, candidates: set, max_distance: int = 2) -> Optional[str]:
+def find_closest(name: str, candidates: set, max_distance: int = 2) -> str | None:
     """Find the closest match to 'name' from candidates."""
     best_match = None
     best_distance = max_distance + 1

@@ -7,8 +7,9 @@ This module is the semantic parser for the UI authoring surface.
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from pathlib import Path
-from typing import NamedTuple, Sequence
+from typing import NamedTuple
 
 from lexer.scan import tokenize, unescape_string
 

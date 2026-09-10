@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Callable, Dict, List
+from collections.abc import Callable
 
 
-def win32_c_builtin_mappings() -> Dict[str, Callable[[List[str]], str]]:
+def win32_c_builtin_mappings() -> dict[str, Callable[[list[str]], str]]:
     """Return C expressions for typed Win32/HCS runtime helpers."""
     return {
         "win32_load_library": lambda a: f"ailang_win32_load_library({a[0]})",

@@ -83,32 +83,19 @@ end
     assert run.stdout.strip() == expected
 
 
-def test_c_backend_rejects_unbounded_instead_of_silent_i64_truncation():
+def test_c_backend_unbounded_preserves_arbitrary_precision():
     source = r"""
 def main(): int
-    unbounded x = 1
-    print x
+    unbounded x = 1267650600228229401496703205376
+    unbounded y = 7
+    unbounded z = x + y
+    print z
     return 0
 end
 """
-    with tempfile.TemporaryDirectory() as td:
-        tmp = Path(td)
-        src = tmp / "unbounded.ail"
-        exe = tmp / "unbounded"
-        src.write_text(source, encoding="utf-8")
-        build = subprocess.run(
-            [sys.executable, str(AILANG), str(src), "--backend=c", "-O2", "-o", str(exe)],
-            cwd=REPO_ROOT,
-            capture_output=True,
-            text=True,
-            timeout=180,
-            check=False,
-        )
-        assert build.returncode != 0
-        text = build.stdout + "\n" + build.stderr
-        assert "unbounded" in text
-        assert "arbitrary-precision" in text
-
+    _build, run = _compile_and_run(source)
+    assert run.returncode == 0, run.stdout + "\n" + run.stderr
+    assert run.stdout.strip() == "1267650600228229401496703205383"
 
 def test_c_backend_wide_decimal_and_base_formatting_do_not_truncate():
     source = r'''

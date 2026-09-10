@@ -65,9 +65,9 @@ def report_optimizer(source_file: str, *, as_json: bool = False) -> bool:
         return True
 
     print(f"Optimizer report for: {source_file}")
-    print("")
+    print()
     _print_backend_report("c", c_summary, c_decisions)
-    print("")
+    print()
     _print_backend_report("llvm", llvm_summary, llvm_decisions)
     return True
 
@@ -82,7 +82,7 @@ def _print_backend_report(
         print("summary:")
         for key in sorted(summary):
             print(f"  {key}={summary[key]}")
-    print("")
+    print()
     print("decisions:")
     if not decisions:
         print("  (none)")

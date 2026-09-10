@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import warnings
 from parser.ast import RangeType, parsed_type_to_str
-from typing import Any, Optional
+from typing import Any
 
 from callback_types import callback_parts, is_callback_type, resolve_callback_alias
 from codegen.codegen import CodeGenError
@@ -251,18 +250,14 @@ class TypeLowering:
             if type_spec and type_spec[0].isupper() and not type_spec.isupper():
                 return ir.IntType(8).as_pointer()
 
-        # Unknown type - warn and fall back to i64 for compatibility.
-        # This should ideally be a hard error, but some stdlib C function
-        # declarations rely on the fallback.  Emit a warning so callers
-        # notice the silent coercion.
-
-        warnings.warn(
-            f"get_llvm_type: unknown type '{type_spec}', defaulting to i64",
-            stacklevel=2,
+        # Mistus-style executable-boundary rule: catalog/syntax recognition
+        # is not permission to fabricate a representation.  Falling back to
+        # i64 made type-collector bugs silently erase i128..i8192 semantics.
+        raise CodeGenError(
+            f"LLVM backend: no executable representation for AILang type {type_spec!r}"
         )
-        return ir.IntType(64)
 
-    def get_variable_class_type(self, var_name: str) -> Optional[str]:
+    def get_variable_class_type(self, var_name: str) -> str | None:
         """Get the class type of a variable if it was annotated with a class type.
 
         Checks:
@@ -275,8 +270,7 @@ class TypeLowering:
         if self.current_function:
             func_name = self.current_function.name
             # Remove underscore prefix if private function
-            if func_name.startswith("_"):
-                func_name = func_name[1:]
+            func_name = func_name.removeprefix("_")
 
             key = (func_name, var_name)
             if key in self.param_class_types:

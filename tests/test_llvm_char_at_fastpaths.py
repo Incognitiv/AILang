@@ -336,4 +336,7 @@ end
 """
     ir_text = _to_ir(src)
     assert "arena_total_size" in ir_text
-    assert "request_arena_slot" in ir_text
+    # Request arenas are cross-function state now, so allocation sites load the
+    # module-global request arena instead of depending on a main-local alloca.
+    assert "__ailang_request_arena" in ir_text
+    assert "req_arena_load" in ir_text

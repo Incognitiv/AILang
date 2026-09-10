@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 from parser import ast as A
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from ast_access import arg_at
 
 from .range_facts_types import Interval, StringInfo
 
-DictState = Dict[str, Dict[str, Interval]]
+DictState = dict[str, dict[str, Interval]]
 
 
-def dict_state_from_facts(facts: Any, func_scope: Optional[str]) -> DictState:
+def dict_state_from_facts(facts: Any, func_scope: str | None) -> DictState:
     state: DictState = {}
     for scope_name in (None, func_scope):
         scoped = facts.dict_value_infos.get(scope_name, {})
@@ -25,11 +25,11 @@ def expr_interval_with_loop_state(
     expr: A.ASTNode,
     *,
     facts: Any,
-    func_scope: Optional[str],
-    scope: Dict[str, Any],
+    func_scope: str | None,
+    scope: dict[str, Any],
     dict_state: DictState,
-    transient_strings: Dict[str, StringInfo],
-) -> Optional[Interval]:
+    transient_strings: dict[str, StringInfo],
+) -> Interval | None:
     if isinstance(expr, A.Number) and isinstance(expr.value, int):
         return Interval(int(expr.value), int(expr.value))
     if isinstance(expr, A.Variable):
@@ -98,7 +98,7 @@ def expr_interval_with_loop_state(
     return facts._expr_interval(expr, func_scope, dict(scope))
 
 
-def literal_dict_key_access(expr: A.ASTNode) -> Optional[Tuple[str, str]]:
+def literal_dict_key_access(expr: A.ASTNode) -> tuple[str, str] | None:
     if isinstance(expr, A.ArrayAccess):
         if isinstance(expr.array, A.Variable) and isinstance(expr.index, A.StringLit):
             return expr.array.name, expr.index.value
@@ -110,7 +110,7 @@ def literal_dict_key_access(expr: A.ASTNode) -> Optional[Tuple[str, str]]:
     return None
 
 
-def literal_dict_assignment(node: A.ASTNode) -> Optional[Tuple[str, str, A.ASTNode]]:
+def literal_dict_assignment(node: A.ASTNode) -> tuple[str, str, A.ASTNode] | None:
     if not isinstance(node, A.DictAssign):
         return None
     if not isinstance(node.dict_expr, A.Variable):
@@ -122,7 +122,7 @@ def literal_dict_assignment(node: A.ASTNode) -> Optional[Tuple[str, str, A.ASTNo
 
 def self_accumulator_growth_terms(
     var_name: str, expr: A.ASTNode
-) -> Optional[List[A.ASTNode]]:
+) -> list[A.ASTNode] | None:
     terms = _flatten_add(expr)
     if not terms:
         return None
@@ -132,7 +132,7 @@ def self_accumulator_growth_terms(
     return terms[1:]
 
 
-def _flatten_add(expr: A.ASTNode) -> List[A.ASTNode]:
+def _flatten_add(expr: A.ASTNode) -> list[A.ASTNode]:
     if isinstance(expr, A.BinaryOp) and expr.op == "+":
         return _flatten_add(expr.left) + _flatten_add(expr.right)
     return [expr]

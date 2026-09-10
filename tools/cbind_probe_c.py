@@ -341,7 +341,7 @@ def probe_binding_spec(
         source_path.write_text(_render_c_probe_source(spec), encoding="utf-8")
         cmd = [
             selected_compiler,
-            "-std=gnu23",
+            "-std=gnu2x",
             str(source_path),
             "-o",
             str(exe_path),

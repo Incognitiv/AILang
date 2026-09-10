@@ -18,7 +18,6 @@ from __future__ import annotations
 
 from parser import ast as A
 from parser.ast import parsed_type_to_str
-from typing import List, Optional
 
 from transpiler.type_info import TypeInfo
 
@@ -36,7 +35,7 @@ class VarTypingScanner:
     # well before the third pass on every test case we have.
     _MAX_ITERATIONS = 3
 
-    def run(self, nodes: List[A.ASTNode], type_info: TypeInfo) -> None:
+    def run(self, nodes: list[A.ASTNode], type_info: TypeInfo) -> None:
         """Populate the var-typing fields of ``type_info`` in place.
 
         The five top-level mutable sets / dicts (``string_vars``,
@@ -67,7 +66,7 @@ class VarTypingScanner:
     def _scan_assigns(
         self,
         node: A.ASTNode,
-        func_scope: Optional[str],
+        func_scope: str | None,
         type_info: TypeInfo,
     ) -> None:
         """Recurse into the AST recording type info at bindings."""
@@ -114,7 +113,7 @@ class VarTypingScanner:
     def _process_assign(
         self,
         node: A.Assign,
-        func_scope: Optional[str],
+        func_scope: str | None,
         type_info: TypeInfo,
     ) -> None:
         """Classify a single Assign's RHS and record the LHS into the
@@ -150,7 +149,7 @@ class VarTypingScanner:
     def _process_var_decl(
         self,
         node: A.VarDecl,
-        func_scope: Optional[str],
+        func_scope: str | None,
         type_info: TypeInfo,
     ) -> None:
         """Classify declaration bindings before C emission.
@@ -161,11 +160,10 @@ class VarTypingScanner:
         addition in the C backend.
         """
         declared = parsed_type_to_str(node.type_name).lower() if node.type_name else ""
-        if declared in ("string", "str", "char *", "const char *"):
-            type_info.var_types[node.var_name] = "string"
-            self._add_string_var(node.var_name, func_scope, type_info)
-        elif node.init_value is not None and type_info.might_be_string_static(
-            node.init_value, func_scope
+        if (
+            declared in ("string", "str", "char *", "const char *")
+            or node.init_value is not None
+            and type_info.might_be_string_static(node.init_value, func_scope)
         ):
             type_info.var_types[node.var_name] = "string"
             self._add_string_var(node.var_name, func_scope, type_info)
@@ -183,7 +181,7 @@ class VarTypingScanner:
 
     @staticmethod
     def _add_string_var(
-        var_name: str, func_scope: Optional[str], type_info: TypeInfo
+        var_name: str, func_scope: str | None, type_info: TypeInfo
     ) -> None:
         if func_scope not in type_info.string_vars:
             type_info.string_vars[func_scope] = set()
@@ -191,7 +189,7 @@ class VarTypingScanner:
 
     @staticmethod
     def _add_vec256_var(
-        var_name: str, func_scope: Optional[str], type_info: TypeInfo
+        var_name: str, func_scope: str | None, type_info: TypeInfo
     ) -> None:
         if func_scope not in type_info.vec256_vars:
             type_info.vec256_vars[func_scope] = set()
@@ -199,7 +197,7 @@ class VarTypingScanner:
 
     @staticmethod
     def _add_vec512_var(
-        var_name: str, func_scope: Optional[str], type_info: TypeInfo
+        var_name: str, func_scope: str | None, type_info: TypeInfo
     ) -> None:
         if func_scope not in type_info.vec512_vars:
             type_info.vec512_vars[func_scope] = set()
@@ -208,9 +206,9 @@ class VarTypingScanner:
     @staticmethod
     def _get_vec_type_from_call(
         call_node: A.Call,
-        func_scope: Optional[str],
+        func_scope: str | None,
         type_info: TypeInfo,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Infer the vector lane width of a ``vec_*(...)`` call.
 
         Two information sources: an explicit ``vec_type`` string

@@ -374,7 +374,9 @@ def parse_extern_record(self) -> ExternRecordDef:
         self.consume("IDENT")
         layout_align = _consume_layout_int(self)
         if self.peek_type() != "COLON":
-            self.error("Expected ':' after extern record layout; 'then' is not valid for record declarations")
+            self.error(
+                "Expected ':' after extern record layout; 'then' is not valid for record declarations"
+            )
         self.consume("COLON")
         self.skip_newlines()
 

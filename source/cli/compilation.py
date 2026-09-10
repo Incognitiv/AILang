@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import shlex
 import shutil
 import subprocess
 import sys
@@ -28,13 +27,19 @@ from pgo.llvm_toolchain import resolve_llvm_tool, same_llvm_root_tool
 from pgo.paths import default_pgo_output_dir as _pgo_default_output_dir
 from pgo.paths import sanitize_stem as _pgo_sanitize_stem
 from pgo.paths import source_identity_tag as _pgo_source_identity_tag
-from target_info import normalize_os_name, os_from_platform, target_matches
+from target_info import os_from_platform
+
+from .link_flags import (
+    _extract_ailang_link_flags,
+    _merge_link_flags,
+    _normalize_native_toolchain,
+)
 
 LLVM_OPT_TIMEOUT_SECONDS = 30
 LLVM_CLANG_TIMEOUT_SECONDS = 120
 LLVM_LLC_TIMEOUT_SECONDS = 120
 LLVM_LINK_TIMEOUT_SECONDS = 120
-CBACKEND_COMPILE_TIMEOUT_SECONDS = 60
+CBACKEND_COMPILE_TIMEOUT_SECONDS = 180
 REPO_ROOT = Path(__file__).resolve().parents[2]
 GENERATED_ROOT = REPO_ROOT / "out" / "generated"
 MINGW_TARGET_TRIPLE = "x86_64-w64-windows-gnu"
@@ -47,92 +52,6 @@ def _normalize_mingw_vararg_symbols(ir_code: str) -> str:
     return ir_code.replace('@"printf"', '@"__mingw_printf"').replace(
         "@printf(", "@__mingw_printf("
     )
-
-
-def _split_ailang_link_flags(raw_flags: str) -> list[str]:
-    """Split one #link payload into subprocess-safe argv tokens."""
-    raw_flags = (raw_flags or "").strip()
-    if not raw_flags:
-        return []
-    try:
-        flags = shlex.split(raw_flags, posix=True)
-    except ValueError as exc:
-        raise ValueError(f"invalid #link flags {raw_flags!r}: {exc}") from exc
-    bad = [flag for flag in flags if "\x00" in flag or "\n" in flag or "\r" in flag]
-    if bad:
-        raise ValueError(f"invalid #link flag contains control character: {bad[0]!r}")
-    return flags
-
-
-def _split_targeted_link_payload(raw: str) -> tuple[str | None, str]:
-    """Split optional target prefix from a #link payload."""
-    payload = raw.strip()
-    if not payload or payload[0] in {'"', "-"}:
-        return None, payload
-    parts = payload.split(None, 1)
-    if len(parts) != 2:
-        return None, payload
-    target, remainder = parts
-    if any(ch in target for ch in '/\\.:"<>'):
-        return None, payload
-    return normalize_os_name(target), remainder.strip()
-
-
-def _extract_ailang_link_flags(text: str, *, target_os: str | None = None) -> list[str]:
-    """Extract explicit AILang link flags from source/C/LLVM text.
-
-    Supported forms:
-      #link "-luser32 -lgdi32"
-      #link windows "-luser32 -lgdi32"
-      /* AILANG_LINK: -luser32 -lgdi32 */
-      ; AILANG_LINK: -luser32 -lgdi32
-    """
-    flags: list[str] = []
-    current_os = target_os or os_from_platform()
-    for line in (text or "").splitlines():
-        stripped = line.strip()
-        raw = ""
-        directive_target = None
-        if stripped.startswith("#link"):
-            raw = stripped[len("#link") :].strip()
-            directive_target, raw = _split_targeted_link_payload(raw)
-            if len(raw) >= 2 and raw[0] == '"' and raw[-1] == '"':
-                raw = raw[1:-1]
-        elif "AILANG_LINK:" in stripped:
-            raw = stripped.split("AILANG_LINK:", 1)[1].strip()
-            if "*/" in raw:
-                raw = raw.split("*/", 1)[0].strip()
-        if raw and target_matches(directive_target, current_os):
-            flags.extend(_split_ailang_link_flags(raw))
-    return flags
-
-
-def _merge_link_flags(*groups: list[str]) -> list[str]:
-    """Merge link flags preserving first occurrence order."""
-    merged: list[str] = []
-    seen: set[str] = set()
-    for group in groups:
-        for flag in group:
-            if flag in seen:
-                continue
-            merged.append(flag)
-            seen.add(flag)
-    return merged
-
-
-def _normalize_native_toolchain(native_toolchain: str) -> str:
-    """Normalize user-facing native toolchain aliases."""
-    value = (native_toolchain or "auto").strip().lower().replace("_", "-")
-    aliases = {
-        "default": "auto",
-        "llvm": "clang",
-        "clang-llvm": "clang",
-        "gnu": "gcc",
-        "gcc-gnu": "gcc",
-        "llc+gcc": "llc-gcc",
-        "llc_gcc": "llc-gcc",
-    }
-    return aliases.get(value, value)
 
 
 def _resolve_tool(name: str):
@@ -284,7 +203,20 @@ def compile_via_c(
     # auto-linked by mingw/clang.
     if "pthread.h" in _c_src and not sys.platform.startswith("win"):
         auto_link_flags.append("-lpthread")
-    link_flags = _merge_link_flags(explicit_link_flags, ["-lm"], auto_link_flags)
+    platform_compile_flags: list[str] = []
+    platform_link_flags: list[str] = []
+    if os_from_platform() == "freebsd":
+        # FreeBSD Ports installs third-party headers/libraries under
+        # /usr/local. The base-system clang intentionally does not search
+        # this prefix automatically, so ports-provided dependencies such as
+        # sqlite3 require explicit search paths.
+        if Path("/usr/local/include").is_dir():
+            platform_compile_flags.append("-I/usr/local/include")
+        if Path("/usr/local/lib").is_dir():
+            platform_link_flags.append("-L/usr/local/lib")
+    link_flags = _merge_link_flags(
+        explicit_link_flags, ["-lm"], platform_link_flags, auto_link_flags
+    )
     include_dirs = collect_cinclude_include_dirs(source_file)
     # Try GCC first (often produces faster code for this workload).
     # Each entry is (display_name, full_path_or_None)  -  full paths
@@ -322,7 +254,7 @@ def compile_via_c(
         # standard, etc. Pass -std=c23 (gcc 14+, clang 18+) and fall back
         # to gnu23 if the strict mode rejects MinGW-specific extensions
         # like winsock. -fpermissive on g++ would help; for C the right
-        # knob is -std=gnu23 which keeps C23 semantics + GNU extensions.
+        # knob is -std=gnu2x which keeps C23 semantics + GNU extensions.
         optimization_flags = [
             f"-{opt_level}" if isinstance(opt_level, str) else f"-O{opt_level}"
         ]
@@ -330,10 +262,11 @@ def compile_via_c(
             optimization_flags.extend(["-fdata-sections", "-ffunction-sections"])
         cmd = [
             exe_path,
-            "-std=gnu23",
+            "-std=gnu2x",
             *optimization_flags,
             "-march=native",
             *pgo_flags,
+            *platform_compile_flags,
             *(f"-I{include_dir}" for include_dir in include_dirs),
             str(c_file),
             "-o",
@@ -529,7 +462,13 @@ def compile_to_native(
         print(f"Error: {exc}")
         return False
     auto_link_flags = _detect_llvm_link_flags(_ll_src)
-    link_flags = _merge_link_flags(explicit_link_flags, ["-lm"], auto_link_flags)
+    platform_link_flags: list[str] = []
+    if os_from_platform() == "freebsd" and Path("/usr/local/lib").is_dir():
+        # FreeBSD Ports libraries are outside the base-system clang search path.
+        platform_link_flags.append("-L/usr/local/lib")
+    link_flags = _merge_link_flags(
+        explicit_link_flags, ["-lm"], platform_link_flags, auto_link_flags
+    )
     if pgo_generate_dir or pgo_use_dir:
         print(
             "Error: --pgo-generate/--pgo-use are C-backend PGO flags. "

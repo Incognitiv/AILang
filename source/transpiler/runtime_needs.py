@@ -30,7 +30,6 @@ Why a dataclass and not a TypedDict / dict[str, bool]?
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Set
 
 RUNTIME_FAMILY_NAMES: tuple[str, ...] = (
     "string",
@@ -107,7 +106,7 @@ class RuntimeNeeds:
     # Fine-grained helper-name set. Each entry is a key into the C
     # transpiler's runtime-emit dispatch (e.g. _CALL_HELPER_MAP values
     # like "strlen", "string", "math", "sockets").
-    helpers: Set[str] = field(default_factory=set)
+    helpers: set[str] = field(default_factory=set)
 
     # Coarse category flags. These map 1:1 onto the existing CTranspiler
     # bool attributes; the migration just renames the storage without
@@ -129,12 +128,12 @@ class RuntimeNeeds:
     # site whose target is a user-defined function. The runtime-emit
     # phase consumes this to generate one box-struct + thunk per unique
     # target so spawn(c, db) can pass real arguments across the thread.
-    spawn_targets: Dict[str, List[str]] = field(default_factory=dict)
+    spawn_targets: dict[str, list[str]] = field(default_factory=dict)
 
-    def family_flags(self) -> Dict[str, bool]:
+    def family_flags(self) -> dict[str, bool]:
         """Coarse runtime-family classification for reports/audits."""
         helpers = self.helpers
-        flags: Dict[str, bool] = {
+        flags: dict[str, bool] = {
             "string": bool(helpers.intersection(_STRING_HELPERS)),
             "array": self.arrays
             or self.dynamic_arrays
@@ -152,7 +151,7 @@ class RuntimeNeeds:
             flags.setdefault(name, False)
         return flags
 
-    def helper_counts_by_family(self) -> Dict[str, int]:
+    def helper_counts_by_family(self) -> dict[str, int]:
         """Count helper keys grouped into coarse runtime families."""
         helpers = set(self.helpers)
         counts = {

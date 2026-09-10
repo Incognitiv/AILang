@@ -19,7 +19,7 @@ from __future__ import annotations
 import ast
 import re
 from dataclasses import dataclass
-from typing import ClassVar, Dict, List, Optional
+from typing import ClassVar
 
 from .transpile_py2ai_control_expr import _binop_symbol as _m__binop_symbol
 from .transpile_py2ai_control_expr import _cmpop_symbol as _m__cmpop_symbol
@@ -126,9 +126,9 @@ class TypeInferer:
     }
 
     def __init__(self):
-        self.field_types: Dict[str, str] = {}  # field_name -> type
-        self.param_types: Dict[str, str] = {}  # param_name -> type
-        self.local_types: Dict[str, str] = {}  # var_name -> type
+        self.field_types: dict[str, str] = {}  # field_name -> type
+        self.param_types: dict[str, str] = {}  # param_name -> type
+        self.local_types: dict[str, str] = {}  # var_name -> type
 
     def infer_from_assignment(self, target: str, value_type: str) -> str:
         """Infer variable type from what's assigned to it"""
@@ -145,7 +145,7 @@ class TypeInferer:
         self.param_types[param] = field_type
         return field_type
 
-    def infer_return_type(self, method_name: str, returns: List[str]) -> str:
+    def infer_return_type(self, method_name: str, returns: list[str]) -> str:
         """Infer return type from method name or return statements"""
         # Check magic method hints first
         if method_name in self.METHOD_HINTS:
@@ -479,8 +479,8 @@ class AILangToPython:
         self.add_assertions = add_assertions
         self.inferer = TypeInferer()
         self.indent = 0
-        self.current_class: Optional[str] = None
-        self.current_method: Optional[str] = None
+        self.current_class: str | None = None
+        self.current_method: str | None = None
 
     def transpile(self, source: str) -> str:
         """Transpile AILang source to Python"""
@@ -664,7 +664,7 @@ class BidirectionalCode:
 
     def __init__(self, python_source: str):
         self._python = python_source
-        self._ailang: Optional[str] = None
+        self._ailang: str | None = None
 
     @property
     def python(self) -> str:
@@ -679,7 +679,7 @@ class BidirectionalCode:
         return self._ailang
 
     @classmethod
-    def from_ailang(cls, ailang_source: str) -> "BidirectionalCode":
+    def from_ailang(cls, ailang_source: str) -> BidirectionalCode:
         """Create from AILang source"""
         python_source = ailang_to_python(ailang_source)
         obj = cls(python_source)

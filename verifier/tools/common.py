@@ -5,10 +5,10 @@ from __future__ import annotations
 import ast
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 
-def validate_filepath(filepath: str) -> Tuple[str, Optional[str]]:
+def validate_filepath(filepath: str) -> tuple[str, str | None]:
     """Validate filepath for safe execution."""
     if not filepath:
         return "", "Empty filepath"
@@ -23,7 +23,7 @@ def validate_filepath(filepath: str) -> Tuple[str, Optional[str]]:
     return str(path), None
 
 
-def check_syntax(code: str) -> Dict[str, Any]:
+def check_syntax(code: str) -> dict[str, Any]:
     """Check Python syntax using ast module."""
     try:
         ast.parse(code)
@@ -64,7 +64,7 @@ SUPPRESSION_PATTERNS = [
 ]
 
 
-def detect_suppressions(code: str) -> Dict[str, Any]:
+def detect_suppressions(code: str) -> dict[str, Any]:
     """Detect suppression comments in code.
 
     Detects patterns like type-ignore, pylint-disable, noqa, nosec markers.
@@ -75,8 +75,8 @@ def detect_suppressions(code: str) -> Dict[str, Any]:
       - details: list of (line_num, line_text, suppression_type)
     """
     lines = code.split("\n")
-    by_type: Dict[str, List[int]] = {}
-    details: List[Tuple[int, str, str]] = []
+    by_type: dict[str, list[int]] = {}
+    details: list[tuple[int, str, str]] = []
 
     for line_num, line in enumerate(lines, 1):
         # Real suppression: there is non-whitespace, non-`#` CODE before the

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 from token_access import token_text_at, token_type_at
 
 from .ast import ASTNode, ClassDef, Function, GenericClass, ParsedType
@@ -29,9 +27,9 @@ def _parse_class_destructor(self, class_name: str, visibility: str) -> Function:
     return dtor
 
 
-def _parse_init_params(self) -> list[tuple[str, ParsedType, Optional[ASTNode]]]:
+def _parse_init_params(self) -> list[tuple[str, ParsedType, ASTNode | None]]:
     """Parse legacy ``init(...)`` parameters using normal function rules."""
-    params: list[tuple[str, ParsedType, Optional[ASTNode]]] = []
+    params: list[tuple[str, ParsedType, ASTNode | None]] = []
     if self.peek_type() == "RPAREN":
         return params
     params.append(self._parse_single_param())
@@ -88,11 +86,11 @@ def _parse_class_init(self, visibility: str) -> Function:
 
 def _parse_class_field(
     self, visibility: str
-) -> tuple[str, str, ParsedType, Optional[ASTNode]]:
+) -> tuple[str, str, ParsedType, ASTNode | None]:
     """Parse a class field: type fieldName [= initialValue]."""
     field_type = self.parse_type()
     field_name = self.consume("IDENT")
-    init_value: Optional[ASTNode] = None
+    init_value: ASTNode | None = None
     if self.peek_type() == "ASSIGN":
         self.consume("ASSIGN")
         init_value = self.parse_expression()
@@ -115,11 +113,13 @@ def parse_class(self) -> ClassDef | GenericClass:
     type_params = self._parse_generic_params()
 
     if self.peek_type() != "COLON":
-        self.error("Expected ':' after class name; 'then' is not valid for class declarations")
+        self.error(
+            "Expected ':' after class name; 'then' is not valid for class declarations"
+        )
     self.consume("COLON")
     self.skip_newlines()
 
-    fields: list[tuple[str, str, ParsedType, Optional[ASTNode]]] = []
+    fields: list[tuple[str, str, ParsedType, ASTNode | None]] = []
     methods: list[Function] = []
 
     while self.peek() and self.peek_type() != "END":
@@ -243,7 +243,7 @@ def _parse_method(self, visibility: str, class_name: str = "") -> Function:
 
     self.consume("LPAREN")
 
-    params: list[tuple[str, ParsedType, Optional[ASTNode]]] = []
+    params: list[tuple[str, ParsedType, ASTNode | None]] = []
     if is_destructor and self.peek_type() != "RPAREN":
         self.error("Destructor cannot have parameters")
         raise AssertionError("unreachable")

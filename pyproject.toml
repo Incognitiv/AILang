@@ -13,19 +13,21 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-llvm = ["llvmlite"]
+llvm = ["llvmlite==0.49.0"]
 dev = [
-  "black",
-  "isort",
-  "ruff",
-  "mypy",
-  "pytest",
-  "pylint",
-  "bandit",
-  "radon",
-  "vulture",
-  "pip-audit",
-  "detect-secrets",
+  "black==26.5.1",
+  "isort==9.0.1",
+  "ruff==0.16.6",
+  "mypy==2.3.1",
+  "pytest==9.1.1",
+  "pylint==4.0.8",
+  "bandit==1.9.4",
+  "radon==6.0.1",
+  "vulture==2.16",
+  "pip-audit==2.10.1",
+  "detect-secrets==1.5.0",
+  "pyflakes==3.4.0",
+  "cohesion==1.2.0",
 ]
 
 [project.scripts]
@@ -42,6 +44,18 @@ profile = "black"
 
 [tool.black]
 line-length = 88
+target-version = ["py311"]
+
+# Golden Gate must not inherit Ruff's evolving default rule set.  Formatting,
+# import ordering, typing, security and deeper structural checks are enforced
+# independently by Black, isort, mypy, pyflakes, Bandit and AILang's verifier.
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
+
+# llvmlite ships without PEP 561 metadata; AILang code remains strict.
+[[tool.mypy.overrides]]
+module = ["llvmlite", "llvmlite.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

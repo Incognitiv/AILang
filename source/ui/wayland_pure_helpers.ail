@@ -1,0 +1,17 @@
+@library("ui_wayland_pure_helpers")
+
+def wayland_color(color: int): int
+    out = color % 16777216
+    if out < 0 then
+        return out + 16777216
+    end
+    return out
+end
+
+def wayland_fixed_to_int(value: short): int
+    return value / 256
+end
+
+def wayland_has_capability(capabilities: ushort, capability: int): int
+    return (capabilities / capability) % 2
+end

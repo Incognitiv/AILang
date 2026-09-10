@@ -1,0 +1,561 @@
+@library("ui_paint_caption")
+
+import stdlib.ui.platform
+import stdlib.ui.paint
+
+// Caption-button and higher-level paint helpers.
+
+enum UiCaptionButtonKind then
+    None = 0
+    Minimize = 1
+    Maximize = 2
+    Restore = 3
+    Close = 4
+end
+
+
+enum UiControlVisualState then
+    Normal = 0
+    Hover = 1
+    Pressed = 2
+end
+
+
+class UiCaptionPaint:
+    public int banded = 0
+    public int button_normal_fill = -1
+    public int button_hover_fill = 0xe9eef7
+    public int button_pressed_fill = 0xd1dbe8
+    public int close_normal_fill = -1
+    public int close_hover_fill = 0xe81123
+    public int close_pressed_fill = 0xc50f1f
+    public int button_border_color = 0xb8c4d4
+    public int close_border_color = 0xf06f78
+    public int button_background_color = 0xffffff
+    public int button_border_width = 0
+    public int button_corner_radius = 0
+    public int glyph_color = 0x111827
+    public int glyph_hover_color = 0x111827
+    public int close_glyph_color = 0x111827
+    public int close_hot_glyph_color = 0xffffff
+    public int button_normal_top = 0x585b60
+    public int button_normal_mid = 0x3f4349
+    public int button_normal_bottom = 0x23272e
+    public int button_hover_top = 0x5ba4e5
+    public int button_hover_mid = 0x4388cc
+    public int button_hover_bottom = 0x1c528f
+    public int button_pressed_top = 0x244c71
+    public int button_pressed_mid = 0x1a3957
+    public int button_pressed_bottom = 0x10263b
+    public int close_normal_top = 0x655356
+    public int close_normal_mid = 0x513d40
+    public int close_normal_bottom = 0x3a2326
+    public int close_hover_top = 0xe85f51
+    public int close_hover_mid = 0xd34031
+    public int close_hover_bottom = 0x8e1c12
+    public int close_pressed_top = 0x5b2822
+    public int close_pressed_mid = 0x411c17
+    public int close_pressed_bottom = 0x2c1210
+    public int band_highlight = 0x80858f
+    public int band_shadow = 0x101318
+    public int band_top_height = 11
+    public int band_mid_height = 1
+
+    public def init():
+        this.banded = 0
+        this.button_normal_fill = -1
+        this.button_hover_fill = 0xe9eef7
+        this.button_pressed_fill = 0xd1dbe8
+        this.close_normal_fill = -1
+        this.close_hover_fill = 0xe81123
+        this.close_pressed_fill = 0xc50f1f
+        this.button_border_color = 0xb8c4d4
+        this.close_border_color = 0xf06f78
+        this.button_background_color = 0xffffff
+        this.button_border_width = 0
+        this.button_corner_radius = 0
+        this.glyph_color = 0x111827
+        this.glyph_hover_color = 0x111827
+        this.close_glyph_color = 0x111827
+        this.close_hot_glyph_color = 0xffffff
+        this.button_normal_top = 0x585b60
+        this.button_normal_mid = 0x3f4349
+        this.button_normal_bottom = 0x23272e
+        this.button_hover_top = 0x5ba4e5
+        this.button_hover_mid = 0x4388cc
+        this.button_hover_bottom = 0x1c528f
+        this.button_pressed_top = 0x244c71
+        this.button_pressed_mid = 0x1a3957
+        this.button_pressed_bottom = 0x10263b
+        this.close_normal_top = 0x655356
+        this.close_normal_mid = 0x513d40
+        this.close_normal_bottom = 0x3a2326
+        this.close_hover_top = 0xe85f51
+        this.close_hover_mid = 0xd34031
+        this.close_hover_bottom = 0x8e1c12
+        this.close_pressed_top = 0x5b2822
+        this.close_pressed_mid = 0x411c17
+        this.close_pressed_bottom = 0x2c1210
+        this.band_highlight = 0x80858f
+        this.band_shadow = 0x101318
+        this.band_top_height = 11
+        this.band_mid_height = 1
+    end
+
+    public def ~UiCaptionPaint():
+    end
+end
+
+
+def ui_caption_paint_free(style: UiCaptionPaint): void
+    dealloc(style)
+end
+
+
+def ui_caption_paint_flux_longhorn_dark(style: UiCaptionPaint): void
+    style.banded = 1
+    style.button_normal_fill = -1
+    style.button_hover_fill = -1
+    style.button_pressed_fill = -1
+    style.close_normal_fill = -1
+    style.close_hover_fill = -1
+    style.close_pressed_fill = -1
+    style.button_border_color = 0x747985
+    style.close_border_color = 0x8a5050
+    style.button_background_color = 0x11161c
+    style.button_border_width = 1
+    style.glyph_color = 0xffffff
+    style.glyph_hover_color = 0xffffff
+    style.close_glyph_color = 0xffffff
+    style.close_hot_glyph_color = 0xffffff
+    style.button_normal_top = 0x585b60
+    style.button_normal_mid = 0x3f4349
+    style.button_normal_bottom = 0x23272e
+    style.button_hover_top = 0x5ba4e5
+    style.button_hover_mid = 0x4388cc
+    style.button_hover_bottom = 0x1c528f
+    style.button_pressed_top = 0x244c71
+    style.button_pressed_mid = 0x1a3957
+    style.button_pressed_bottom = 0x10263b
+    style.close_normal_top = 0x655356
+    style.close_normal_mid = 0x513d40
+    style.close_normal_bottom = 0x3a2326
+    style.close_hover_top = 0xe85f51
+    style.close_hover_mid = 0xd34031
+    style.close_hover_bottom = 0x8e1c12
+    style.close_pressed_top = 0x5b2822
+    style.close_pressed_mid = 0x411c17
+    style.close_pressed_bottom = 0x2c1210
+    style.band_highlight = 0x858a96
+    style.band_shadow = 0x05070a
+    style.band_top_height = 11
+    style.band_mid_height = 1
+end
+
+
+def ui_caption_paint_default_dark(style: UiCaptionPaint, accent: int, warm: int, close: int, close_pressed: int): void
+    glow = ui_paint_lerp_color(warm, accent, 820, 1000)
+    bg = ui_paint_lerp_color(0x101419, glow, 35, 1000)
+    style.banded = 0
+    style.button_normal_fill = -1
+    style.button_hover_fill = ui_paint_lerp_color(bg, glow, 120, 1000)
+    style.button_pressed_fill = ui_paint_lerp_color(bg, glow, 200, 1000)
+    style.close_normal_fill = -1
+    style.close_hover_fill = ui_paint_lerp_color(bg, close, 880, 1000)
+    style.close_pressed_fill = close_pressed
+    style.button_border_color = ui_paint_lerp_color(bg, glow, 280, 1000)
+    style.close_border_color = ui_paint_lerp_color(style.close_hover_fill, 0xffffff, 160, 1000)
+    style.button_background_color = bg
+    style.button_border_width = 1
+    style.button_corner_radius = 8
+    style.glyph_color = 0xe7f8f4
+    style.glyph_hover_color = 0xffffff
+    style.close_glyph_color = 0xe7f8f4
+    style.close_hot_glyph_color = 0xffffff
+    style.band_highlight = 0x000000
+    style.band_shadow = 0x000000
+    style.band_top_height = 0
+    style.band_mid_height = 0
+end
+
+
+def ui_caption_paint_apply_metrics(style: UiCaptionPaint, metrics: UiChromeMetrics): void
+    style.band_top_height = metrics.caption_top_band_height
+    style.band_mid_height = metrics.caption_mid_band_height
+    style.button_corner_radius = metrics.control_outer_radius
+end
+
+
+def ui_caption_button_fill(style: UiCaptionPaint, kind: int, visual: int): int
+    if kind == 4 then
+        if visual == 2 then
+            return style.close_pressed_fill
+        end
+        if visual == 1 then
+            return style.close_hover_fill
+        end
+        return style.close_normal_fill
+    end
+
+    if visual == 2 then
+        return style.button_pressed_fill
+    end
+    if visual == 1 then
+        return style.button_hover_fill
+    end
+    return style.button_normal_fill
+end
+
+
+def ui_caption_band_top(style: UiCaptionPaint, kind: int, visual: int): int
+    if kind == 4 then
+        if visual == 2 then
+            return style.close_pressed_top
+        end
+        if visual == 1 then
+            return style.close_hover_top
+        end
+        return style.close_normal_top
+    end
+
+    if visual == 2 then
+        return style.button_pressed_top
+    end
+    if visual == 1 then
+        return style.button_hover_top
+    end
+    return style.button_normal_top
+end
+
+
+def ui_caption_band_mid(style: UiCaptionPaint, kind: int, visual: int): int
+    if kind == 4 then
+        if visual == 2 then
+            return style.close_pressed_mid
+        end
+        if visual == 1 then
+            return style.close_hover_mid
+        end
+        return style.close_normal_mid
+    end
+
+    if visual == 2 then
+        return style.button_pressed_mid
+    end
+    if visual == 1 then
+        return style.button_hover_mid
+    end
+    return style.button_normal_mid
+end
+
+
+def ui_caption_band_bottom(style: UiCaptionPaint, kind: int, visual: int): int
+    if kind == 4 then
+        if visual == 2 then
+            return style.close_pressed_bottom
+        end
+        if visual == 1 then
+            return style.close_hover_bottom
+        end
+        return style.close_normal_bottom
+    end
+
+    if visual == 2 then
+        return style.button_pressed_bottom
+    end
+    if visual == 1 then
+        return style.button_hover_bottom
+    end
+    return style.button_normal_bottom
+end
+
+
+def ui_caption_glyph_color(style: UiCaptionPaint, kind: int, visual: int): int
+    if kind == 4 then
+        if visual != 0 then
+            return style.close_hot_glyph_color
+        end
+        return style.close_glyph_color
+    end
+
+    if visual != 0 then
+        return style.glyph_hover_color
+    end
+    return style.glyph_color
+end
+
+
+def ui_draw_caption_diag_down(window: int, x: int, y: int, size: int, thickness: int, color: int): void
+    i = 0
+    while i < size then
+        ail_ui_draw_rect(window, x + i, y + i, thickness, thickness, color)
+        i = i + 1
+    end
+end
+
+
+def ui_draw_caption_diag_up(window: int, x: int, y: int, size: int, thickness: int, color: int): void
+    i = 0
+    while i < size then
+        ail_ui_draw_rect(window, x + i, y + size - i, thickness, thickness, color)
+        i = i + 1
+    end
+end
+
+
+def ui_draw_caption_icon(
+    window: int,
+    kind: int,
+    x: int,
+    y: int,
+    width: int,
+    height: int,
+    color: int
+): void
+    maximized = 0
+    if height <= 28 then
+        maximized = 1
+    end
+    glyph_down = 1
+
+    if kind == 1 then
+        line_w = 14
+        line_h = 1
+        line_y = 18
+        offset_x = 0
+        if maximized == 1 then
+            line_w = 12
+            line_h = 1
+            line_y = 17
+            offset_x = 0
+        end
+        ail_ui_draw_rect(window, x + ((width - line_w) / 2) + offset_x, y + line_y + glyph_down, line_w, line_h, color)
+        return
+    end
+
+    if kind == 2 then
+        icon_w = 16
+        icon_h = 12
+        ui_draw_border(window, x + ((width - icon_w) / 2), y + ((height - icon_h) / 2) - 1 + glyph_down, icon_w, icon_h, color, 1)
+        return
+    end
+
+    if kind == 3 then
+        icon_x = x + ((width - 12) / 2) - 1
+        icon_y = y + ((height - 10) / 2) + 1 + glyph_down
+        if maximized == 1 then
+            icon_x = icon_x + 1
+            icon_y = icon_y - 2
+        end
+
+        ail_ui_draw_rect(window, icon_x + 2, icon_y, 10, 1, color)
+        ail_ui_draw_rect(window, icon_x + 11, icon_y, 1, 8, color)
+        ail_ui_draw_rect(window, icon_x + 2, icon_y + 1, 1, 1, color)
+        ail_ui_draw_rect(window, icon_x + 10, icon_y + 7, 1, 1, color)
+        ui_draw_border(window, icon_x, icon_y + 2, 10, 8, color, 1)
+        return
+    end
+
+    if kind == 4 then
+        glyph_pixels = 12
+        glyph_start = 0
+        glyph_y_offset = -1
+        if maximized == 1 then
+            glyph_pixels = 10
+            glyph_start = 1
+            glyph_y_offset = -1
+        end
+        icon_x = x + ((width - 12) / 2)
+        icon_y = y + ((height - 12) / 2) + glyph_y_offset + glyph_down
+
+        i = 0
+        while i < glyph_pixels then
+            ail_ui_draw_rect(window, icon_x + glyph_start + i, icon_y + glyph_start + i, 1, 1, color)
+            ail_ui_draw_rect(window, icon_x + glyph_start + (glyph_pixels - 1 - i), icon_y + glyph_start + i, 1, 1, color)
+            i = i + 1
+        end
+    end
+end
+
+
+def ui_draw_caption_banded_face(
+    window: int,
+    style: UiCaptionPaint,
+    x: int,
+    y: int,
+    width: int,
+    height: int,
+    kind: int,
+    visual: int
+): void
+    top_h = style.band_top_height
+    mid_h = style.band_mid_height
+    if height < 16 then
+        top_h = height / 2
+    end
+    if top_h < 1 then
+        top_h = 1
+    end
+    if height - top_h - mid_h < 1 then
+        mid_h = 0
+    end
+
+    ail_ui_draw_rect(window, x, y, width, top_h, ui_caption_band_top(style, kind, visual))
+    if mid_h > 0 then
+        ail_ui_draw_rect(window, x, y + top_h, width, mid_h, ui_caption_band_mid(style, kind, visual))
+    end
+    ail_ui_draw_rect(window, x, y + top_h + mid_h, width, height - top_h - mid_h, ui_caption_band_bottom(style, kind, visual))
+    ail_ui_draw_rect(window, x, y, width, 1, style.band_highlight)
+    ail_ui_draw_rect(window, x, y + height - 1, width, 1, style.band_shadow)
+    ail_ui_draw_rect(window, x, y, 1, height, style.band_shadow)
+    ail_ui_draw_rect(window, x + width - 1, y, 1, height, style.band_highlight)
+end
+
+
+def ui_draw_caption_button(
+    window: int,
+    style: UiCaptionPaint,
+    x: int,
+    y: int,
+    width: int,
+    height: int,
+    kind: int,
+    visual: int
+): void
+    fill = ui_caption_button_fill(style, kind, visual)
+    glyph = ui_caption_glyph_color(style, kind, visual)
+    border = style.button_border_color
+    if kind == 4 then
+        border = style.close_border_color
+    end
+
+    if style.banded == 1 then
+        ui_draw_caption_banded_face(window, style, x, y, width, height, kind, visual)
+    else
+        if fill >= 0 then
+            if style.button_corner_radius > 0 then
+                bottom_left = 0
+                bottom_right = 0
+                if kind == 1 then
+                    bottom_left = 1
+                end
+                if kind == 4 then
+                    bottom_right = 1
+                end
+                if visual != 0 and style.button_border_width > 0 then
+                    ui_draw_bottom_cornered_box_aa(
+                        window,
+                        x,
+                        y,
+                        width,
+                        height,
+                        fill,
+                        border,
+                        style.button_border_width,
+                        style.button_corner_radius,
+                        bottom_left,
+                        bottom_right,
+                        style.button_background_color
+                    )
+                else
+                    ui_draw_bottom_cornered_rect_aa(
+                        window,
+                        x,
+                        y,
+                        width,
+                        height,
+                        fill,
+                        style.button_corner_radius,
+                        bottom_left,
+                        bottom_right,
+                        style.button_background_color
+                    )
+                end
+            else
+                ail_ui_draw_rect(window, x, y, width, height, fill)
+            end
+        end
+    end
+    if visual != 0 and style.button_border_width > 0 and style.button_corner_radius <= 0 then
+        ui_draw_border(window, x, y, width, height, border, style.button_border_width)
+    end
+    ui_draw_caption_icon(window, kind, x, y, width, height, glyph)
+end
+
+def ui_draw_panel(window: int, x: int, y: int, width: int, height: int): void
+    ail_ui_draw_rect(window, x + 4, y + 5, width, height, 0xd1d5db)
+    ail_ui_draw_rect(window, x, y, width, height, 0xffffff)
+    ail_ui_draw_rect(window, x, y, width, 1, 0xe5e7eb)
+    ail_ui_draw_rect(window, x, y + height - 1, width, 1, 0xd8dee9)
+    ail_ui_draw_rect(window, x, y, 1, height, 0xe5e7eb)
+    ail_ui_draw_rect(window, x + width - 1, y, 1, height, 0xd8dee9)
+end
+
+
+def ui_draw_label(window: int, x: int, y: int, scale: int, color: int, text: string): void
+    ail_ui_draw_text(window, x, y, scale, color, text)
+end
+
+
+def ui_draw_dark_button(window: int, x: int, y: int, width: int, height: int, label: string): void
+    ail_ui_draw_rect(window, x + 2, y + 3, width, height, 0xcbd5e1)
+    ail_ui_draw_rect(window, x, y, width, height, 0x111827)
+    ail_ui_draw_text(window, x + 14, y + 12, 2, 0xffffff, label)
+end
+
+
+def ui_draw_light_button(window: int, x: int, y: int, width: int, height: int, label: string): void
+    ail_ui_draw_rect(window, x + 2, y + 3, width, height, 0xcbd5e1)
+    ail_ui_draw_rect(window, x, y, width, height, 0xe0f2fe)
+    ail_ui_draw_rect(window, x, y, width, 1, 0xbae6fd)
+    ail_ui_draw_text(window, x + 14, y + 12, 2, 0x075985, label)
+end
+
+
+def ui_draw_badge(window: int, x: int, y: int, width: int, label: string): void
+    ail_ui_draw_rect(window, x, y, width, 24, 0xdbeafe)
+    ail_ui_draw_text(window, x + 12, y + 8, 1, 0x1d4ed8, label)
+end
+
+
+def ui_draw_text_bars(window: int, x: int, y: int, width: int, color: int): void
+    ail_ui_draw_rect(window, x, y, width, 4, color)
+    ail_ui_draw_rect(window, x, y + 9, width - 30, 3, color)
+    ail_ui_draw_rect(window, x, y + 17, width - 58, 3, 0x94a3b8)
+end
+
+
+def ui_draw_card(window: int, x: int, y: int, width: int, height: int, accent: int, title: string, subtitle: string): void
+    ui_draw_panel(window, x, y, width, height)
+    ail_ui_draw_rect(window, x + 16, y + 18, 44, 10, accent)
+    ail_ui_draw_text(window, x + 16, y + 40, 2, 0x334155, title)
+    ail_ui_draw_text(window, x + 16, y + 64, 1, 0x64748b, subtitle)
+end
+
+
+def ui_draw_progress(window: int, x: int, y: int, width: int, fill_width: int, color: int): void
+    ail_ui_draw_rect(window, x, y, width, 8, 0xe5e7eb)
+    ail_ui_draw_rect(window, x, y, fill_width, 8, color)
+end
+
+
+def ui_draw_desktop_bar(window: int, width: int, height: int): void
+    ail_ui_draw_rect(window, 0, height - 48, width, 48, 0x111827)
+    ail_ui_draw_rect(window, 18, height - 34, 20, 20, 0x2563eb)
+    ail_ui_draw_rect(window, 52, height - 34, 20, 20, 0x10b981)
+    ail_ui_draw_rect(window, 86, height - 34, 20, 20, 0xf59e0b)
+    ail_ui_draw_text(window, 22, height - 28, 1, 0xffffff, "AIL")
+    ail_ui_draw_text(window, width - 144, height - 28, 1, 0xd1d5db, "READY")
+end
+
+
+def ui_draw_window_chrome(window: int, x: int, y: int, width: int, height: int, title: string): void
+    ail_ui_draw_rect(window, x + 6, y + 8, width, height, 0xcbd5e1)
+    ail_ui_draw_rect(window, x, y, width, height, 0xffffff)
+    ail_ui_draw_rect(window, x, y, width, 32, 0xf8fafc)
+    ail_ui_draw_rect(window, x, y + 32, width, 1, 0xe5e7eb)
+    ail_ui_draw_text(window, x + 12, y + 12, 1, 0x475569, title)
+    ail_ui_draw_rect(window, x + width - 68, y + 12, 8, 8, 0x94a3b8)
+    ail_ui_draw_rect(window, x + width - 44, y + 12, 8, 8, 0x94a3b8)
+    ail_ui_draw_rect(window, x + width - 20, y + 12, 8, 8, 0xef4444)
+end

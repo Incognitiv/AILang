@@ -9,7 +9,6 @@ Defines built-in modules that don't need file lookup:
 """
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional
 
 
 @dataclass
@@ -17,17 +16,17 @@ class StdFunction:
     """Represents a standard library function"""
 
     name: str
-    param_types: List[str]
+    param_types: list[str]
     return_type: str
     description: str
     # For built-ins that map to C functions
-    c_name: Optional[str] = None
+    c_name: str | None = None
     # For built-ins that need special codegen
     is_intrinsic: bool = False
 
 
 # Standard library modules
-STD_MODULES: Dict[str, Dict[str, StdFunction]] = {
+STD_MODULES: dict[str, dict[str, StdFunction]] = {
     # std.io - Input/Output functions
     "std.io": {
         "print": StdFunction(
@@ -379,7 +378,7 @@ STD_MODULES: Dict[str, Dict[str, StdFunction]] = {
 }
 
 
-def get_std_module(module_path: str) -> Optional[Dict[str, StdFunction]]:
+def get_std_module(module_path: str) -> dict[str, StdFunction] | None:
     """Get a standard library module by path"""
     return STD_MODULES.get(module_path)
 
@@ -389,7 +388,7 @@ def is_std_module(module_path: str) -> bool:
     return module_path in STD_MODULES
 
 
-def get_std_function(module_path: str, func_name: str) -> Optional[StdFunction]:
+def get_std_function(module_path: str, func_name: str) -> StdFunction | None:
     """Get a specific function from a standard library module"""
     module = STD_MODULES.get(module_path)
     if module:
@@ -397,12 +396,12 @@ def get_std_function(module_path: str, func_name: str) -> Optional[StdFunction]:
     return None
 
 
-def list_std_modules() -> List[str]:
+def list_std_modules() -> list[str]:
     """List all available standard library modules"""
     return list(STD_MODULES.keys())
 
 
-def list_std_functions(module_path: str) -> List[str]:
+def list_std_functions(module_path: str) -> list[str]:
     """List all functions in a standard library module"""
     module = STD_MODULES.get(module_path)
     if module:

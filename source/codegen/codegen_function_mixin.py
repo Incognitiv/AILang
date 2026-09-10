@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import contextlib
 from parser.ast import ASTNode, Number, RangeType
-from typing import Any, Optional
+from typing import Any
 
 from abi_symbols import has_export_decorator
 from ast_access import arg_at
@@ -18,10 +18,10 @@ class _CodeGenFunctionMixin:
     def __init__(self: Any) -> None:
         # Linter-only declarations for attributes reassigned while generating
         # methods/functions. CodeGen.__init__ owns the actual runtime state.
-        self.builder: Optional[ir.IRBuilder] = None
+        self.builder: ir.IRBuilder | None = None
         self._pending_di_sp: Any = None
         self._pending_di_sp_line: int = 0
-        self.func: Optional[ir.Function] = None
+        self.func: ir.Function | None = None
         self.locals: dict[str, Any] = {}
         self.local_decl_types: dict[str, Any] = {}
         self._synchronized_mutex_ptr: Any = None
@@ -32,13 +32,13 @@ class _CodeGenFunctionMixin:
         self._current_di_sp: Any = None
         self._string_arena: Any = None
         self._request_arena_slot: Any = None
-        self._current_function_name: Optional[str] = None
-        self.argc_global: Optional[ir.GlobalVariable] = None
-        self.argv_global: Optional[ir.GlobalVariable] = None
+        self._current_function_name: str | None = None
+        self.argc_global: ir.GlobalVariable | None = None
+        self.argv_global: ir.GlobalVariable | None = None
         self._stack_class_locals: set[str] = set()
         self._stack_class_cleanup_plans: dict[str, Any] = {}
         self._stack_array_field_values: dict[tuple[str, str], tuple[Any, ...]] = {}
-        self._inline_this_stack_var: Optional[str] = None
+        self._inline_this_stack_var: str | None = None
         self._llvm_length_only_string_locals: set[str] = set()
         self._fn_ptr_function_names: set[str] = set()
 
@@ -117,7 +117,6 @@ class _CodeGenFunctionMixin:
                 for arg in self.func.args:
                     if isinstance(arg.type, ir.PointerType):
                         arg.add_attribute("noalias")
-                        arg.add_attribute("nocapture")
             elif decorator == "fastmath":
                 # llvmlite has no function-level unsafe-fp-math flag.
                 self._fastmath_mode = True
@@ -266,10 +265,15 @@ class _CodeGenFunctionMixin:
         self.builder = ir.IRBuilder(block)
         if getattr(self, "_module_uses_string_arena", True):
             i8_ptr = ir.IntType(8).as_pointer()
-            self._request_arena_slot = self.builder.alloca(
-                i8_ptr, name="request_arena_slot"
-            )
-            self.builder.store(ir.Constant(i8_ptr, None), self._request_arena_slot)
+            # arena_use() is request context, not function-local state. Keep one
+            # module slot so ordinary callees observe the arena selected by the
+            # caller. This matches the C backend's single-threaded fast path.
+            slot = self.module.globals.get("__ailang_request_arena")
+            if slot is None:
+                slot = ir.GlobalVariable(self.module, i8_ptr, "__ailang_request_arena")
+                slot.linkage = "internal"
+                slot.initializer = ir.Constant(i8_ptr, None)
+            self._request_arena_slot = slot
         pending_sp = getattr(self, "_pending_di_sp", None)
         if pending_sp is not None:
             self.builder.debug_metadata = self._make_di_location(
@@ -441,7 +445,7 @@ class _CodeGenFunctionMixin:
             return
         plans = getattr(self, "_stack_class_cleanup_plans", {})
         if plans:
-            from transpiler.emit_statements_control_data import (
+            from transpiler.emit_statements_cleanup import (
                 _emit_stack_class_cleanup,
             )
 

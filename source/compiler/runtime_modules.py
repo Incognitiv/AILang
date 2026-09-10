@@ -4,14 +4,21 @@ These are AILang modules, not foreign/native runtimes.  Backends may lower
 primitive operations (allocation, raw memory, syscalls), but language-level
 semantics such as arbitrary-precision arithmetic live in `.ail`.
 """
+
 from __future__ import annotations
 
-from typing import Any, Iterable
-
+from collections.abc import Iterable
 from parser import ast as A
 from parser.ast import parsed_type_to_str
+from typing import Any
 
-_BIGINT_MODULE = "stdlib.core.bigint"
+_BIGINT_MODULES = (
+    "stdlib.core.bigint",
+    "stdlib.core.bigint_bits",
+    "stdlib.core.bigint_adapters",
+    "stdlib.core.bigint_wide_adapters",
+    "stdlib.core.bigint_pow",
+)
 
 
 def _spec_is_unbounded(value: Any) -> bool:
@@ -51,11 +58,14 @@ def ensure_language_runtime_imports(nodes: Iterable[A.ASTNode]) -> list[A.ASTNod
     result = list(nodes)
     if not _mentions_unbounded(result, set()):
         return result
+
+    imported: set[str] = set()
     for node in result:
-        if isinstance(node, A.Import) and node.module_path == _BIGINT_MODULE:
-            return result
-        if isinstance(node, A.FromImport) and node.module_path == _BIGINT_MODULE:
-            return result
-    # Put the implicit language module first so its declarations are available
-    # before backend pass-1 declarations and user code generation.
-    return [A.Import(_BIGINT_MODULE), *result]
+        if isinstance(node, (A.Import, A.FromImport)):
+            imported.add(node.module_path)
+
+    # Keep the representation/core module first, then the exponent module that
+    # is implemented solely in terms of that core.  Both are ordinary AILang
+    # modules and are declared before backend pass-1/user code generation.
+    prefix = [A.Import(module) for module in _BIGINT_MODULES if module not in imported]
+    return [*prefix, *result]

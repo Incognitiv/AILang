@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from parser import ast as A
-from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 from transpiler.array_literal_hints import get_array_literal_values
 from transpiler.codegen_int_ranges import (
@@ -16,15 +16,15 @@ from transpiler.codegen_int_ranges import (
 )
 
 
-def derive_counted_loop_ranges(self, node: A.While) -> Set[str]:
+def derive_counted_loop_ranges(self, node: A.While) -> set[str]:
     return _derive_counted_loop_ranges(self, node)
 
 
-def _derive_counted_loop_ranges(self, node: A.While) -> Set[str]:
+def _derive_counted_loop_ranges(self, node: A.While) -> set[str]:
     counter, bound, step = _while_counter_bound(self, node)
     if counter is None or bound is None or step <= 0:
         return set()
-    ranges: Dict[str, IntRange] = getattr(self, "_codegen_int_ranges", {})
+    ranges: dict[str, IntRange] = getattr(self, "_codegen_int_ranges", {})
     current = ranges.get(counter)
     if current is None or current[0] > bound:
         return set()
@@ -34,8 +34,8 @@ def _derive_counted_loop_ranges(self, node: A.While) -> Set[str]:
     preserved = {counter}
     ranges[counter] = (current[0], bound)
     simulated_fields = dict(getattr(self, "_codegen_field_int_ranges", {}))
-    acc_name: Optional[str] = None
-    per_iter_budget: Optional[int] = None
+    acc_name: str | None = None
+    per_iter_budget: int | None = None
     exact = _exact_indexed_reduction_details(
         self, node, counter, current[0], bound, step
     )
@@ -80,9 +80,9 @@ def _derive_counted_loop_ranges(self, node: A.While) -> Set[str]:
 
 def _loop_clamped_accumulator_ranges(
     self, body: Iterable[A.ASTNode], counter_name: str
-) -> Dict[str, IntRange]:
-    clamp_limits: Dict[str, int] = {}
-    update_exprs: Dict[str, A.ASTNode] = {}
+) -> dict[str, IntRange]:
+    clamp_limits: dict[str, int] = {}
+    update_exprs: dict[str, A.ASTNode] = {}
     for stmt in body:
         clamp = _clamp_if_pattern(stmt)
         if clamp is not None:
@@ -96,8 +96,8 @@ def _loop_clamped_accumulator_ranges(
     if not clamp_limits or set(clamp_limits) != set(update_exprs):
         return {}
 
-    ranges: Dict[str, IntRange] = getattr(self, "_codegen_int_ranges", {})
-    refined: Dict[str, IntRange] = {}
+    ranges: dict[str, IntRange] = getattr(self, "_codegen_int_ranges", {})
+    refined: dict[str, IntRange] = {}
     for var_name, limit in clamp_limits.items():
         current = ranges.get(var_name)
         if current is None or current[0] < 0 or current[1] > limit:
@@ -121,9 +121,7 @@ def _loop_clamped_accumulator_ranges(
     return refined
 
 
-def _while_counter_bound(
-    self, node: A.While
-) -> Tuple[Optional[str], Optional[int], int]:
+def _while_counter_bound(self, node: A.While) -> tuple[str | None, int | None, int]:
     if not isinstance(node.cond, A.BinaryOp):
         return None, None, 0
     if node.cond.op not in {"<", "<="}:
@@ -173,9 +171,9 @@ def _loop_accumulator_budget(
     self,
     body: Iterable[A.ASTNode],
     counter_name: str,
-    field_ranges: Dict[FieldKey, IntRange],
-) -> Tuple[Optional[str], Optional[int]]:
-    acc_name: Optional[str] = None
+    field_ranges: dict[FieldKey, IntRange],
+) -> tuple[str | None, int | None]:
+    acc_name: str | None = None
     budget = 0
     found_growth = False
     saved_ranges = getattr(self, "_codegen_int_ranges", {})
@@ -238,9 +236,9 @@ def _loop_accumulator_budget(
     return acc_name, budget
 
 
-def _simulate_local_decl_range(self, var_name: str, expr: Optional[A.ASTNode]) -> None:
+def _simulate_local_decl_range(self, var_name: str, expr: A.ASTNode | None) -> None:
     remember_string_length_range(self, var_name, expr)
-    ranges: Dict[str, IntRange] = getattr(self, "_codegen_int_ranges", {})
+    ranges: dict[str, IntRange] = getattr(self, "_codegen_int_ranges", {})
     if expr is None:
         ranges.pop(var_name, None)
         return
@@ -253,12 +251,12 @@ def _simulate_local_decl_range(self, var_name: str, expr: Optional[A.ASTNode]) -
 
 
 def _while_accumulator_budget(
-    self, node: A.While, field_ranges: Dict[FieldKey, IntRange]
-) -> Tuple[Optional[str], Optional[int]]:
+    self, node: A.While, field_ranges: dict[FieldKey, IntRange]
+) -> tuple[str | None, int | None]:
     counter, bound, step = _while_counter_bound(self, node)
     if counter is None or bound is None or step <= 0:
         return None, None
-    ranges: Dict[str, IntRange] = getattr(self, "_codegen_int_ranges", {})
+    ranges: dict[str, IntRange] = getattr(self, "_codegen_int_ranges", {})
     current = ranges.get(counter)
     if current is None or current[0] > bound:
         return None, None
@@ -288,17 +286,17 @@ def _while_accumulator_budget(
 
 def _exact_indexed_reduction_budget(
     self, node: A.While, counter: str, start: int, bound: int, step: int
-) -> Tuple[Optional[str], Optional[int]]:
+) -> tuple[str | None, int | None]:
     details = _exact_indexed_reduction_details(self, node, counter, start, bound, step)
     return details[0], details[1]
 
 
 def _exact_indexed_reduction_details(
     self, node: A.While, counter: str, start: int, bound: int, step: int
-) -> Tuple[Optional[str], Optional[int], Optional[int]]:
-    acc_name: Optional[str] = None
-    add_term: Optional[A.ArrayAccess] = None
-    array_name: Optional[str] = None
+) -> tuple[str | None, int | None, int | None]:
+    acc_name: str | None = None
+    add_term: A.ArrayAccess | None = None
+    array_name: str | None = None
     for stmt in node.body:
         if isinstance(stmt, A.Assign) and stmt.var_name == counter:
             continue
@@ -332,7 +330,7 @@ def _exact_indexed_reduction_details(
 
 
 def _simulate_field_assign_range(
-    self, stmt: A.FieldAssign, field_ranges: Dict[FieldKey, IntRange]
+    self, stmt: A.FieldAssign, field_ranges: dict[FieldKey, IntRange]
 ) -> None:
     if not isinstance(stmt.object_expr, A.Variable):
         return
@@ -352,9 +350,7 @@ def _simulate_field_assign_range(
     )
 
 
-def _self_accumulator_terms(
-    var_name: str, expr: A.ASTNode
-) -> Optional[List[A.ASTNode]]:
+def _self_accumulator_terms(var_name: str, expr: A.ASTNode) -> list[A.ASTNode] | None:
     terms = _flatten_add(expr)
     if not terms:
         return None
@@ -364,15 +360,15 @@ def _self_accumulator_terms(
     return terms[1:]
 
 
-def _flatten_add(expr: A.ASTNode) -> List[A.ASTNode]:
+def _flatten_add(expr: A.ASTNode) -> list[A.ASTNode]:
     if isinstance(expr, A.BinaryOp) and expr.op == "+":
         return _flatten_add(expr.left) + _flatten_add(expr.right)
     return [expr]
 
 
 def _expr_int_range_with_fields(
-    self, expr: A.ASTNode, field_ranges: Dict[FieldKey, IntRange]
-) -> Optional[IntRange]:
+    self, expr: A.ASTNode, field_ranges: dict[FieldKey, IntRange]
+) -> IntRange | None:
     saved = getattr(self, "_codegen_field_int_ranges", {})
     try:
         self._codegen_field_int_ranges = field_ranges

@@ -28,14 +28,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from parser import ast as A
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
 
 from ast_access import arg_at
 
 # Type aliases used widely. Re-exported here to avoid a tangled import
 # graph -- emit_prologue and the tests import these names from here.
-RecordField = Tuple[str, str]  # (field_name, field_type)
-ClassField = Tuple[str, str, str]  # (visibility, field_name, field_type)
+RecordField = tuple[str, str]  # (field_name, field_type)
+ClassField = tuple[str, str, str]  # (visibility, field_name, field_type)
 
 
 @dataclass(slots=True)
@@ -49,50 +49,48 @@ class TypeInfo:
 
     # ==================== Type tables (TypeCollector) ====================
 
-    records: Dict[str, List[RecordField]] = field(default_factory=dict)
+    records: dict[str, list[RecordField]] = field(default_factory=dict)
     # Record field default expressions, keyed by record then field name.  Kept
     # separate from ``records`` so the long-standing ``(name, type)`` shape
     # remains stable for layout/type consumers.
-    record_defaults: Dict[str, Dict[str, A.ASTNode]] = field(default_factory=dict)
-    opaque_records: Set[str] = field(default_factory=set)
-    extern_record_c_names: Dict[str, str] = field(default_factory=dict)
-    extern_record_c_name_explicit: Set[str] = field(default_factory=set)
-    extern_record_opaque: Set[str] = field(default_factory=set)
-    extern_record_layouts: Dict[str, Dict[str, Any]] = field(default_factory=dict)
-    unions: Dict[str, List[RecordField]] = field(default_factory=dict)
-    enums: Dict[str, List[Tuple[str, int]]] = field(default_factory=dict)
+    record_defaults: dict[str, dict[str, A.ASTNode]] = field(default_factory=dict)
+    opaque_records: set[str] = field(default_factory=set)
+    extern_record_c_names: dict[str, str] = field(default_factory=dict)
+    extern_record_c_name_explicit: set[str] = field(default_factory=set)
+    extern_record_opaque: set[str] = field(default_factory=set)
+    extern_record_layouts: dict[str, dict[str, Any]] = field(default_factory=dict)
+    unions: dict[str, list[RecordField]] = field(default_factory=dict)
+    enums: dict[str, list[tuple[str, int]]] = field(default_factory=dict)
     # Class entry: ([(visibility, field_name, field_type), ...], [methods])
-    classes: Dict[str, Tuple[List[ClassField], List[A.Function]]] = field(
+    classes: dict[str, tuple[list[ClassField], list[A.Function]]] = field(
         default_factory=dict
     )
     # Class field initializers.  The class layout table intentionally omits
     # expressions; constructor lowering consults this map when a field has a
     # declaration-time default.
-    class_field_defaults: Dict[str, Dict[str, A.ASTNode]] = field(
-        default_factory=dict
-    )
+    class_field_defaults: dict[str, dict[str, A.ASTNode]] = field(default_factory=dict)
     # Function entry: ([param_type_names], return_type_name)
-    functions: Dict[str, Tuple[List[str], str]] = field(default_factory=dict)
+    functions: dict[str, tuple[list[str], str]] = field(default_factory=dict)
     # Data-carrying enum variants: enum_name -> {variant_name -> [(field_name, field_type)]}
-    data_enums: Dict[str, Dict[str, List[Tuple[str, str]]]] = field(
+    data_enums: dict[str, dict[str, list[tuple[str, str]]]] = field(
         default_factory=dict
     )
     # Decorators attached to type definitions: type_name -> [decorator_names]
-    type_decorators: Dict[str, List[Any]] = field(default_factory=dict)
+    type_decorators: dict[str, list[Any]] = field(default_factory=dict)
     # Compile-time type aliases, including range aliases.
-    type_aliases: Dict[str, Any] = field(default_factory=dict)
-    callback_aliases: Dict[str, Any] = field(default_factory=dict)
+    type_aliases: dict[str, Any] = field(default_factory=dict)
+    callback_aliases: dict[str, Any] = field(default_factory=dict)
     # Function default-arg metadata: fn_name -> [(param_index, default_value_node)]
-    func_defaults: Dict[str, List[Tuple[int, A.ASTNode]]] = field(default_factory=dict)
+    func_defaults: dict[str, list[tuple[int, A.ASTNode]]] = field(default_factory=dict)
     # Functions / methods that participate in a call cycle. Computed once per
     # compile by ``TypeCollector`` from the call graph; consumed during emit
     # to decide whether to wrap a function body in a recursion-depth guard.
     # Names are bare for free functions, ``Class_method`` for methods.
-    recursive_funcs: Set[str] = field(default_factory=set)
+    recursive_funcs: set[str] = field(default_factory=set)
     # User functions whose string return value is known to be heap-owned.
     # Literal/borrowed string returns stay out of this set so the C backend
     # does not free static storage returned through a `: string` signature.
-    owned_string_return_funcs: Set[str] = field(default_factory=set)
+    owned_string_return_funcs: set[str] = field(default_factory=set)
 
     # ==================== Variable typing (VarTypingScanner) ====================
     #
@@ -102,17 +100,17 @@ class TypeInfo:
     # they were that way on the legacy mixin; folding them into per-scope
     # dicts is a future cleanup.
 
-    string_vars: Dict[Optional[str], Set[str]] = field(default_factory=dict)
-    vec256_vars: Dict[Optional[str], Set[str]] = field(default_factory=dict)
-    vec512_vars: Dict[Optional[str], Set[str]] = field(default_factory=dict)
-    array_vars: Set[str] = field(default_factory=set)
-    dict_vars: Set[str] = field(default_factory=set)
-    dyn_array_vars: Set[str] = field(default_factory=set)
-    enum_vars: Set[str] = field(default_factory=set)
+    string_vars: dict[str | None, set[str]] = field(default_factory=dict)
+    vec256_vars: dict[str | None, set[str]] = field(default_factory=dict)
+    vec512_vars: dict[str | None, set[str]] = field(default_factory=dict)
+    array_vars: set[str] = field(default_factory=set)
+    dict_vars: set[str] = field(default_factory=set)
+    dyn_array_vars: set[str] = field(default_factory=set)
+    enum_vars: set[str] = field(default_factory=set)
     # Variable -> AILang type name (for typeof() and field-access type-resolution).
-    var_types: Dict[str, str] = field(default_factory=dict)
+    var_types: dict[str, str] = field(default_factory=dict)
     # Owned-string locals read exactly once -- consume-on-read candidates.
-    single_use_owned_strings: Set[str] = field(default_factory=set)
+    single_use_owned_strings: set[str] = field(default_factory=set)
 
     # ==================== Queries ====================
     #
@@ -137,6 +135,7 @@ class TypeInfo:
             "bin",
             "oct",
             "str_replace",
+            "str_escape_json",
             "typeof",
             "str_array_get",
             "str_array_join",
@@ -222,9 +221,7 @@ class TypeInfo:
                     return True
         return False
 
-    def might_be_string_static(
-        self, node: A.ASTNode, func_scope: Optional[str]
-    ) -> bool:
+    def might_be_string_static(self, node: A.ASTNode, func_scope: str | None) -> bool:
         """Static check used during the var-typing scan itself: the
         scanner needs to ask 'is this RHS a string?' to decide whether
         to record the LHS as a string var. Same body as
@@ -257,7 +254,7 @@ class TypeInfo:
                 return True
         return False
 
-    def might_be_string(self, node: A.ASTNode, current_function: Optional[str]) -> bool:
+    def might_be_string(self, node: A.ASTNode, current_function: str | None) -> bool:
         """Full string-typing check used during emit. Accepts user-fn
         return types in addition to the built-in string-returning set
         consulted by ``might_be_string_static``."""
@@ -286,7 +283,7 @@ class TypeInfo:
                 return True
         return False
 
-    def field_ailang_type(self, parent_type: str, field_name: str) -> Optional[str]:
+    def field_ailang_type(self, parent_type: str, field_name: str) -> str | None:
         """Return the declared AILang type of a record/class field."""
         record_fields = self.records.get(parent_type)
         if record_fields:
@@ -301,9 +298,7 @@ class TypeInfo:
                     return ftype
         return None
 
-    def class_ptr_type(
-        self, node: A.ASTNode, current_class: Optional[str]
-    ) -> Optional[str]:
+    def class_ptr_type(self, node: A.ASTNode, current_class: str | None) -> str | None:
         """Return the class name if ``node`` evaluates to a class pointer.
 
         Classes have pointer semantics in C output. Many code-gen

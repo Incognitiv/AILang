@@ -1,21 +1,27 @@
-// AILang-native metadata for the release hard gate.
-// The Python runner owns execution; this file is the self-hosted contract that
-// keeps gate identity visible to AILang-side tooling.
+// AILang-native metadata for the Golden Gate release contract.
+// Python currently owns orchestration; this file keeps the contract visible to
+// AILang-side tooling so a future self-hosted compiler can inherit it directly.
 
-const int AILANG_HARD_GATE_STEP_COUNT = 6
+const int AILANG_GOLDEN_GATE_STEP_COUNT = 9
 
 const string AILANG_GATE_SOURCE_STRICT = "source_strict"
 const string AILANG_GATE_VERIFIER_STRICT = "verifier_strict"
+const string AILANG_GATE_REPOSITORY_HYGIENE = "repository_hygiene"
+const string AILANG_GATE_FULL_PYTEST = "full_pytest"
 const string AILANG_GATE_C23_HOSTED = "c23_hosted_compile"
 const string AILANG_GATE_C23_FREESTANDING = "c23_freestanding_compile"
-const string AILANG_GATE_FOCUSED_PYTEST = "focused_pytest"
-const string AILANG_GATE_C23_WORKLOAD_COMPARE = "c23_workload_compare"
+const string AILANG_GATE_BACKEND_DIFFERENTIAL = "backend_differential"
+const string AILANG_GATE_EXECUTION_MATRIX = "ailang_execution_matrix"
+const string AILANG_GATE_EQUIVALENT_WORKLOADS = "equivalent_workload_parity"
 
-def hard_gate_step_count(): int
-    return AILANG_HARD_GATE_STEP_COUNT
+// Compatibility alias for tooling written before the Golden Gate rename.
+const int AILANG_HARD_GATE_STEP_COUNT = 9
+
+def golden_gate_step_count(): int
+    return AILANG_GOLDEN_GATE_STEP_COUNT
 end
 
-def hard_gate_step_name(index: int): string
+def golden_gate_step_name(index: int): string
     if index == 0 then
         return AILANG_GATE_SOURCE_STRICT
     end
@@ -23,27 +29,47 @@ def hard_gate_step_name(index: int): string
         return AILANG_GATE_VERIFIER_STRICT
     end
     if index == 2 then
-        return AILANG_GATE_C23_HOSTED
+        return AILANG_GATE_REPOSITORY_HYGIENE
     end
     if index == 3 then
-        return AILANG_GATE_C23_FREESTANDING
+        return AILANG_GATE_FULL_PYTEST
     end
     if index == 4 then
-        return AILANG_GATE_FOCUSED_PYTEST
+        return AILANG_GATE_C23_HOSTED
     end
     if index == 5 then
-        return AILANG_GATE_C23_WORKLOAD_COMPARE
+        return AILANG_GATE_C23_FREESTANDING
+    end
+    if index == 6 then
+        return AILANG_GATE_BACKEND_DIFFERENTIAL
+    end
+    if index == 7 then
+        return AILANG_GATE_EXECUTION_MATRIX
+    end
+    if index == 8 then
+        return AILANG_GATE_EQUIVALENT_WORKLOADS
     end
     return ""
 end
 
+def hard_gate_step_count(): int
+    return AILANG_HARD_GATE_STEP_COUNT
+end
+
+def hard_gate_step_name(index: int): string
+    return golden_gate_step_name(index)
+end
+
 def main(): int
-    print hard_gate_step_count()
-    print hard_gate_step_name(0)
-    print hard_gate_step_name(1)
-    print hard_gate_step_name(2)
-    print hard_gate_step_name(3)
-    print hard_gate_step_name(4)
-    print hard_gate_step_name(5)
+    print golden_gate_step_count()
+    print golden_gate_step_name(0)
+    print golden_gate_step_name(1)
+    print golden_gate_step_name(2)
+    print golden_gate_step_name(3)
+    print golden_gate_step_name(4)
+    print golden_gate_step_name(5)
+    print golden_gate_step_name(6)
+    print golden_gate_step_name(7)
+    print golden_gate_step_name(8)
     return 0
 end

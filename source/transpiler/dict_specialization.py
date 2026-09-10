@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from parser import ast as A
-from typing import Dict, List, Optional, Set
 
 UINT64_MASK = (1 << 64) - 1
 
@@ -26,14 +25,14 @@ def _hash_literal_key(key: str) -> int:
     return h
 
 
-def _literal_key(node: A.ASTNode) -> Optional[str]:
+def _literal_key(node: A.ASTNode) -> str | None:
     if isinstance(node, A.StringLit):
         return node.value
     return None
 
 
-def _literal_dict_slots(node: A.DictLit) -> Optional[Dict[str, int]]:
-    keys: List[str] = []
+def _literal_dict_slots(node: A.DictLit) -> dict[str, int] | None:
+    keys: list[str] = []
     for key, _value in node.pairs:
         literal = _literal_key(key)
         if literal is None:
@@ -41,8 +40,8 @@ def _literal_dict_slots(node: A.DictLit) -> Optional[Dict[str, int]]:
         if literal not in keys:
             keys.append(literal)
     capacity = _dict_stack_capacity(len(node.pairs))
-    slots: Dict[str, int] = {}
-    occupied: Set[int] = set()
+    slots: dict[str, int] = {}
+    occupied: set[int] = set()
     for key in keys:
         slot = _hash_literal_key(key) & (capacity - 1)
         while slot in occupied:
@@ -53,10 +52,10 @@ def _literal_dict_slots(node: A.DictLit) -> Optional[Dict[str, int]]:
 
 
 def fixed_dict_literal_slots(
-    body: List[A.ASTNode], tracked_dicts: Set[str]
-) -> Dict[str, Dict[str, int]]:
-    literal_inits: Dict[str, A.DictLit] = {}
-    invalid: Set[str] = set()
+    body: list[A.ASTNode], tracked_dicts: set[str]
+) -> dict[str, dict[str, int]]:
+    literal_inits: dict[str, A.DictLit] = {}
+    invalid: set[str] = set()
 
     def note_init(var_name: str, value: A.ASTNode) -> None:
         if var_name not in tracked_dicts:
@@ -136,7 +135,7 @@ def fixed_dict_literal_slots(
                     if not isinstance(child, (str, int, bool, float, tuple)):
                         check_expr(child)
 
-    def _keys_for(var_name: str) -> Set[str]:
+    def _keys_for(var_name: str) -> set[str]:
         init = literal_inits.get(var_name)
         if init is None:
             return set()

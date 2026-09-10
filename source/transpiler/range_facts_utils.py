@@ -2,20 +2,21 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from parser import ast as A
-from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any
 
 from ast_access import arg_at
 
 
-def collect_assigned_vars(analyzer: Any, nodes: Iterable[A.ASTNode]) -> Set[str]:
-    assigned: Set[str] = set()
+def collect_assigned_vars(analyzer: Any, nodes: Iterable[A.ASTNode]) -> set[str]:
+    assigned: set[str] = set()
     for node in nodes:
-        if isinstance(node, A.Assign):
-            assigned.add(node.var_name)
-        elif isinstance(node, A.VarDecl):
-            assigned.add(node.var_name)
-        elif isinstance(node, A.RangeVarDecl):
+        if (
+            isinstance(node, A.Assign)
+            or isinstance(node, A.VarDecl)
+            or isinstance(node, A.RangeVarDecl)
+        ):
             assigned.add(node.var_name)
         elif isinstance(node, A.TupleAssign):
             assigned.update(node.var_names)
@@ -25,7 +26,7 @@ def collect_assigned_vars(analyzer: Any, nodes: Iterable[A.ASTNode]) -> Set[str]
         elif isinstance(node, A.While):
             assigned |= analyzer._collect_assigned_vars(node.body)
         elif isinstance(node, A.For):
-            parts: List[A.ASTNode] = []
+            parts: list[A.ASTNode] = []
             if node.init is not None:
                 parts.append(node.init)
             parts.extend(node.body)
@@ -37,8 +38,8 @@ def collect_assigned_vars(analyzer: Any, nodes: Iterable[A.ASTNode]) -> Set[str]
 
 def capture_expr_tree(
     analyzer: Any,
-    expr: Optional[A.ASTNode],
-    func_scope: Optional[str],
+    expr: A.ASTNode | None,
+    func_scope: str | None,
     facts: Any,
 ) -> None:
     if expr is None or not isinstance(expr, A.ASTNode):
@@ -73,7 +74,7 @@ def iter_child_nodes(analyzer: Any, value: object) -> Iterable[A.ASTNode]:
 
 def invalidate_non_locked_scope(
     analyzer: Any,
-    func_scope: Optional[str],
+    func_scope: str | None,
     facts: Any,
     *,
     reason: str,
@@ -99,7 +100,7 @@ def invalidate_non_locked_scope(
 
 
 def invalidate_for_side_effect(
-    analyzer: Any, func_scope: Optional[str], facts: Any
+    analyzer: Any, func_scope: str | None, facts: Any
 ) -> None:
     analyzer._invalidate_non_locked_scope(
         func_scope,
@@ -136,7 +137,7 @@ def node_is_unknown_side_effect_barrier(analyzer: Any, node: A.ASTNode) -> bool:
     }
 
 
-def expr_contains_unknown_side_effect(analyzer: Any, expr: Optional[A.ASTNode]) -> bool:
+def expr_contains_unknown_side_effect(analyzer: Any, expr: A.ASTNode | None) -> bool:
     if expr is None:
         return False
     for node in analyzer._walk_ast(expr):
@@ -157,16 +158,16 @@ def contains_unknown_side_effect_call(
 
 def infer_array_info(
     analyzer: Any,
-    expr: Optional[A.ASTNode],
-    func_scope: Optional[str],
+    expr: A.ASTNode | None,
+    func_scope: str | None,
     facts: Any,
-    scope: Dict[str, Any],
+    scope: dict[str, Any],
     interval_ctor: Callable[[int, int], Any],
-) -> Optional[Tuple[Any, int]]:
+) -> tuple[Any, int] | None:
     if expr is None:
         return None
     if isinstance(expr, A.ArrayLit):
-        vals: List[int] = []
+        vals: list[int] = []
         for elem in expr.elements:
             if not isinstance(elem, A.Number) or not isinstance(elem.value, int):
                 return None
@@ -199,10 +200,10 @@ def infer_array_info(
 
 def observe_calls_in_expr(
     analyzer: Any,
-    expr: Optional[A.ASTNode],
-    func_scope: Optional[str],
+    expr: A.ASTNode | None,
+    func_scope: str | None,
     facts: Any,
-    scope: Dict[str, Any],
+    scope: dict[str, Any],
 ) -> None:
     if expr is None:
         return
@@ -226,9 +227,9 @@ def observe_calls_in_expr(
 
 def _string_info_from_expr(
     facts: Any,
-    func_scope: Optional[str],
+    func_scope: str | None,
     expr: A.ASTNode,
-    scope: Optional[Dict[str, Any]] = None,
+    scope: dict[str, Any] | None = None,
 ):
     if isinstance(expr, A.StringLit):
         from .range_facts_types import string_info_from_literal
@@ -249,7 +250,7 @@ def _string_info_from_expr(
     return None
 
 
-def _strlen_source_var(expr: Optional[A.ASTNode]) -> Optional[str]:
+def _strlen_source_var(expr: A.ASTNode | None) -> str | None:
     if not isinstance(expr, A.Call):
         return None
     if expr.name not in {"strlen", "len"} or len(expr.args or []) != 1:
@@ -262,9 +263,9 @@ def _strlen_source_var(expr: Optional[A.ASTNode]) -> Optional[str]:
 
 def _remember_or_clear_strlen_var(
     facts: Any,
-    func_scope: Optional[str],
+    func_scope: str | None,
     target_var: str,
-    expr: Optional[A.ASTNode],
+    expr: A.ASTNode | None,
 ) -> None:
     facts.clear_string_len_var(func_scope, target_var)
     source = _strlen_source_var(expr)
@@ -274,10 +275,10 @@ def _remember_or_clear_strlen_var(
 
 def _remember_or_clear_string_info(
     facts: Any,
-    func_scope: Optional[str],
+    func_scope: str | None,
     target_var: str,
-    expr: Optional[A.ASTNode],
-    scope: Optional[Dict[str, Any]] = None,
+    expr: A.ASTNode | None,
+    scope: dict[str, Any] | None = None,
 ) -> None:
     facts.clear_string_info(func_scope, target_var)
     if expr is None:
@@ -287,7 +288,7 @@ def _remember_or_clear_string_info(
         facts.set_string_info(func_scope, target_var, info)
 
 
-def _expr_roots_for_guarded_char_at(stmt: A.ASTNode) -> List[A.ASTNode]:
+def _expr_roots_for_guarded_char_at(stmt: A.ASTNode) -> list[A.ASTNode]:
     """Expressions in a statement, excluding nested statement bodies.
 
     This keeps symbolic loop-bound proofs local to expressions reached before a
@@ -299,7 +300,7 @@ def _expr_roots_for_guarded_char_at(stmt: A.ASTNode) -> List[A.ASTNode]:
     if isinstance(stmt, A.Assign):
         return [stmt.value]
     if isinstance(stmt, A.RangeVarDecl):
-        roots: List[A.ASTNode] = []
+        roots: list[A.ASTNode] = []
         if stmt.init_value is not None:
             roots.append(stmt.init_value)
         roots.extend([stmt.range_type.low, stmt.range_type.high])
@@ -327,7 +328,7 @@ def _expr_roots_for_guarded_char_at(stmt: A.ASTNode) -> List[A.ASTNode]:
     return []
 
 
-def _stmt_assigns_any(stmt: A.ASTNode, names: Set[str]) -> bool:
+def _stmt_assigns_any(stmt: A.ASTNode, names: set[str]) -> bool:
     if isinstance(stmt, (A.Assign, A.VarDecl, A.RangeVarDecl)):
         return getattr(stmt, "var_name", None) in names
     if isinstance(stmt, A.TupleAssign):
@@ -347,7 +348,7 @@ def _intersect_interval(
 
 
 def _refine_scope_with_var_bound(
-    scope: Dict[str, Any],
+    scope: dict[str, Any],
     var_name: str,
     *,
     low: int,
@@ -367,7 +368,7 @@ def _refine_scope_with_var_bound(
 
 def _refine_scope_for_condition(
     cond: A.ASTNode,
-    scope: Dict[str, Any],
+    scope: dict[str, Any],
     *,
     truthy: bool,
     interval_ctor: Callable[[int, int], Any],
@@ -436,7 +437,7 @@ def _refine_scope_for_condition(
 
 def _relation_for_condition(
     cond: A.ASTNode, *, truthy: bool
-) -> Optional[Tuple[str, str, str]]:
+) -> tuple[str, str, str] | None:
     if not isinstance(cond, A.BinaryOp):
         return None
     if cond.op not in {">", ">=", "<", "<=", "=="}:
@@ -458,9 +459,7 @@ def _relation_for_condition(
     return cond.left.name, op, cond.right.name
 
 
-def _drop_relations_for_var(
-    facts: Any, func_scope: Optional[str], var_name: str
-) -> None:
+def _drop_relations_for_var(facts: Any, func_scope: str | None, var_name: str) -> None:
     relations = facts.scope_relations.get(func_scope)
     if not relations:
         return
@@ -470,8 +469,8 @@ def _drop_relations_for_var(
 
 
 def _relations_with_condition(
-    base: Set[Tuple[str, str, str]], cond: A.ASTNode, *, truthy: bool
-) -> Set[Tuple[str, str, str]]:
+    base: set[tuple[str, str, str]], cond: A.ASTNode, *, truthy: bool
+) -> set[tuple[str, str, str]]:
     out = set(base)
     relation = _relation_for_condition(cond, truthy=truthy)
     if relation is not None:
@@ -479,7 +478,7 @@ def _relations_with_condition(
     return out
 
 
-def _body_exits_current_path(body: List[A.ASTNode]) -> bool:
+def _body_exits_current_path(body: list[A.ASTNode]) -> bool:
     if not body:
         return False
     return isinstance(body[-1], (A.Break, A.Continue, A.Return, A.Throw))

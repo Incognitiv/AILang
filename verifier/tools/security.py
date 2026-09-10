@@ -6,12 +6,12 @@ import contextlib
 import importlib
 import io
 import logging
-from typing import Any, Dict, cast
+from typing import Any, cast
 
 from .common import validate_filepath
 
 
-def run_pip_audit(_filepath: str) -> Dict[str, Any]:
+def run_pip_audit(_filepath: str) -> dict[str, Any]:
     """Run pip-audit for dependency CVEs.
 
     Note: pip-audit scans the entire Python environment.
@@ -49,7 +49,7 @@ def run_pip_audit(_filepath: str) -> Dict[str, Any]:
             "issues": [],
             "error": "pip-audit not installed",
         }
-    except (OSError, IOError, RuntimeError) as exc:
+    except (OSError, RuntimeError) as exc:
         return {
             "passed": True,
             "vulnerabilities_count": 0,
@@ -58,7 +58,7 @@ def run_pip_audit(_filepath: str) -> Dict[str, Any]:
         }
 
 
-def run_detect_secrets(filepath: str) -> Dict[str, Any]:
+def run_detect_secrets(filepath: str) -> dict[str, Any]:
     """Run detect-secrets using its Python API."""
     try:
         scan_mod = cast(Any, importlib.import_module("detect_secrets.core.scan"))
@@ -89,7 +89,7 @@ def run_detect_secrets(filepath: str) -> Dict[str, Any]:
                 secrets = list(scan_mod.scan_file(validated_path))
         issues = [f"Potential secret: {s.type}" for s in secrets[:100]]
         return {"passed": not secrets, "secrets_count": len(secrets), "issues": issues}
-    except (OSError, IOError, ValueError) as exc:
+    except (OSError, ValueError) as exc:
         return {"passed": True, "secrets_count": 0, "issues": [], "error": str(exc)}
     finally:
         logger.setLevel(prev_level)

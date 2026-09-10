@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Optional, Tuple
 
-
-def parse_fixed_array_type_spec(atype: str) -> Optional[Tuple[str, int]]:
+def parse_fixed_array_type_spec(atype: str) -> tuple[str, int] | None:
     """Parse canonical fixed-array type string: ``[elem;N]``."""
     spec = atype.strip()
     if not (spec.startswith("[") and spec.endswith("]")):

@@ -4,9 +4,11 @@ AILang's 256..8192-bit integer ladder maps to C23 ``_BitInt`` types on the
 C backend.  Keeping this metadata centralized prevents type lowering,
 expression emission and printing from disagreeing about widths/signedness.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
+
 
 @dataclass(frozen=True)
 class WideIntInfo:
@@ -15,6 +17,7 @@ class WideIntInfo:
     unsigned: bool
     c_name: str
     suffix: str
+
 
 _CANON = [
     ("wide", 256, False, "ailang_i256", "i256", ("wide", "i256")),

@@ -31,7 +31,7 @@ from __future__ import annotations
 import ctypes
 import threading
 import time
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 # --------------------------------------------------------------------------
 # State (held on a single instance to keep mutation explicit and avoid the
@@ -65,8 +65,8 @@ class _State:
         # histogram of stacks-as-seen — gives a sample-based view that
         # complements the deterministic blame report (the blame says where
         # time was *attributed*; samples say where it was *caught*).
-        self.sampling_thread: Optional[threading.Thread] = None
-        self.sampling_stop: Optional[threading.Event] = None
+        self.sampling_thread: threading.Thread | None = None
+        self.sampling_stop: threading.Event | None = None
         self.sampling_interval_s: float = 0.001  # 1 ms = 1 kHz default
         self.sample_hist: dict[str, int] = {}
 

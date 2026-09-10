@@ -23,7 +23,7 @@ from parser.ast import (
     VarDecl,
 )
 from parser.parser import Parser
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Optional
 
 from lexer.scan import tokenize
 
@@ -32,9 +32,9 @@ class ModuleCache:
     """Caches loaded modules to avoid re-parsing"""
 
     def __init__(self):
-        self.modules: Dict[str, "Module"] = {}
-        self.loading: Set[str] = set()  # Detect circular imports
-        self.mtimes: Dict[str, float] = {}  # L13 fix: Track file modification times
+        self.modules: dict[str, Module] = {}
+        self.loading: set[str] = set()  # Detect circular imports
+        self.mtimes: dict[str, float] = {}  # L13 fix: Track file modification times
 
     @staticmethod
     def _cache_key(path: str) -> str:
@@ -90,14 +90,16 @@ class ModuleCache:
 class Module:
     """Represents a loaded AILang module"""
 
-    def __init__(self, name: str, path: str, ast: List[ASTNode]):
+    def __init__(self, name: str, path: str, ast: list[ASTNode]):
         self.name = name
         self.path = path
         self.ast = ast
-        self.exports: Dict[str, ASTNode] = {}
-        self.link_directives: List[LinkDirective] = []
+        self.exports: dict[str, ASTNode] = {}
+        # Public interface and implementation closure are separate.
+        self.implementation: dict[str, ASTNode] = {}
+        self.link_directives: list[LinkDirective] = []
         self.is_library = False
-        self.library_name: Optional[str] = None
+        self.library_name: str | None = None
 
         self._extract_exports()
 
@@ -116,40 +118,48 @@ class Module:
             elif isinstance(node, Function):
                 # Stamp source path for the profiler's func -> file:line map.
                 node._source_path = self.path
-                # Export all non-private functions
-                if not node.name.startswith("_"):
+                self.implementation[node.name] = node
+                if getattr(node, "is_public", True) and not node.name.startswith("_"):
                     self.exports[node.name] = node
             elif isinstance(node, (RecordDef, EnumDef)):
+                self.implementation[node.name] = node
                 self.exports[node.name] = node
             elif isinstance(node, ClassDef):
                 # ClassDef methods get tagged too — they're emitted as
                 # functions and end up in the same instrumentation path.
                 node._source_path = self.path
+                self.implementation[node.name] = node
                 self.exports[node.name] = node
             elif isinstance(node, VarDecl):
+                self.implementation[node.var_name] = node
                 # Export all variables from library modules so imported functions
                 # can reference their module's mutable state (e.g. counters, tables).
                 # Non-library modules still only export const/public variables.
                 if self.is_library or node.is_const or node.is_public:
                     self.exports[node.var_name] = node
             # Export bare assignments from library modules (e.g. _count = 0)
-            # so imported functions can reference and mutate their module globals
+            # so imported functions can reference and mutate their module globals.
             elif isinstance(node, Assign) and self.is_library:
+                self.implementation[node.var_name] = node
                 self.exports[node.var_name] = node
             elif isinstance(node, LinkDirective):
                 self.link_directives.append(node)
 
-    def get_export(self, name: str) -> Optional[ASTNode]:
+    def get_export(self, name: str) -> ASTNode | None:
         """Get an exported symbol by name"""
         return self.exports.get(name)
 
-    def get_all_exports(self) -> Dict[str, ASTNode]:
-        """Get all exported symbols"""
+    def get_all_exports(self) -> dict[str, ASTNode]:
+        """Get the public source-level interface of this module."""
         return self.exports.copy()
+
+    def get_all_implementation(self) -> dict[str, ASTNode]:
+        """Get declarations required to lower this module's implementation."""
+        return self.implementation.copy()
 
 
 def _has_link_directive(
-    directives: List[LinkDirective], candidate: LinkDirective
+    directives: list[LinkDirective], candidate: LinkDirective
 ) -> bool:
     """Return True if an equivalent link directive is already present."""
     return any(
@@ -162,23 +172,24 @@ def _has_link_directive(
 class ModuleLoader:
     """Loads and resolves AILang modules"""
 
-    def __init__(self, search_paths: Optional[List[str]] = None):
+    def __init__(self, search_paths: list[str] | None = None):
         self.cache = ModuleCache()
         # Canonical language-module root.  Standard-library imports must not
         # depend on the caller's CWD or on the source file living inside the
         # repository tree (native/JIT temporary files commonly do not).
-        repo_root = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "..", "..")
-        )
+        repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
         requested = list(search_paths or [])
-        self.search_paths = [repo_root, *[p for p in requested if os.path.abspath(p) != repo_root]]
-        self.current_file: Optional[str] = None
+        self.search_paths = [
+            repo_root,
+            *[p for p in requested if os.path.abspath(p) != repo_root],
+        ]
+        self.current_file: str | None = None
 
     def set_current_file(self, path: str) -> None:
         """Set the current file being compiled (for relative imports)"""
         self.current_file = os.path.abspath(path)
 
-    def resolve_module_path(self, module_name: str) -> Optional[str]:
+    def resolve_module_path(self, module_name: str) -> str | None:
         """Resolve a module name to a file path
 
         Search order:
@@ -281,43 +292,70 @@ class ModuleLoader:
         self.current_file = path
         try:
             for node in ast:
-                if isinstance(node, Import):
-                    try:
-                        imported_mod = self.load_module(node.module_path)
-                        # Add all exports from the imported module to this module's exports
-                        # (unless they conflict with local definitions)
-                        for exp_name, exp_node in imported_mod.exports.items():
-                            if exp_name not in module.exports:
-                                module.exports[exp_name] = exp_node
-                        for link_directive in imported_mod.link_directives:
-                            if not _has_link_directive(
-                                module.link_directives, link_directive
-                            ):
-                                module.link_directives.append(link_directive)
-                    except ImportError as e:
-                        # Don't silently swallow import errors - report them
-                        import sys
+                if not isinstance(node, (Import, FromImport)):
+                    continue
+                try:
+                    imported_mod = self.load_module(node.module_path)
+                    requested_names = (
+                        node.names if isinstance(node, FromImport) else None
+                    )
+                    self._merge_dependency_exports(
+                        module,
+                        imported_mod,
+                        node.module_path,
+                        requested_names=requested_names,
+                    )
+                except ImportError as exc:
+                    # A selective import names an explicit contract: a missing
+                    # symbol is an error, not an optional dependency. Preserve
+                    # the historical warning behavior for plain imports only.
+                    if isinstance(node, FromImport):
+                        raise
+                    import sys
 
-                        print(
-                            f"Warning: Failed to import '{node.module_path}': {e}",
-                            file=sys.stderr,
-                        )
+                    print(
+                        f"Warning: Failed to import '{node.module_path}': {exc}",
+                        file=sys.stderr,
+                    )
         finally:
             self.current_file = old_file
 
         return module
 
+    @staticmethod
+    def _merge_dependency_exports(
+        module: Module,
+        imported_module: Module,
+        module_path: str,
+        *,
+        requested_names: list[str] | None,
+    ) -> None:
+        """Merge the symbol closure required by a nested module import."""
+        exports = imported_module.exports
+        for name, node in imported_module.implementation.items():
+            if name not in module.implementation:
+                module.implementation[name] = node
+        names = list(exports) if requested_names is None else requested_names
+        for name in names:
+            if name not in exports:
+                raise ImportError(f"Cannot import '{name}' from '{module_path}'")
+            if name not in module.exports:
+                module.exports[name] = exports[name]
+        for link_directive in imported_module.link_directives:
+            if not _has_link_directive(module.link_directives, link_directive):
+                module.link_directives.append(link_directive)
+
     def process_imports(
-        self, ast: List[ASTNode]
-    ) -> Tuple[List[ASTNode], Dict[str, Module]]:
+        self, ast: list[ASTNode]
+    ) -> tuple[list[ASTNode], dict[str, Module]]:
         """Process import statements in an AST
 
         Returns:
         - Modified AST with imports removed
         - Dict of imported modules (name -> Module)
         """
-        imports: Dict[str, Module] = {}
-        remaining_ast: List[ASTNode] = []
+        imports: dict[str, Module] = {}
+        remaining_ast: list[ASTNode] = []
 
         for node in ast:
             if isinstance(node, Import):
@@ -346,7 +384,7 @@ class ModuleLoader:
 
 
 # Module-level singleton holder (simple list avoids 'global' statement and class with too-few-methods)
-_LOADER_INSTANCE: List[ModuleLoader] = []
+_LOADER_INSTANCE: list[ModuleLoader] = []
 
 
 def get_loader() -> ModuleLoader:
@@ -356,7 +394,7 @@ def get_loader() -> ModuleLoader:
     return _LOADER_INSTANCE[0]
 
 
-def set_search_paths(paths: List[str]) -> None:
+def set_search_paths(paths: list[str]) -> None:
     """Set the module search paths"""
     get_loader().search_paths = paths
 
@@ -367,8 +405,8 @@ def load_module(name: str) -> Module:
 
 
 def process_imports(
-    ast: List[ASTNode], current_file: Optional[str] = None
-) -> Tuple[List[ASTNode], Dict[str, Module]]:
+    ast: list[ASTNode], current_file: str | None = None
+) -> tuple[list[ASTNode], dict[str, Module]]:
     """Process imports in an AST"""
     loader = get_loader()
     if current_file:

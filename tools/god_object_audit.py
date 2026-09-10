@@ -31,8 +31,10 @@ class FileMetrics:
     total_defs: int
     parse_ok: bool
     parse_error: str | None
+    oversized_module: bool
     god_object_candidate: bool
     reasons: list[str]
+    warnings: list[str]
 
 
 def _iter_py_files(targets: Iterable[Path]) -> list[Path]:
@@ -89,9 +91,14 @@ def _collect_metrics(
 
     total_defs = top_level_function_count + total_method_count
     reasons: list[str] = []
+    warnings: list[str] = []
+    oversized_module = line_count > max_file_lines
 
-    if line_count > max_file_lines:
-        reasons.append(f"line_count>{max_file_lines} ({line_count})")
+    # File length is module-size debt, not by itself evidence of a God Object.
+    # Keep it visible and trendable without conflating a long collection of
+    # small helpers with a class/module that has excessive responsibility.
+    if oversized_module:
+        warnings.append(f"line_count>{max_file_lines} ({line_count})")
     if max_methods_in_class > max_class_methods:
         cls_name = max_method_class_name or "<unknown>"
         reasons.append(
@@ -113,8 +120,10 @@ def _collect_metrics(
         total_defs=total_defs,
         parse_ok=parse_ok,
         parse_error=parse_error,
+        oversized_module=oversized_module,
         god_object_candidate=bool(reasons),
         reasons=reasons,
+        warnings=warnings,
     )
 
 
@@ -134,6 +143,7 @@ def _render_markdown(
     max_total_defs: int,
 ) -> str:
     candidates = [r for r in rows if r.god_object_candidate]
+    oversized = [r for r in rows if r.oversized_module]
     candidates_sorted = sorted(candidates, key=_severity_key, reverse=True)
     lines: list[str] = []
     lines.append("# God-Object Audit")
@@ -143,6 +153,7 @@ def _render_markdown(
     )
     lines.append(f"- scanned files: {len(rows)}")
     lines.append(f"- candidates: {len(candidates_sorted)}")
+    lines.append(f"- oversized modules: {len(oversized)}")
     lines.append("")
     lines.append(
         "| path | lines | classes | top funcs | methods | max class methods | total defs | reasons |"
@@ -218,6 +229,7 @@ def main() -> int:
         for path in files
     ]
     candidates = [r for r in rows if r.god_object_candidate]
+    oversized = [r for r in rows if r.oversized_module]
 
     payload = {
         "thresholds": {
@@ -227,8 +239,13 @@ def main() -> int:
         },
         "scanned_files": len(rows),
         "candidate_count": len(candidates),
+        "oversized_file_count": len(oversized),
+        "max_file_line_count": max((r.line_count for r in rows), default=0),
         "candidates": [
             asdict(r) for r in sorted(candidates, key=_severity_key, reverse=True)
+        ],
+        "oversized_files": [
+            asdict(r) for r in sorted(oversized, key=_severity_key, reverse=True)
         ],
         "all_files": [asdict(r) for r in rows],
     }
@@ -249,6 +266,7 @@ def main() -> int:
 
     print(f"scanned files: {len(rows)}")
     print(f"god-object candidates: {len(candidates)}")
+    print(f"oversized modules: {len(oversized)}")
     top = sorted(candidates, key=_severity_key, reverse=True)[:10]
     for row in top:
         print(f"- {row.path} :: {', '.join(row.reasons)}")

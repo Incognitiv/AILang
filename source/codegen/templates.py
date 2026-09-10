@@ -6,7 +6,7 @@ Handles foreign code injection via #template blocks
 import os
 import subprocess
 import tempfile
-from typing import Any, Optional
+from typing import Any
 
 TEMPLATE_COMPILE_TIMEOUT_SECONDS = 120
 
@@ -21,11 +21,11 @@ class TemplateBlock:
     language: str
     code: str
     captured_vars: list[str]
-    compiled_ir: Optional[str]
+    compiled_ir: str | None
     function_names: list[str]
 
     def __init__(
-        self, language: str, code: str, captured_vars: Optional[list[str]] = None
+        self, language: str, code: str, captured_vars: list[str] | None = None
     ) -> None:
         self.language = language
         self.code = code
@@ -151,7 +151,7 @@ class TemplateCompiler:
             },
         }
 
-    def compile_template(self, template_block: TemplateBlock) -> Optional[str]:
+    def compile_template(self, template_block: TemplateBlock) -> str | None:
         """Compile template block to LLVM IR"""
         template_config = self.templates.get(template_block.language)
         if not template_config:

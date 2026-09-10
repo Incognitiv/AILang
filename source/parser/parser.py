@@ -4,7 +4,7 @@ Implements recursive descent parser with operator precedence
 """
 
 import re
-from typing import NoReturn, Optional
+from typing import NoReturn
 
 from .parser_control_flow_advanced_impl import (
     _consume_match_default as _m_consume_match_default_impl,
@@ -282,13 +282,13 @@ class Parser:
             raise SyntaxError("Unexpected end of input \u2014 missing 'end' keyword?")
         return tt not in terminators
 
-    def peek(self) -> Optional[tuple[str, str, int, int]]:
+    def peek(self) -> tuple[str, str, int, int] | None:
         """Look at current token without consuming"""
         if self.pos < len(self.tokens):
             return self.tokens[self.pos]
         return None
 
-    def peek_type(self) -> Optional[str]:
+    def peek_type(self) -> str | None:
         """Get type of current token"""
         token = self.peek()
         if not token:
@@ -320,21 +320,21 @@ class Parser:
         _, _, _, col = token
         return col
 
-    def _get_token_line(self, token: Optional[tuple[str, str, int, int]]) -> int:
+    def _get_token_line(self, token: tuple[str, str, int, int] | None) -> int:
         """Safely get line number from a token tuple, returns -1 if invalid."""
         if token is None or len(token) < 3:
             return -1
         _ttype, _text, line, *_rest = token
         return line
 
-    def _get_token_col(self, token: Optional[tuple[str, str, int, int]]) -> int:
+    def _get_token_col(self, token: tuple[str, str, int, int] | None) -> int:
         """Safely get column number from a token tuple, returns 0 if invalid."""
         if token is None or len(token) < 4:
             return 0
         _ttype, _text, _line, col = token
         return col
 
-    def consume(self, expected_type: Optional[str] = None) -> str:
+    def consume(self, expected_type: str | None = None) -> str:
         """Consume current token and advance"""
         if self.pos >= len(self.tokens):
             raise SyntaxError("Unexpected end of input")

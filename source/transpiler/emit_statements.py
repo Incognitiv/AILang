@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from llvmlite import ir
 
 from .control_loop_utils import (
     close_streams_if_outer_loop as _m__close_streams_if_outer_loop,
 )
-from .emit_statements_basic import _emit_range_check as _m__emit_range_check
+from .emit_statements_assignment import _emit_range_check as _m__emit_range_check
+from .emit_statements_assignment import visit_Assign as _m_visit_Assign
+from .emit_statements_assignment import visit_TupleAssign as _m_visit_TupleAssign
 from .emit_statements_basic import _evaluate_comptime as _m__evaluate_comptime
 from .emit_statements_basic import visit_Assert as _m_visit_Assert
-from .emit_statements_basic import visit_Assign as _m_visit_Assign
 from .emit_statements_basic import visit_BlockCall as _m_visit_BlockCall
 from .emit_statements_basic import visit_Break as _m_visit_Break
 from .emit_statements_basic import visit_Call as _m_visit_Call
@@ -24,20 +26,19 @@ from .emit_statements_basic import visit_InlineAsm as _m_visit_InlineAsm
 from .emit_statements_basic import visit_RangeVarDecl as _m_visit_RangeVarDecl
 from .emit_statements_basic import visit_Return as _m_visit_Return
 from .emit_statements_basic import visit_StaticAssert as _m_visit_StaticAssert
-from .emit_statements_basic import visit_TupleAssign as _m_visit_TupleAssign
 from .emit_statements_basic import visit_TypeAlias as _m_visit_TypeAlias
 from .emit_statements_basic import visit_VarDecl as _m_visit_VarDecl
 from .emit_statements_block_each import _block_each as _m__block_each
-from .emit_statements_control_data import _block_times as _m__block_times
 from .emit_statements_control_data import visit_DictAssign as _m_visit_DictAssign
-from .emit_statements_control_data import visit_DoWhile as _m_visit_DoWhile
 from .emit_statements_control_data import visit_FieldAssign as _m_visit_FieldAssign
-from .emit_statements_control_data import visit_For as _m_visit_For
-from .emit_statements_control_data import visit_Foreach as _m_visit_Foreach
 from .emit_statements_control_data import visit_If as _m_visit_If
-from .emit_statements_control_data import visit_Loop as _m_visit_Loop
-from .emit_statements_control_data import visit_Repeat as _m_visit_Repeat
-from .emit_statements_control_data import visit_While as _m_visit_While
+from .emit_statements_loops import _block_times as _m__block_times
+from .emit_statements_loops import visit_DoWhile as _m_visit_DoWhile
+from .emit_statements_loops import visit_For as _m_visit_For
+from .emit_statements_loops import visit_Foreach as _m_visit_Foreach
+from .emit_statements_loops import visit_Loop as _m_visit_Loop
+from .emit_statements_loops import visit_Repeat as _m_visit_Repeat
+from .emit_statements_loops import visit_While as _m_visit_While
 from .emit_statements_match_exceptions import _can_use_switch as _m__can_use_switch
 from .emit_statements_match_exceptions import _default_value as _m__default_value
 from .emit_statements_match_exceptions import (

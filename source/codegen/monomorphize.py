@@ -15,10 +15,7 @@ from __future__ import annotations
 from parser import ast as A
 from parser.ast import parsed_type_to_str
 from parser.naming import mangle_generic_name
-from typing import TYPE_CHECKING, Any, Optional
-
-if TYPE_CHECKING:
-    pass
+from typing import Any
 
 __all__ = ["MonomorphizationError", "Monomorphizer", "mangle_generic_name"]
 
@@ -106,7 +103,7 @@ def substitute_in_stmt(stmt: A.ASTNode, substitutions: dict[str, str]) -> A.ASTN
         return A.Assign(stmt.var_name, new_value)
 
     if isinstance(stmt, A.Return):
-        ret_value: Optional[A.ASTNode] = None
+        ret_value: A.ASTNode | None = None
         if stmt.value:
             ret_value = substitute_in_expr(stmt.value, substitutions)
         return A.Return(ret_value)
@@ -144,11 +141,11 @@ def substitute_in_stmt(stmt: A.ASTNode, substitutions: dict[str, str]) -> A.ASTN
         return A.Match(new_expr, new_cases, new_default)
 
     if isinstance(stmt, A.For):
-        for_init: Optional[A.ASTNode] = None
+        for_init: A.ASTNode | None = None
         if stmt.init is not None:
             for_init = substitute_in_stmt(stmt.init, substitutions)
         new_cond = substitute_in_expr(stmt.cond, substitutions)
-        for_step: Optional[A.ASTNode] = None
+        for_step: A.ASTNode | None = None
         if stmt.step is not None:
             for_step = substitute_in_stmt(stmt.step, substitutions)
         new_body = [substitute_in_stmt(s, substitutions) for s in stmt.body]
@@ -250,7 +247,7 @@ def monomorphize_function_body(
 ) -> A.Function:
     """Substitute type parameters in a function's body."""
     # Substitute in parameter types
-    new_params: list[tuple[str, Any, Optional[Any]]] = []
+    new_params: list[tuple[str, Any, Any | None]] = []
     for param in func.params or []:
         if isinstance(param, tuple) and len(param) >= 2:
             param_name = param[0]
@@ -310,7 +307,7 @@ def monomorphize_generic_function(
     mangled_name = mangle_generic_name(generic_func.name, type_args)
 
     # Substitute in parameter types
-    new_params: list[tuple[str, Any, Optional[Any]]] = []
+    new_params: list[tuple[str, Any, Any | None]] = []
     for func_param in generic_func.params or []:
         if isinstance(func_param, tuple) and len(func_param) >= 2:
             param_name = func_param[0]

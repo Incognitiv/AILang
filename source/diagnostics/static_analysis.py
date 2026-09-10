@@ -11,7 +11,7 @@ These are WARNINGS, not errors - they don't block compilation.
 """
 
 from parser import ast as A
-from typing import ClassVar, Optional
+from typing import ClassVar
 
 from ast_access import arg_at
 from diagnostics.static_analysis_class_cleanup import (
@@ -32,7 +32,10 @@ from diagnostics.static_analysis_models import (
     NullState,
     VariableAccess,
 )
-from diagnostics.static_analysis_perf import check_string_concat_loops
+from diagnostics.static_analysis_perf import (
+    check_owned_string_into_borrowed_str_array,
+    check_string_concat_loops,
+)
 
 
 class StaticAnalyzer:
@@ -82,7 +85,7 @@ class StaticAnalyzer:
         # Functions and their contexts
         self.functions: dict[str, FunctionContext] = {}
         # Current function being analyzed
-        self.current_func: Optional[FunctionContext] = None
+        self.current_func: FunctionContext | None = None
         # Functions called via spawn
         self.spawned_functions: set[str] = set()
         # Functions called via parallel_map
@@ -119,6 +122,7 @@ class StaticAnalyzer:
         # the empirical 1500ms-vs-28ms demo. Suggest str_array_join.
         for node in ast_nodes:
             check_string_concat_loops(self, node, in_loop=False)
+            check_owned_string_into_borrowed_str_array(self, node)
 
         return self.warnings
 

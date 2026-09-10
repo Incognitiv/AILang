@@ -8,10 +8,11 @@ It deliberately rejects mutating/exposing uses outside the constructor.
 from __future__ import annotations
 
 import importlib
+from collections.abc import Iterable
 from dataclasses import dataclass
 from parser import ast as A
 from parser.ast import parsed_type_to_str
-from typing import Any, Iterable
+from typing import Any
 
 from ast_access import arg_at, body_at
 from transpiler.optimizer_decisions import record_virtual_string_arg

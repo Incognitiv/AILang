@@ -26,11 +26,17 @@ import sys
 from parser import ast as A
 from parser.parser import Parser
 from pathlib import Path
-from typing import Any, List, Optional, Set
+from typing import Any
 
 from lexer.scan import tokenize
 from target_info import os_from_platform, target_matches
 from transpiler.cbind_flags import headers_from_cflags
+from transpiler.import_visibility import (
+    import_sort_key,
+    reject_private_selective_imports,
+    tag_source_file,
+    validate_private_function_boundaries,
+)
 
 
 class ImportResolver:
@@ -45,13 +51,13 @@ class ImportResolver:
     # up the directory tree looking for the module file.
     _MAX_PARENT_WALK = 10
 
-    def run(self, nodes: List[A.ASTNode], source_file: str) -> List[A.ASTNode]:
+    def run(self, nodes: list[A.ASTNode], source_file: str) -> list[A.ASTNode]:
         """Return the AST with all transitive imports inlined."""
-        result: List[A.ASTNode] = []
-        imported_funcs: Set[str] = set()
+        result: list[A.ASTNode] = []
+        imported_funcs: set[str] = set()
         base_dir = Path(source_file).parent if source_file else Path(".")
-        processed_files: Set[str] = set()
-        self._tag_source_file(nodes, source_file)
+        processed_files: set[str] = set()
+        tag_source_file(nodes, source_file)
 
         self._process_file_imports(
             nodes, base_dir, result, imported_funcs, processed_files
@@ -68,19 +74,30 @@ class ImportResolver:
         # Order so type definitions and constants precede function bodies
         # that reference them. Without this, static globals would be
         # declared after their first use site -- C compile error.
-        result.sort(key=self._sort_key)
+        result.sort(key=import_sort_key)
+        validate_private_function_boundaries(result)
 
+        # Parsing a file cannot infer return types that depend on imported
+        # declarations.  Once imports are flattened, resolve and validate the
+        # complete program so the C backend sees the same contracts as LLVM.
+        from parser.return_type_inference import (
+            infer_unannotated_return_types,
+            validate_return_contracts,
+        )
+
+        infer_unannotated_return_types(result)
+        validate_return_contracts(result)
         return result
 
     # ==================== internals ====================
 
     def _process_file_imports(
         self,
-        file_nodes: List[A.ASTNode],
+        file_nodes: list[A.ASTNode],
         file_base_dir: Path,
-        result: List[A.ASTNode],
-        imported_funcs: Set[str],
-        processed_files: Set[str],
+        result: list[A.ASTNode],
+        imported_funcs: set[str],
+        processed_files: set[str],
     ) -> None:
         """Recursively splice in each Import/FromImport/CImport target."""
         current_os = os_from_platform()
@@ -106,6 +123,10 @@ class ImportResolver:
                 imported_nodes = self._parse_probe_import_file(import_file_str)
             else:
                 imported_nodes = self._parse_import_file(import_file_str)
+            if isinstance(node, A.FromImport):
+                reject_private_selective_imports(
+                    imported_nodes, set(node.names), import_file_str
+                )
             # Recurse into the imported file's own imports first so its
             # dependencies are inlined before its definitions.
             self._process_file_imports(
@@ -116,15 +137,13 @@ class ImportResolver:
                 processed_files,
             )
             # Then splice in this file's definitions.
-            filter_names: Optional[Set[str]] = None
+            filter_names: set[str] | None = None
             if isinstance(node, A.FromImport):
                 filter_names = set(node.names)
             for imp_node in imported_nodes:
                 self._add_imported_node(imp_node, result, imported_funcs, filter_names)
 
-    def _resolve_cimport_path(
-        self, raw_path: str, file_base_dir: Path
-    ) -> Optional[Path]:
+    def _resolve_cimport_path(self, raw_path: str, file_base_dir: Path) -> Path | None:
         """Resolve a filesystem path from a #cimport directive.
 
         Supports quoted paths, optional suffix inference, and parent-tree
@@ -193,7 +212,7 @@ class ImportResolver:
 
     def _resolve_module_path(
         self, module_path: str, file_base_dir: Path
-    ) -> Optional[Path]:
+    ) -> Path | None:
         """Resolve `module.path` -> filesystem `module/path.ail`.
 
         Tries source-relative first, then walks up the tree to find an
@@ -231,9 +250,9 @@ class ImportResolver:
     def _add_imported_node(
         self,
         imp_node: A.ASTNode,
-        result: List[A.ASTNode],
-        imported_funcs: Set[str],
-        filter_names: Optional[Set[str]] = None,
+        result: list[A.ASTNode],
+        imported_funcs: set[str],
+        filter_names: set[str] | None = None,
     ) -> None:
         """Splice one node from an imported module into ``result`` if it
         isn't already there and isn't filtered out by a `from` clause.
@@ -244,7 +263,11 @@ class ImportResolver:
             # in one TU. Only the top-level file's main belongs in output.
             if imp_node.name == "main":
                 return
-            if filter_names is not None and imp_node.name not in filter_names:
+            if (
+                filter_names is not None
+                and imp_node.name not in filter_names
+                and getattr(imp_node, "is_public", True)
+            ):
                 return
             if imp_node.name in imported_funcs:
                 return
@@ -288,7 +311,7 @@ class ImportResolver:
         elif isinstance(imp_node, (A.CInclude, A.LinkDirective, A.TemplateBlock)):
             result.append(imp_node)
 
-    def _parse_import_file(self, filepath: str) -> List[A.ASTNode]:
+    def _parse_import_file(self, filepath: str) -> list[A.ASTNode]:
         """Parse one imported `.ail` file.
 
         Existing-but-invalid imports must fail at the import boundary. Returning
@@ -301,7 +324,7 @@ class ImportResolver:
             tokens = tokenize(code)
             p = Parser(tokens)
             nodes = p.parse_program()
-            self._tag_source_file(nodes, filepath)
+            tag_source_file(nodes, filepath)
             return nodes
         except SyntaxError as exc:
             raise SyntaxError(
@@ -310,7 +333,7 @@ class ImportResolver:
         except OSError as exc:
             raise OSError(f"{filepath}: failed to read imported module: {exc}") from exc
 
-    def _parse_probe_import_file(self, filepath: str) -> List[A.ASTNode]:
+    def _parse_probe_import_file(self, filepath: str) -> list[A.ASTNode]:
         """Parse one imported cbind JSON file.
 
         Accepts generated `.probe.json` payloads and raw binding specs. Raw specs
@@ -371,7 +394,7 @@ class ImportResolver:
             if c_unit:
                 nodes.append(A.TemplateBlock("ansi_c", c_unit))
 
-            self._tag_source_file(nodes, filepath)
+            tag_source_file(nodes, filepath)
             return nodes
         except (OSError, ValueError, TypeError):
             return []
@@ -444,7 +467,7 @@ class ImportResolver:
         return rows
 
     @staticmethod
-    def _normalize_probe_header(header: object) -> tuple[Optional[str], bool]:
+    def _normalize_probe_header(header: object) -> tuple[str | None, bool]:
         """Return ``(path, is_system)`` from cbind probe header descriptor."""
         if isinstance(header, str):
             text = header.strip()
@@ -469,7 +492,7 @@ class ImportResolver:
         row: object,
         *,
         c_header_declared: bool = False,
-    ) -> Optional[A.VarDecl]:
+    ) -> A.VarDecl | None:
         if not isinstance(row, dict):
             return None
         name = str(row.get("name", "")).strip()
@@ -495,11 +518,11 @@ class ImportResolver:
             is_const=True,
         )
         if c_header_declared:
-            setattr(node, "c_header_declared", True)
+            node.c_header_declared = True
         return node
 
     @staticmethod
-    def _probe_enum_node(row: object) -> Optional[A.EnumDef]:
+    def _probe_enum_node(row: object) -> A.EnumDef | None:
         if not isinstance(row, dict):
             return None
         name = str(row.get("name", "")).strip()
@@ -544,7 +567,7 @@ class ImportResolver:
         return str(key)
 
     @staticmethod
-    def _probe_record_node(row: object) -> Optional[A.ExternRecordDef]:
+    def _probe_record_node(row: object) -> A.ExternRecordDef | None:
         if not isinstance(row, dict):
             return None
         name = str(row.get("name", "")).strip()
@@ -689,7 +712,7 @@ class ImportResolver:
         *,
         function_name: str | None = None,
         header_declared: bool = False,
-    ) -> Optional[A.ExternFn]:
+    ) -> A.ExternFn | None:
         if not isinstance(row, dict):
             return None
         name = function_name or str(row.get("name", "")).strip()
@@ -718,25 +741,3 @@ class ImportResolver:
             fn_decorators.append("header_declared")
         fn.decorators = fn_decorators
         return fn
-
-    @staticmethod
-    def _tag_source_file(nodes: List[A.ASTNode], filepath: str) -> None:
-        """Attach source path metadata to parsed nodes for diagnostics/reports."""
-        if not filepath:
-            return
-        for node in nodes:
-            if not hasattr(node, "_source_file"):
-                setattr(node, "_source_file", filepath)
-
-    @staticmethod
-    def _sort_key(node: A.ASTNode) -> int:
-        """Order so type defs / constants come before functions that
-        reference them. Stable sort preserves the within-bucket order
-        from the splice walk."""
-        if isinstance(node, (A.RecordDef, A.EnumDef, A.ExternRecordDef)):
-            return 0
-        if isinstance(node, A.VarDecl):
-            return 1
-        if isinstance(node, A.ClassDef):
-            return 2
-        return 3

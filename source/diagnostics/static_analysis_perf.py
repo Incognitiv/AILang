@@ -112,9 +112,9 @@ def check_string_concat_loops(
                             "the entire prior string."
                         ),
                         suggestion=(
-                            "Build with str_array_push into a str_array_new(cap), "
-                            'then str_array_join(arr, "") once at the end. O(n) '
-                            "total, single allocation."
+                            "Use concat()/a dedicated builder or an arena-scoped buffer. If "
+                            "using str_array, push only borrowed strings; owned "
+                            "temporaries require explicit lifetime management."
                         ),
                         severity="warning",
                     )
@@ -126,3 +126,79 @@ def check_string_concat_loops(
         if isinstance(sub, list):
             for stmt in sub:
                 check_string_concat_loops(analyzer, stmt, in_loop=in_loop)
+
+
+_OWNED_STRING_PRODUCERS: frozenset[str] = frozenset(
+    {
+        "str",
+        "chr",
+        "substr",
+        "concat",
+        "str_replace",
+        "str_escape_json",
+        "hex",
+        "bin",
+        "oct",
+        "read_file",
+        "read_stdin",
+        "input",
+        "process_capture",
+        "tcp_recv",
+    }
+)
+
+
+def _owned_string_expr(node: A.ASTNode) -> bool:
+    if isinstance(node, (A.InterpolatedString, A.StringSlice)):
+        return True
+    if isinstance(node, A.Call):
+        return node.name in _OWNED_STRING_PRODUCERS
+    if isinstance(node, A.BinaryOp) and node.op in {"+", "plus"}:
+        return _looks_like_string(node)
+    return False
+
+
+def check_owned_string_into_borrowed_str_array(
+    analyzer: _WarnCollector, node: A.ASTNode
+) -> None:
+    """Flag ownership transfer that str_array cannot perform.
+
+    str_array stores borrowed string pointers and dealloc_str_array intentionally
+    frees only the container.  Pushing a fresh owned string directly therefore
+    loses the only ownership handle and leaks it.
+    """
+    if node is None:
+        return
+    if (
+        isinstance(node, A.Call)
+        and node.name == "str_array_push"
+        and len(node.args) >= 2
+    ):
+        _container, value, *_extra_args = node.args
+        if _owned_string_expr(value):
+            analyzer.warnings.append(
+                AnalysisWarning(
+                    line=getattr(node, "line", 0),
+                    column=getattr(node, "column", 0),
+                    category="memory",
+                    message=(
+                        "OWNERSHIP LEAK: str_array stores borrowed string pointers, "
+                        "but this push receives a freshly allocated string. The "
+                        "container will not free that element."
+                    ),
+                    suggestion=(
+                        "Use a one-allocation transformation/builder (for JSON escaping, "
+                        "str_escape_json), or retain and explicitly release each owned "
+                        "element after the array is no longer used."
+                    ),
+                    severity="warning",
+                )
+            )
+    values = vars(node).values() if hasattr(node, "__dict__") else ()
+    for value in values:
+        if isinstance(value, A.ASTNode):
+            check_owned_string_into_borrowed_str_array(analyzer, value)
+        elif isinstance(value, (list, tuple)):
+            for item in value:
+                if isinstance(item, A.ASTNode):
+                    check_owned_string_into_borrowed_str_array(analyzer, item)

@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from parser import ast as A
 from parser.ast import parsed_type_to_str
-from typing import Any, Dict, List, Optional, Set, Tuple
+from parser.return_type_inference import body_terminates_with_value_or_throw
+from typing import Any
 
 from abi_symbols import explicit_c_abi_parts, has_export_decorator
 from ast_access import param_at
 from calling_conventions import c_callconv_macro
 from target_info import os_from_platform
 from transpiler.class_field_ownership import (
-    auto_owned_fields,
     is_auto_owned_field_type,
     is_auto_owned_param,
     is_string_type,
@@ -21,6 +21,7 @@ from transpiler.class_field_ownership import (
     string_len_field_name,
     string_len_param_name,
 )
+from transpiler.comptime_eval import evaluate_comptime
 from transpiler.fixed_int_cast_codegen import checked_fixed_int_conversion_expr
 
 from .local_int_narrowing import apply_proven_i32_narrowing
@@ -30,7 +31,7 @@ from .stmt_visit_class_method import (
 from .strlen_assign_cache import collect_length_only_string_locals
 
 
-def _param_parts(param: Any) -> Tuple[str, Any]:
+def _param_parts(param: Any) -> tuple[str, Any]:
     if isinstance(param, tuple):
         ptype = param[1] if len(param) >= 2 else None
         return str(param[0]), ptype
@@ -72,10 +73,10 @@ def _seed_call_hint_param_ranges(self, node: A.Function) -> None:
             self._codegen_int_ranges[pname] = hinted
 
 
-def _declared_param_range(self, ptype: Any) -> Optional[Tuple[int, int]]:
+def _declared_param_range(self, ptype: Any) -> tuple[int, int] | None:
     target = ptype
     aliases = getattr(self, "_type_aliases", {})
-    seen: Set[str] = set()
+    seen: set[str] = set()
     while isinstance(target, str) and target in aliases and target not in seen:
         seen.add(target)
         target = aliases[target]
@@ -93,7 +94,7 @@ def _declared_param_range(self, ptype: Any) -> Optional[Tuple[int, int]]:
     return low, high - 1 if target.exclusive else high
 
 
-def _is_literal_return_guard(stmt: A.ASTNode, param_name: str) -> Optional[int]:
+def _is_literal_return_guard(stmt: A.ASTNode, param_name: str) -> int | None:
     if not isinstance(stmt, A.If):
         return None
     cond = stmt.cond
@@ -154,7 +155,7 @@ def _can_elide_recursion_guard(self, node: A.Function) -> bool:
     if not isinstance(param, tuple) or len(param) < 2:
         return False
     param_name = str(param[0])
-    guard_bound: Optional[int] = None
+    guard_bound: int | None = None
     for stmt in node.body:
         guard_bound = _is_literal_return_guard(stmt, param_name)
         if guard_bound is not None:
@@ -167,8 +168,7 @@ def _can_elide_recursion_guard(self, node: A.Function) -> bool:
     if entry is None:
         return False
     max_depth = int(entry.high) - int(guard_bound) + 1
-    if max_depth < 1:
-        max_depth = 1
+    max_depth = max(max_depth, 1)
     if max_depth > 10000:
         return False
     return _self_calls_are_decreasing(node, param_name, 0)
@@ -211,17 +211,26 @@ def visit_Function(self, node: A.Function) -> None:
             self.declared_vars.add(pname)
 
     self._bigint_params_for_cleanup = [
-        p[0] for p in (node.params or [])
-        if isinstance(p, tuple) and len(p) >= 2
+        p[0]
+        for p in (node.params or [])
+        if isinstance(p, tuple)
+        and len(p) >= 2
         and parsed_type_to_str(p[1]).strip().lower() == "unbounded"
     ]
 
     # Collect all variables
-    all_vars: Dict[str, str] = {}
+    all_vars: dict[str, str] = {}
     self._collect_vars_in_body(node.body, all_vars)
     self._current_param_type_overrides = apply_proven_i32_narrowing(
         self, node, all_vars
     )
+    self._current_local_c_types = dict(all_vars)
+    for p in node.params or []:
+        if isinstance(p, tuple) and len(p) >= 2:
+            pname, ptype = str(p[0]), p[1]
+            self._current_local_c_types[pname] = self._current_param_type_overrides.get(
+                pname, parsed_type_to_str(ptype) if ptype else "i64"
+            )
     self._length_only_string_locals = collect_length_only_string_locals(
         self, node.body, all_vars
     )
@@ -344,8 +353,10 @@ def visit_Function(self, node: A.Function) -> None:
     for stmt in node.body:
         self.visit(stmt)
 
-    # Implicit return for functions that don't end with a return statement
-    if not node.body or not isinstance(node.body[-1], A.Return):
+    # Emit a fallthrough return only when control flow can actually reach the
+    # function end.  A trailing if/match/try may terminate on every branch
+    # even though the final AST node is not itself Return.
+    if not body_terminates_with_value_or_throw(node.body):
         # Auto-cleanup of non-escaping class locals at function exit.
         self._emit_class_cleanup(None)
         # Unlock @synchronized mutex before implicit return
@@ -356,7 +367,11 @@ def visit_Function(self, node: A.Function) -> None:
         # Language-level void functions may fall through. Native main still
         # has an int ABI and therefore returns process status 0. No other
         # non-void function is allowed a manufactured default value.
-        language_ret = parsed_type_to_str(getattr(node, "return_type", None) or "void").strip().lower()
+        language_ret = (
+            parsed_type_to_str(getattr(node, "return_type", None) or "void")
+            .strip()
+            .lower()
+        )
         if ret_type == "void":
             self.emit("return;")
         elif is_main and language_ret == "void":
@@ -384,6 +399,7 @@ def visit_Function(self, node: A.Function) -> None:
     self._fixed_dict_value_ranges = {}
     self._codegen_string_length_ranges = {}
     self._current_param_type_overrides = {}
+    self._current_local_c_types = {}
     # Reset unchecked mode and synchronized state after function
     self._unchecked_mode = False
     self._synchronized_mutex_name = None
@@ -501,74 +517,11 @@ def visit_StaticAssert(self, node: A.StaticAssert) -> None:
 
 
 def _evaluate_comptime(self, expr: A.ASTNode) -> Any:
-    """Evaluate an expression at compile time if possible."""
-    if isinstance(expr, A.Number):
-        if expr.is_float:
-            return float(expr.value)
-        return int(expr.value)
-
-    if isinstance(expr, A.Bool):
-        return expr.value
-
-    if isinstance(expr, A.StringLit):
-        return expr.value
-
-    if isinstance(expr, A.Call):
-        if expr.args:
-            return None
-        if expr.name == "target_os":
-            return os_from_platform()
-        if expr.name == "target_backend":
-            return "c"
-
-    if isinstance(expr, A.BinaryOp):
-        left = self._evaluate_comptime(expr.left)
-        right = self._evaluate_comptime(expr.right)
-        if left is None or right is None:
-            return None
-
-        op = expr.op
-        if op == "+":
-            return left + right
-        if op == "-":
-            return left - right
-        if op == "*":
-            return left * right
-        if op == "/":
-            if right == 0:
-                return None  # Can't divide by zero
-            return left // right if isinstance(left, int) else left / right
-        if op == "%":
-            return left % right
-        if op == "**":
-            return left**right
-        if op == "==":
-            return left == right
-        if op == "!=":
-            return left != right
-        if op == "<":
-            return left < right
-        if op == ">":
-            return left > right
-        if op == "<=":
-            return left <= right
-        if op == ">=":
-            return left >= right
-        if op in ("and", "&&"):
-            return left and right
-        if op in ("or", "||"):
-            return left or right
-
-    if isinstance(expr, A.UnaryOp):
-        operand = self._evaluate_comptime(expr.operand)
-        if operand is None:
-            return None
-        if expr.op == "-":
-            return -operand
-        if expr.op in ("not", "!"):
-            return not operand
-
-    return None
+    return evaluate_comptime(
+        expr,
+        target_os=os_from_platform(),
+        target_backend="c",
+    )
 
 
 def visit_ClassDef(self, node: A.ClassDef) -> None:
@@ -600,7 +553,7 @@ def visit_ClassDef(self, node: A.ClassDef) -> None:
     self._emit_class_new_wrapper(node)
 
 
-def _class_new_signature(self, node: A.ClassDef) -> Tuple[str, List[str]]:
+def _class_new_signature(self, node: A.ClassDef) -> tuple[str, list[str]]:
     """Return (param_decl, arg_names) for Class_new based on init or fields.
 
     AILang's JIT codegen (expr_generator.visit_NewExpr) uses two
@@ -609,7 +562,7 @@ def _class_new_signature(self, node: A.ClassDef) -> Tuple[str, List[str]]:
     argument per field, in declaration order, and assigns positionally.
     Mirror both modes here so the C output matches the JIT semantics.
     """
-    init_method: Optional[A.Function] = next(
+    init_method: A.Function | None = next(
         (m for m in node.methods if m.name == "init"), None
     )
     if init_method is not None:
@@ -653,7 +606,7 @@ def _emit_class_new_wrapper(self, node: A.ClassDef) -> None:
     field assignment (record-style construction)."""
     class_name = node.name
     param_decl, arg_names = self._class_new_signature(node)
-    init_method: Optional[A.Function] = next(
+    init_method: A.Function | None = next(
         (m for m in node.methods if m.name == "init"), None
     )
     self.emit_raw("")
@@ -678,6 +631,16 @@ def _emit_class_new_wrapper(self, node: A.ClassDef) -> None:
         )
         if checked_expr is not None:
             init_expr = checked_expr
+        field_type_text = parsed_type_to_str(field_type).strip().lower()
+        if (
+            field_type_text in {"array", "str_array", "stringarray", "intarray"}
+            and isinstance(init_value, A.Number)
+            and not isinstance(init_value.value, float)
+            and int(init_value.value) == 0
+        ):
+            init_expr = (
+                f"({self._ailang_type_to_c(parsed_type_to_str(field_type))}){{0}}"
+            )
         self.emit_raw(f"    __t->{field_name} = {init_expr};")
         if is_string_type(field_type):
             self.emit_raw(
@@ -687,9 +650,7 @@ def _emit_class_new_wrapper(self, node: A.ClassDef) -> None:
         if is_auto_owned_field_type(field_type, self.classes):
             kind = self._auto_owned_field_kind(field_type)
             if kind is not None:
-                owned = self._expr_produces_owned_value(
-                    init_value, kind, field_type
-                )
+                owned = self._expr_produces_owned_value(init_value, kind, field_type)
                 self.emit_raw(
                     f"    __t->{owned_field_flag_name(field_name)} = "
                     f"{'1' if owned else '0'};"

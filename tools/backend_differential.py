@@ -194,7 +194,7 @@ def _evaluate(case: ProgramCase, tmp: Path) -> DifferentialResult:
             case,
             tmp,
             helper_compiler=_helper_compiler(),
-            helper_flags=("-std=gnu23",),
+            helper_flags=("-std=gnu2x",),
         )
     except Exception as exc:  # noqa: BLE001 - differential runner reports all cases.
         failed = BackendRun(

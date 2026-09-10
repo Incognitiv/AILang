@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from .ast_base import ASTNode, ParsedType
 
@@ -11,23 +11,25 @@ class Function(ASTNode):
     def __init__(
         self,
         name: str,
-        params: list[tuple[str, ParsedType, Optional[Any]]],
+        params: list[tuple[str, ParsedType, Any | None]],
         return_type: ParsedType,
         body: list[ASTNode],
         is_public: bool = False,
-        decorators: Optional[list[str]] = None,
+        decorators: list[str] | None = None,
         is_async: bool = False,
         is_test: bool = False,
     ) -> None:
         self.name: str = name
         # params: [(name, type, default_value), ...] where default_value can be None
-        self.params: list[tuple[str, ParsedType, Optional[Any]]] = params
+        self.params: list[tuple[str, ParsedType, Any | None]] = params
         self.return_type: ParsedType = return_type
         self.body: list[ASTNode] = body
         self.is_public: bool = is_public
         self.decorators: list[str] = decorators or []
         self.is_async: bool = is_async  # True for async def functions
         self.is_test: bool = is_test  # True for test functions
+        self.return_type_explicit: bool = True
+        self.return_type_inferred: bool = False
 
 
 class Block(ASTNode):
@@ -46,7 +48,7 @@ class BlockCall(ASTNode):
         object_expr: ASTNode,
         method_name: str,
         args: list[ASTNode],
-        block: "Block",
+        block: Block,
     ) -> None:
         self.object_expr: ASTNode = object_expr
         self.method_name: str = method_name
@@ -58,7 +60,7 @@ class TemplateBlock(ASTNode):
     """Foreign code template block (#template ... #end)"""
 
     def __init__(
-        self, language: str, code: str, captured_vars: Optional[list[str]] = None
+        self, language: str, code: str, captured_vars: list[str] | None = None
     ) -> None:
         self.language: str = language
         self.code: str = code
@@ -72,11 +74,11 @@ class Match(ASTNode):
         self,
         expr: ASTNode,
         cases: list[tuple[ASTNode, list[ASTNode]]],
-        default_case: Optional[list[ASTNode]] = None,
+        default_case: list[ASTNode] | None = None,
     ) -> None:
         self.expr: ASTNode = expr
         self.cases: list[tuple[ASTNode, list[ASTNode]]] = cases  # [(value, body), ...]
-        self.default_case: Optional[list[ASTNode]] = default_case  # body
+        self.default_case: list[ASTNode] | None = default_case  # body
 
 
 class MatchPattern(ASTNode):
@@ -290,8 +292,6 @@ class MethodCall(ASTNode):
 class ThisExpr(ASTNode):
     """Reference to current instance: this"""
 
-    ...
-
 
 # ============================================================================
 # Low-level / Systems Programming
@@ -319,11 +319,11 @@ class GenericParam(ASTNode):
     """Generic type parameter: T, T: Comparable, etc."""
 
     def __init__(
-        self, name: str, constraint: Optional[str] = None, default: Optional[str] = None
+        self, name: str, constraint: str | None = None, default: str | None = None
     ) -> None:
         self.name: str = name  # Type parameter name (e.g., "T")
-        self.constraint: Optional[str] = constraint  # Optional constraint
-        self.default: Optional[str] = default  # Optional default type
+        self.constraint: str | None = constraint  # Optional constraint
+        self.default: str | None = default  # Optional default type
 
 
 class GenericFunction(ASTNode):
@@ -332,11 +332,11 @@ class GenericFunction(ASTNode):
     def __init__(
         self,
         name: str,
-        type_params: list["GenericParam"],
-        params: list[tuple[str, Any, Optional[Any]]],
+        type_params: list[GenericParam],
+        params: list[tuple[str, Any, Any | None]],
         return_type: Any,
         body: list[ASTNode],
-        decorators: Optional[list[str]] = None,
+        decorators: list[str] | None = None,
     ) -> None:
         self.name: str = name
         self.type_params: list[GenericParam] = type_params
@@ -352,7 +352,7 @@ class GenericRecord(ASTNode):
     def __init__(
         self,
         name: str,
-        type_params: list["GenericParam"],
+        type_params: list[GenericParam],
         fields: list[tuple[str, str]],
         field_defaults: dict[str, ASTNode] | None = None,
     ) -> None:
@@ -369,7 +369,7 @@ class GenericClass(ASTNode):
     def __init__(
         self,
         name: str,
-        type_params: list["GenericParam"],
+        type_params: list[GenericParam],
         fields: list[Any],
         methods: list[Any],
     ) -> None:
@@ -429,9 +429,9 @@ class StaticAssert(ASTNode):
     Compile-time assertion that fails compilation if false.
     """
 
-    def __init__(self, condition: ASTNode, message: Optional[str] = None) -> None:
+    def __init__(self, condition: ASTNode, message: str | None = None) -> None:
         self.condition: ASTNode = condition
-        self.message: Optional[str] = message
+        self.message: str | None = message
 
 
 class CInclude(ASTNode):
@@ -671,6 +671,6 @@ class ReinterpretCast(ASTNode):
     Reinterprets the bit pattern of expr as target_type.
     """
 
-    def __init__(self, target_type: str, value: "ASTNode") -> None:
+    def __init__(self, target_type: str, value: ASTNode) -> None:
         self.target_type: str = target_type
         self.value: ASTNode = value

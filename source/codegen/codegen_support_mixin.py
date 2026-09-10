@@ -24,19 +24,20 @@ from parser.ast import (
     Use,
     VarDecl,
 )
-from typing import Any, Optional
+from typing import Any
 
 from ast_access import arg_at
 from calling_conventions import llvm_calling_convention, normalized_decorators
 from llvmlite import ir
 
 from .codegen_errors import CodeGenError
+from .codegen_template_support_mixin import _CodeGenTemplateSupportMixin
 
 
-class _CodeGenSupportMixin:
+class _CodeGenSupportMixin(_CodeGenTemplateSupportMixin):
     def __init__(self: Any) -> None:
         # Linter-only declaration for mixin-owned lazy attribute.
-        self.free_func: Optional[ir.Function] = None
+        self.free_func: ir.Function | None = None
 
     def _get_free(self: Any) -> ir.Function:
         """Lazy declaration of free for temporary string cleanup."""
@@ -67,23 +68,47 @@ class _CodeGenSupportMixin:
         one = ir.Constant(ir.IntType(64), 1)
         total_len = self.current_builder.add(left_len, right_len, name="concat_len")
         total_len = self.current_builder.add(total_len, one, name="total_len")
-        # Always use malloc for concat (arena would accumulate loop intermediates)
-        new_str = self.current_builder.call(
-            self.get_malloc(), [total_len], name="concat_str"
-        )
+        # Route through the same string allocator as str/substr/chr. With an
+        # active request arena the caller can reclaim the whole request with
+        # arena_reset(); without one this falls back to the existing heap/main
+        # arena policy.
+        new_str = self.string_alloc(total_len, "concat_str")
         # Copy left string
         self.current_builder.call(self.get_strcpy(), [new_str, left_str])
         # Concatenate right string
         self.current_builder.call(self.get_strcat(), [new_str, right_str])
-        # Free intermediate temporaries from prior concatenations
-        left_name = getattr(left_str, "name", "")
-        right_name = getattr(right_str, "name", "")
-        if left_name in self.temp_strings:
-            self.current_builder.call(self._get_free(), [left_str])
-            self.temp_strings.discard(left_name)
-        if right_name in self.temp_strings:
-            self.current_builder.call(self._get_free(), [right_str])
-            self.temp_strings.discard(right_name)
+
+        # Free heap intermediates, but never individually free pointers owned
+        # by the main/request arena. Request-arena temps are reclaimed by
+        # arena_reset() and main-arena temps by arena_destroy().
+        def release_temp_if_heap(value: Any) -> None:
+            name = getattr(value, "name", "")
+            if name not in self.temp_strings:
+                return
+            self.temp_strings.discard(name)
+            if self._string_arena is not None:
+                return
+            request_slot = getattr(self, "_request_arena_slot", None)
+            if request_slot is None:
+                self.current_builder.call(self._get_free(), [value])
+                return
+            i8_ptr = ir.IntType(8).as_pointer()
+            active = self.current_builder.load(
+                request_slot, name="concat_active_request_arena"
+            )
+            is_heap = self.current_builder.icmp_unsigned(
+                "==", active, ir.Constant(i8_ptr, None), name="concat_temp_is_heap"
+            )
+            free_block = self.current_function.append_basic_block("concat_temp_free")
+            done_block = self.current_function.append_basic_block("concat_temp_done")
+            self.current_builder.cbranch(is_heap, free_block, done_block)
+            self.current_builder.position_at_end(free_block)
+            self.current_builder.call(self._get_free(), [value])
+            self.current_builder.branch(done_block)
+            self.current_builder.position_at_end(done_block)
+
+        release_temp_if_heap(left_str)
+        release_temp_if_heap(right_str)
         # Track this result as a temporary for potential future cleanup
         result_name = getattr(new_str, "name", "")
         if result_name:
@@ -502,7 +527,7 @@ class _CodeGenSupportMixin:
         except ImportError as e:
             raise CodeGenError(f"Cannot load library '{node.module_path}': {e}") from e
 
-    def _process_ast_node(self: Any, node: ASTNode) -> Optional[Function]:
+    def _process_ast_node(self: Any, node: ASTNode) -> Function | None:
         """Process a single AST node in Pass 1. Returns Function if it's a function."""
         from parser.ast import Assign
 
@@ -641,8 +666,7 @@ class _CodeGenSupportMixin:
         for _fname, ftype_name in node.fields:
             ftype = self.get_llvm_type(ftype_name)
             bits = self._type_size_bits(ftype)
-            if bits > max_bits:
-                max_bits = bits
+            max_bits = max(max_bits, bits)
         max_bytes = (max_bits + 7) // 8
         if max_bytes == 0:
             max_bytes = 8
@@ -672,72 +696,3 @@ class _CodeGenSupportMixin:
                 llvm_type.count
             )
         return 64
-
-    def _compile_ast_template(self: Any, node: TemplateBlock) -> str:
-        """Compile a TemplateBlock AST node to LLVM IR."""
-        from .templates import TemplateBlock as TBlock
-        from .templates import template_compiler
-
-        tblock = TBlock(node.language, node.code, node.captured_vars)
-        result = template_compiler.compile_template(tblock)
-        return result or ""
-
-    def _parse_template_func_sigs(
-        self, llvm_ir: str
-    ) -> list[tuple[str, ir.Type, list[ir.Type]]]:
-        """Parse function signatures from LLVM IR text.
-        Returns list of (name, return_type, [param_types]).
-        Handles lines like:
-          define dso_local i32 @c_add(i32 noundef %0, i32 noundef %1) #0 {
-          define i64 @compute(i64 %x, double %y) {
-          define void @setup() {
-        """
-        type_map: dict[str, ir.Type] = {
-            "void": ir.VoidType(),
-            "i1": ir.IntType(1),
-            "i8": ir.IntType(8),
-            "i16": ir.IntType(16),
-            "i32": ir.IntType(32),
-            "i64": ir.IntType(64),
-            "i128": ir.IntType(128),
-            "float": ir.FloatType(),
-            "double": ir.DoubleType(),
-        }
-        ptr_type = ir.IntType(8).as_pointer()
-        results: list[tuple[str, ir.Type, list[ir.Type]]] = []
-        for line in llvm_ir.split("\n"):
-            stripped = line.strip()
-            if not stripped.startswith("define"):
-                continue
-            if "@" not in stripped:
-                continue
-            # Strip 'define' and optional linkage (dso_local, hidden, etc.)
-            parts = stripped.split("@", 1)
-            pre_at = parts[0].split()  # ['define', 'dso_local', 'i32'] etc.
-            post_at = parts[1]  # 'c_add(i32 noundef %0, ...) #0 {'
-            # Return type is last token before @
-            ret_str = pre_at[-1] if pre_at else "void"
-            if ret_str.endswith("*"):
-                ret_type: ir.Type = ptr_type
-            else:
-                ret_type = type_map.get(ret_str, ir.IntType(64))
-            # Function name is before '('
-            name = post_at.split("(", 1)[0]
-            # Parse param types from between ( and )
-            param_section = ""
-            if "(" in post_at and ")" in post_at:
-                param_section = post_at.split("(", 1)[1].rsplit(")", 1)[0].strip()
-            param_types: list[ir.Type] = []
-            if param_section and param_section != "...":
-                for param in param_section.split(","):
-                    param = param.strip()
-                    if not param or param == "...":
-                        continue
-                    # First word is the type
-                    ptype_str = param.split()[0]
-                    if ptype_str.endswith("*"):
-                        param_types.append(ptr_type)
-                    else:
-                        param_types.append(type_map.get(ptype_str, ir.IntType(64)))
-            results.append((name, ret_type, param_types))
-        return results

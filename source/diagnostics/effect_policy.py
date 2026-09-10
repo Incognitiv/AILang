@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from parser import ast as A
-from typing import Iterable
 
 from runtime.modes import CompilationMode
 

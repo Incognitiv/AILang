@@ -7,9 +7,9 @@ expressions; unknown terms are left for the normal strlen/cache paths.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 from parser import ast as A
-from typing import Iterator
 
 
 @dataclass(frozen=True)

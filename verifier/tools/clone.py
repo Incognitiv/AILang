@@ -165,7 +165,7 @@ def _clone_windows(tree: ast.AST) -> dict[tuple[str, ...], list[tuple[str, int]]
         if len(statements) < _CLONE_MIN_STATEMENTS:
             continue
         keys = [_clone_statement_key(stmt) for stmt in statements]
-        for start in range(0, len(keys) - _CLONE_MIN_STATEMENTS + 1):
+        for start in range(len(keys) - _CLONE_MIN_STATEMENTS + 1):
             window = tuple(keys[start : start + _CLONE_MIN_STATEMENTS])
             if sum(len(part) for part in window) < _CLONE_MIN_CHARS:
                 continue

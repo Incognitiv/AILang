@@ -38,10 +38,14 @@ class BigIntRuntime:
         return self._cg._bigint_type.as_pointer()
 
     @staticmethod
-    def _cast_value(builder: ir.IRBuilder, value: ir.Value, target: ir.Type, name: str) -> ir.Value:
+    def _cast_value(
+        builder: ir.IRBuilder, value: ir.Value, target: ir.Type, name: str
+    ) -> ir.Value:
         if value.type == target:
             return value
-        if isinstance(value.type, ir.PointerType) and isinstance(target, ir.PointerType):
+        if isinstance(value.type, ir.PointerType) and isinstance(
+            target, ir.PointerType
+        ):
             return builder.bitcast(value, target, name=name)
         if isinstance(value.type, ir.IntType) and isinstance(target, ir.IntType):
             if value.type.width < target.width:
@@ -67,13 +71,17 @@ class BigIntRuntime:
             )
         return fn
 
-    def _adapter(self, cache_name: str, symbol: str, ret: ir.Type, args: list[ir.Type]) -> ir.Function:
+    def _adapter(
+        self, cache_name: str, symbol: str, ret: ir.Type, args: list[ir.Type]
+    ) -> ir.Function:
         cached = getattr(self._cg, cache_name, None)
         if cached is not None:
             return cached
 
         target = self._language_function(symbol)
-        wrapper_name = f"__ailang_unbounded_adapter_{symbol.removeprefix('ailang_bigint_')}"
+        wrapper_name = (
+            f"__ailang_unbounded_adapter_{symbol.removeprefix('ailang_bigint_')}"
+        )
         existing = self._cg.module.globals.get(wrapper_name)
         if isinstance(existing, ir.Function):
             setattr(self._cg, cache_name, existing)
@@ -93,7 +101,15 @@ class BigIntRuntime:
             self._cast_value(builder, arg, target_ty, f"arg_{idx}")
             for idx, (arg, target_ty) in enumerate(zip(wrapper.args, target_args))
         ]
-        result = builder.call(target, call_args, name="call" if not isinstance(target.function_type.return_type, ir.VoidType) else "")
+        result = builder.call(
+            target,
+            call_args,
+            name=(
+                "call"
+                if not isinstance(target.function_type.return_type, ir.VoidType)
+                else ""
+            ),
+        )
         if isinstance(ret, ir.VoidType):
             builder.ret_void()
         else:
@@ -104,23 +120,39 @@ class BigIntRuntime:
 
     def _get_bigint_new(self) -> ir.Function:
         p = self._get_bigint_type()
-        return self._adapter("_bigint_new_func", "ailang_bigint_new", p, [ir.IntType(64)])
+        return self._adapter(
+            "_bigint_new_func", "ailang_bigint_new", p, [ir.IntType(64)]
+        )
 
     def _get_bigint_from_int(self) -> ir.Function:
         p = self._get_bigint_type()
-        return self._adapter("_bigint_from_int_func", "ailang_bigint_from_int", p, [ir.IntType(64)])
+        return self._adapter(
+            "_bigint_from_int_func", "ailang_bigint_from_int", p, [ir.IntType(64)]
+        )
 
     def _get_bigint_from_u64(self) -> ir.Function:
         p = self._get_bigint_type()
-        return self._adapter("_bigint_from_u64_func", "ailang_bigint_from_u64", p, [ir.IntType(64)])
+        return self._adapter(
+            "_bigint_from_u64_func", "ailang_bigint_from_u64", p, [ir.IntType(64)]
+        )
 
     def _get_bigint_from_decimal(self) -> ir.Function:
         p = self._get_bigint_type()
-        return self._adapter("_bigint_from_decimal_func", "ailang_bigint_from_decimal", p, [ir.IntType(8).as_pointer()])
+        return self._adapter(
+            "_bigint_from_decimal_func",
+            "ailang_bigint_from_decimal",
+            p,
+            [ir.IntType(8).as_pointer()],
+        )
 
     def _get_bigint_from_words(self) -> ir.Function:
         p = self._get_bigint_type()
-        return self._adapter("_bigint_from_words_func", "ailang_bigint_from_words", p, [ir.IntType(64), ir.IntType(64).as_pointer(), ir.IntType(64)])
+        return self._adapter(
+            "_bigint_from_words_func",
+            "ailang_bigint_from_words",
+            p,
+            [ir.IntType(64), ir.IntType(64).as_pointer(), ir.IntType(64)],
+        )
 
     def _binary(self, cache_name: str, symbol: str) -> ir.Function:
         p = self._get_bigint_type()
@@ -152,15 +184,21 @@ class BigIntRuntime:
 
     def _get_bigint_pow(self) -> ir.Function:
         p = self._get_bigint_type()
-        return self._adapter("_bigint_pow_func", "ailang_bigint_pow", p, [p, ir.IntType(64)])
+        return self._adapter(
+            "_bigint_pow_func", "ailang_bigint_pow_unbounded", p, [p, p]
+        )
 
     def _get_bigint_shl(self) -> ir.Function:
         p = self._get_bigint_type()
-        return self._adapter("_bigint_shl_func", "ailang_bigint_shl", p, [p, ir.IntType(64)])
+        return self._adapter(
+            "_bigint_shl_func", "ailang_bigint_shl", p, [p, ir.IntType(64)]
+        )
 
     def _get_bigint_shr(self) -> ir.Function:
         p = self._get_bigint_type()
-        return self._adapter("_bigint_shr_func", "ailang_bigint_shr", p, [p, ir.IntType(64)])
+        return self._adapter(
+            "_bigint_shr_func", "ailang_bigint_shr", p, [p, ir.IntType(64)]
+        )
 
     def _get_bigint_not(self) -> ir.Function:
         p = self._get_bigint_type()
@@ -172,50 +210,86 @@ class BigIntRuntime:
 
     def _get_bigint_cmp(self) -> ir.Function:
         p = self._get_bigint_type()
-        return self._adapter("_bigint_cmp_func", "ailang_bigint_cmp", ir.IntType(64), [p, p])
+        return self._adapter(
+            "_bigint_cmp_func", "ailang_bigint_cmp", ir.IntType(64), [p, p]
+        )
 
     def _get_bigint_print(self) -> ir.Function:
         p = self._get_bigint_type()
-        return self._adapter("_bigint_print_func", "ailang_bigint_print", ir.VoidType(), [p])
+        return self._adapter(
+            "_bigint_print_func", "ailang_bigint_print", ir.VoidType(), [p]
+        )
 
     def _get_bigint_digits(self) -> ir.Function:
         p = self._get_bigint_type()
-        return self._adapter("_bigint_digits_func", "ailang_bigint_digits", ir.IntType(64), [p])
+        return self._adapter(
+            "_bigint_digits_func", "ailang_bigint_digits", ir.IntType(64), [p]
+        )
 
     def _get_bigint_free(self) -> ir.Function:
         p = self._get_bigint_type()
-        return self._adapter("_bigint_free_func", "ailang_bigint_free", ir.VoidType(), [p])
+        return self._adapter(
+            "_bigint_free_func", "ailang_bigint_free", ir.VoidType(), [p]
+        )
 
     def _get_bigint_fits_signed(self) -> ir.Function:
         p = self._get_bigint_type()
-        return self._adapter("_bigint_fits_signed_func", "ailang_bigint_fits_signed", ir.IntType(64), [p, ir.IntType(64)])
+        return self._adapter(
+            "_bigint_fits_signed_func",
+            "ailang_bigint_fits_signed",
+            ir.IntType(64),
+            [p, ir.IntType(64)],
+        )
 
     def _get_bigint_fits_unsigned(self) -> ir.Function:
         p = self._get_bigint_type()
-        return self._adapter("_bigint_fits_unsigned_func", "ailang_bigint_fits_unsigned", ir.IntType(64), [p, ir.IntType(64)])
+        return self._adapter(
+            "_bigint_fits_unsigned_func",
+            "ailang_bigint_fits_unsigned",
+            ir.IntType(64),
+            [p, ir.IntType(64)],
+        )
 
     def _get_bigint_to_i64(self) -> ir.Function:
         p = self._get_bigint_type()
-        return self._adapter("_bigint_to_i64_func", "ailang_bigint_to_i64", ir.IntType(64), [p])
+        return self._adapter(
+            "_bigint_to_i64_func", "ailang_bigint_to_i64", ir.IntType(64), [p]
+        )
 
     def _get_bigint_to_u64(self) -> ir.Function:
         p = self._get_bigint_type()
-        return self._adapter("_bigint_to_u64_func", "ailang_bigint_to_u64", ir.IntType(64), [p])
+        return self._adapter(
+            "_bigint_to_u64_func", "ailang_bigint_to_u64", ir.IntType(64), [p]
+        )
 
     def _get_bigint_word_at(self) -> ir.Function:
         p = self._get_bigint_type()
-        return self._adapter("_bigint_word_at_func", "ailang_bigint_word_at", ir.IntType(64), [p, ir.IntType(64)])
+        return self._adapter(
+            "_bigint_word_at_func",
+            "ailang_bigint_word_at",
+            ir.IntType(64),
+            [p, ir.IntType(64)],
+        )
 
     def _get_bigint_sign(self) -> ir.Function:
         p = self._get_bigint_type()
-        return self._adapter("_bigint_sign_func", "ailang_bigint_sign", ir.IntType(64), [p])
+        return self._adapter(
+            "_bigint_sign_func", "ailang_bigint_sign", ir.IntType(64), [p]
+        )
 
     def _get_bigint_to_decimal(self) -> ir.Function:
         p = self._get_bigint_type()
-        return self._adapter("_bigint_to_decimal_func", "ailang_bigint_to_decimal", ir.IntType(8).as_pointer(), [p])
+        return self._adapter(
+            "_bigint_to_decimal_func",
+            "ailang_bigint_to_decimal",
+            ir.IntType(8).as_pointer(),
+            [p],
+        )
 
     def _get_bigint_live_count(self) -> ir.Function:
-        return self._adapter("_bigint_live_count_func", "ailang_bigint_live_count", ir.IntType(64), [])
+        return self._adapter(
+            "_bigint_live_count_func", "ailang_bigint_live_count", ir.IntType(64), []
+        )
 
     def is_bigint_type(self, llvm_type: ir.Type) -> bool:
         if self._cg._bigint_type is None:

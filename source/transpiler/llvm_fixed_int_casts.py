@@ -1,7 +1,9 @@
 """Shared LLVM-side fixed integer contract helpers."""
+
 from __future__ import annotations
 
 from parser.ast import parsed_type_to_str
+
 from llvmlite import ir
 from transpiler.fixed_int_types import info_for_fixed_int
 

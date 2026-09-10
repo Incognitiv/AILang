@@ -97,24 +97,19 @@ end
 
 
 
-def test_llvm_backend_rejects_unbounded_instead_of_pointer_placeholder() -> None:
+def test_llvm_backend_unbounded_preserves_arbitrary_precision() -> None:
     source = """
 def main(): int
-    unbounded x = 1
-    print x
+    unbounded x = 1267650600228229401496703205376
+    unbounded y = 7
+    unbounded z = x + y
+    print z
     return 0
 end
 """
-    try:
-        compile_to_ir_fast(source, source_file="unbounded.ail")
-    except TypeError as exc:
-        text = str(exc)
-        assert "unbounded" in text
-        assert "arbitrary-precision" in text
-        assert "not implemented" in text
-    else:
-        raise AssertionError("unbounded must fail closed until BigInt runtime exists")
-
+    run = _compile_and_run_llvm(source)
+    assert run.returncode == 0, run.stdout + "\n" + run.stderr
+    assert run.stdout.strip() == "1267650600228229401496703205383"
 
 def _compile_and_run_llvm(source: str) -> subprocess.CompletedProcess[str]:
     with tempfile.TemporaryDirectory() as td:

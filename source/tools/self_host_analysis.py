@@ -13,7 +13,6 @@ from __future__ import annotations
 import ast
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List
 
 
 @dataclass
@@ -21,11 +20,11 @@ class DependencyAnalysis:
     """Analysis of a Python file's dependencies."""
 
     file: str
-    imports: List[str]  # All imports
-    python_only: List[str]  # Python-specific (can't transpile)
-    transpilable: List[str]  # Can be transpiled to AILang
-    external_calls: List[str]  # Calls to external modules
-    llvm_usage: List[str]  # LLVM-specific code
+    imports: list[str]  # All imports
+    python_only: list[str]  # Python-specific (can't transpile)
+    transpilable: list[str]  # Can be transpiled to AILang
+    external_calls: list[str]  # Calls to external modules
+    llvm_usage: list[str]  # LLVM-specific code
     feasibility: str  # "easy", "medium", "hard", "requires_ffi"
 
 
@@ -56,12 +55,12 @@ FFI_REQUIRED_MODULES = {
 }
 
 
-def analyze_imports(source: str) -> tuple[List[str], List[str], List[str]]:
+def analyze_imports(source: str) -> tuple[list[str], list[str], list[str]]:
     """Analyze imports in Python source."""
     tree = ast.parse(source)
-    all_imports: List[str] = []
-    python_only: List[str] = []
-    ffi_required: List[str] = []
+    all_imports: list[str] = []
+    python_only: list[str] = []
+    ffi_required: list[str] = []
 
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -84,9 +83,9 @@ def analyze_imports(source: str) -> tuple[List[str], List[str], List[str]]:
     return all_imports, python_only, ffi_required
 
 
-def analyze_llvm_usage(source: str) -> List[str]:
+def analyze_llvm_usage(source: str) -> list[str]:
     """Find LLVM-specific code patterns."""
-    patterns: List[str] = []
+    patterns: list[str] = []
     tree = ast.parse(source)
 
     for node in ast.walk(tree):
@@ -134,10 +133,10 @@ def analyze_file(filepath: Path, base_dir: Path) -> DependencyAnalysis:
     )
 
 
-def analyze_ailang_codebase() -> Dict[str, DependencyAnalysis]:
+def analyze_ailang_codebase() -> dict[str, DependencyAnalysis]:
     """Analyze the entire AILang codebase."""
     ailang_dir = Path(__file__).resolve().parents[1]
-    results: Dict[str, DependencyAnalysis] = {}
+    results: dict[str, DependencyAnalysis] = {}
 
     for py_file in sorted(ailang_dir.rglob("*.py")):
         if py_file.name.startswith("__"):
@@ -151,7 +150,7 @@ def analyze_ailang_codebase() -> Dict[str, DependencyAnalysis]:
     return results
 
 
-def print_report(results: Dict[str, DependencyAnalysis]) -> None:
+def print_report(results: dict[str, DependencyAnalysis]) -> None:
     """Print a formatted report."""
     print("\n" + "=" * 70)
     print("AILANG SELF-HOSTING FEASIBILITY ANALYSIS")
@@ -203,8 +202,7 @@ def print_report(results: Dict[str, DependencyAnalysis]) -> None:
     print("\n" + "=" * 70)
     print("PATH TO SELF-HOSTING")
     print("=" * 70)
-    print(
-        """
+    print("""
 Phase 1: Transpile "easy" files
   - These files have no Python-specific dependencies
   - Can be transpiled and run immediately
@@ -227,8 +225,7 @@ Recommended approach: Phase 4 Option A
   - AILang can already generate .ll files
   - Use system clang/llc to compile .ll to binary
   - This avoids needing runtime LLVM bindings
-"""
-    )
+""")
 
 
 if __name__ == "__main__":

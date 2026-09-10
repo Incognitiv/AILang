@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import List, Tuple
-
 from token_access import token_type_at
 
 from .diagnostics_models import Diagnostic
@@ -15,7 +13,7 @@ _STATEMENT_START_TOKENS = frozenset(
 _STATEMENT_END_TOKENS = frozenset({"END", "ELSE", "ELSIF", "CASE", "DEFAULT"})
 
 
-def _starts_statement(tokens: List[Tuple], token_index: int) -> bool:
+def _starts_statement(tokens: list[tuple], token_index: int) -> bool:
     """Return true when token_index appears at the start of a statement."""
     if token_index <= 0:
         return True
@@ -26,7 +24,7 @@ def _starts_statement(tokens: List[Tuple], token_index: int) -> bool:
     return previous[0] in _STATEMENT_START_TOKENS
 
 
-def _ends_statement(tokens: List[Tuple], token_index: int) -> bool:
+def _ends_statement(tokens: list[tuple], token_index: int) -> bool:
     """Return true when token_index appears at the end of a statement."""
     if token_index + 1 >= len(tokens):
         return True
@@ -37,7 +35,7 @@ def _ends_statement(tokens: List[Tuple], token_index: int) -> bool:
     return following[0] in _STATEMENT_END_TOKENS
 
 
-def _emit_increment_context_diagnostic(engine, token: Tuple) -> None:
+def _emit_increment_context_diagnostic(engine, token: tuple) -> None:
     token_type, token_text, token_line, token_col = token
     op = token_text if token_text in ("++", "--") else token_type
     engine.diagnostics.append(
@@ -57,7 +55,7 @@ def _emit_increment_context_diagnostic(engine, token: Tuple) -> None:
     )
 
 
-def check_increment_decrement_statement_only(engine, tokens: List[Tuple]) -> None:
+def check_increment_decrement_statement_only(engine, tokens: list[tuple]) -> None:
     """Reject C-style expression-valued ++/-- forms.
 
     AILang keeps prefix and postfix increment/decrement as equivalent

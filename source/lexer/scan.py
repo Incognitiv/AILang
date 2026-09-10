@@ -5,7 +5,7 @@ Converts AILang source code into tokens
 
 import re
 import string
-from typing import Pattern
+from re import Pattern
 
 from token_access import token_type_at
 

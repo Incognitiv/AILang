@@ -8,7 +8,7 @@ class Interval:
     low: int
     high: int
 
-    def union(self, other: "Interval") -> "Interval":
+    def union(self, other: Interval) -> Interval:
         return Interval(min(self.low, other.low), max(self.high, other.high))
 
 
@@ -18,7 +18,7 @@ class StringInfo:
     max_len: int
     max_digit_run: int
 
-    def union(self, other: "StringInfo") -> "StringInfo":
+    def union(self, other: StringInfo) -> StringInfo:
         return StringInfo(
             min(self.min_len, other.min_len),
             max(self.max_len, other.max_len),

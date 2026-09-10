@@ -1,0 +1,53 @@
+name: AILang Lean Proof
+
+on:
+  push:
+    branches:
+      - agent/unbounded-field-semantics
+    paths:
+      - "proof/**"
+      - "source/type_semantics.py"
+      - "source/ir/**"
+      - "source/parser/**"
+      - "source/lexer/**"
+      - ".github/workflows/ailang-lean-proof.yml"
+  pull_request:
+    paths:
+      - "proof/**"
+      - "source/type_semantics.py"
+      - "source/ir/**"
+      - "source/parser/**"
+      - "source/lexer/**"
+      - ".github/workflows/ailang-lean-proof.yml"
+  workflow_dispatch:
+
+jobs:
+  lean-proof:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and independently check Lean proofs
+        uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: proof
+          auto-config: false
+          build: true
+          test: false
+          lint: false
+          leanchecker: true
+          leanchecker-args: AILangProof
+          axiom-audit: true
+          axiom-audit-root: AILangProof
+          axiom-audit-allow: propext,Classical.choice,Quot.sound
+          use-mathlib-cache: false
+
+      - name: Run AILang proof-model report
+        working-directory: proof
+        run: lake exe ailangProofReport
+
+      - name: Verify Python/Lean semantic conformance
+        run: python proof/check_python_conformance.py
+
+      - name: Verify real Typed IR certificates with Lean
+        run: python proof/check_ir_certificate.py

@@ -11,7 +11,7 @@ from transpiler.class_field_ownership import (
 from transpiler.codegen_int_ranges import remember_fixed_dict_range
 from transpiler.fixed_int_cast_codegen import checked_fixed_int_conversion_expr
 
-from .stmt_visit_data import _emit_dyn_array_push_in_place
+from .stmt_visit_reassign import _emit_dyn_array_push_in_place
 
 
 def visit_FieldAssign(self, node: A.FieldAssign) -> None:
@@ -206,9 +206,7 @@ def visit_DictAssign(self, node: A.DictAssign) -> None:
                 f"  if (__ailang_fixed_idx < 0 || __ailang_fixed_idx >= {int(fixed_len)}) "
                 f'__ailang_safety_trap("array index out of bounds");'
             )
-            self.emit(
-                f"  {dict_expr}[__ailang_fixed_idx] = {val};"
-            )
+            self.emit(f"  {dict_expr}[__ailang_fixed_idx] = {val};")
             self.emit("}")
             return
 

@@ -1,0 +1,48 @@
+@library("core_bigint_pow")
+import stdlib.core.bigint
+
+// Arbitrary-precision exponentiation for `unbounded ** unbounded`.
+//
+// The representation and primitive BigInt operations come from
+// stdlib/core/bigint.ail.  This module deliberately keeps the exponent as a
+// BigInt for the entire algorithm: no i64/u64 conversion and therefore no
+// machine-width exponent ceiling.
+
+pointer ailang_bigint_pow_unbounded(pointer base, pointer exponent):
+    if ailang_bigint_sign(exponent) < 0 then
+        ailang_bigint_fail("negative integer exponent")
+    end
+
+    pointer result = ailang_bigint_from_int(1)
+    pointer factor = ailang_bigint_clone(base)
+    pointer e = ailang_bigint_clone(exponent)
+
+    while ailang_bigint_sign(e) != 0 then
+        if (ailang_bigint_limb(e, 0) & 1) != 0 then
+            pointer next_result = ailang_bigint_mul(result, factor)
+            ailang_bigint_free(result)
+            result = next_result
+        end
+
+        pointer next_e = ailang_bigint_shr(e, 1)
+        ailang_bigint_free(e)
+        e = next_e
+
+        if ailang_bigint_sign(e) != 0 then
+            pointer squared = ailang_bigint_mul(factor, factor)
+            ailang_bigint_free(factor)
+            factor = squared
+        end
+    end
+
+    ailang_bigint_free(e)
+    ailang_bigint_free(factor)
+    return result
+end
+
+pointer ailang_bigint_pow_unbounded_take(pointer base, pointer exponent):
+    pointer out = ailang_bigint_pow_unbounded(base, exponent)
+    ailang_bigint_free(base)
+    ailang_bigint_free(exponent)
+    return out
+end

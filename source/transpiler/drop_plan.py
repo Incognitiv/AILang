@@ -8,11 +8,12 @@ heuristics.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from enum import Enum
 from parser import ast as A
 from parser.ast import parsed_type_to_str
-from typing import Any, Callable, Iterable
+from typing import Any
 
 from ast_access import arg_at
 
@@ -135,6 +136,7 @@ def _default_owned_string_alloc(expr: A.ASTNode) -> bool:
         "substr",
         "concat",
         "str_replace",
+        "str_escape_json",
     }:
         return True
     return False

@@ -177,7 +177,7 @@ def test_cbind_probe_cli_outputs_deterministic_json_and_ail(tmp_path: Path) -> N
 
     obj = tmp_path / "probe_a.o"
     compile_proc = subprocess.run(
-        [_available_c_compiler(), "-std=gnu23", "-c", str(c_a), "-o", str(obj)],
+        [_available_c_compiler(), "-std=gnu2x", "-c", str(c_a), "-o", str(obj)],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
@@ -324,7 +324,7 @@ typedef struct ProbeBits {
     compile_proc = subprocess.run(
         [
             compiler,
-            "-std=gnu23",
+            "-std=gnu2x",
             f"-I{tmp_path.as_posix()}",
             "-c",
             str(c_out),

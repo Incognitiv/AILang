@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from parser import ast as A
-from typing import Any, Optional, Tuple
+from typing import Any
 
-ArrayValues = Tuple[int, ...]
-HintKey = Tuple[Optional[str], str]
+ArrayValues = tuple[int, ...]
+HintKey = tuple[str | None, str]
 
 
-def _function_scope(owner: Any) -> Optional[str]:
+def _function_scope(owner: Any) -> str | None:
     scope = getattr(owner, "current_function", None)
     if isinstance(scope, str):
         return scope
@@ -33,7 +33,7 @@ def update_array_literal_hints(owner: Any, var_name: str, expr: A.ASTNode) -> No
     hints.pop(key, None)
 
 
-def get_array_literal_values(owner: Any, var_name: str) -> Optional[ArrayValues]:
+def get_array_literal_values(owner: Any, var_name: str) -> ArrayValues | None:
     hints = getattr(owner, "_array_literal_value_hints", None)
     if not isinstance(hints, dict):
         return None
@@ -46,7 +46,7 @@ def get_array_literal_values(owner: Any, var_name: str) -> Optional[ArrayValues]
     return None
 
 
-def _literal_int_values(expr: A.ASTNode) -> Optional[ArrayValues]:
+def _literal_int_values(expr: A.ASTNode) -> ArrayValues | None:
     if not isinstance(expr, A.ArrayLit):
         return None
     values: list[int] = []

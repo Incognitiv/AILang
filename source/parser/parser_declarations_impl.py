@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 from token_access import token_type_at
 
 from .ast import (
@@ -393,7 +391,7 @@ def parse_function(
     self.consume("LPAREN")
 
     # Parse parameters using helper method
-    params: list[tuple[str, ParsedType, Optional[ASTNode]]] = []
+    params: list[tuple[str, ParsedType, ASTNode | None]] = []
     if self.peek_type() != "RPAREN":
         params.append(self._parse_single_param())
         while self.peek_type() == "COMMA":
@@ -551,10 +549,10 @@ def parse_function(
 
 def _infer_string_types(
     self,
-    params: list[tuple[str, ParsedType, Optional[ASTNode]]],
+    params: list[tuple[str, ParsedType, ASTNode | None]],
     return_type: ParsedType,
     body: list[ASTNode],
-) -> tuple[list[tuple[str, ParsedType, Optional[ASTNode]]], ParsedType]:
+) -> tuple[list[tuple[str, ParsedType, ASTNode | None]], ParsedType]:
     # Extract name->type mapping, handling 2 or 3-tuple params
     param_names: dict[str, ParsedType] = {}
     for p in params:
@@ -600,7 +598,7 @@ def _infer_string_types(
             mark_param_strings(stmt)
 
     # Rebuild params preserving defaults (3-tuple format)
-    new_params: list[tuple[str, ParsedType, Optional[ASTNode]]] = []
+    new_params: list[tuple[str, ParsedType, ASTNode | None]] = []
     for p in params:
         name = p[0]
         default = p[2] if len(p) == 3 else None
@@ -629,7 +627,9 @@ def parse_record(self) -> RecordDef | GenericRecord:
     type_params = self._parse_generic_params()
 
     if self.peek_type() != "COLON":
-        self.error("Expected ':' after record name; 'then' is not valid for record declarations")
+        self.error(
+            "Expected ':' after record name; 'then' is not valid for record declarations"
+        )
     self.consume("COLON")
     self.skip_newlines()
 

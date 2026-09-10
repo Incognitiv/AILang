@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from parser import ast as A
 from parser.ast import parsed_type_to_str
-from typing import Dict, List, Set, cast
+from parser.return_type_inference import body_terminates_with_value_or_throw
+from typing import cast
 
 from transpiler.class_field_ownership import (
     auto_owned_field_kind,
@@ -16,10 +17,10 @@ from transpiler.dict_specialization import fixed_dict_literal_slots
 
 
 def _explicitly_deallocated_locals(
-    body: List[A.ASTNode], var_names: Set[str]
-) -> Set[str]:
+    body: list[A.ASTNode], var_names: set[str]
+) -> set[str]:
     """Tracked locals passed to dealloc/free must stay heap-backed."""
-    hits: Set[str] = set()
+    hits: set[str] = set()
 
     def walk(node: A.ASTNode) -> None:
         if node is None:
@@ -59,10 +60,10 @@ def _explicitly_deallocated_locals(
     return hits
 
 
-def _scan_dict_locals(body: List[A.ASTNode]) -> Set[str]:
-    dict_vars: Set[str] = set()
+def _scan_dict_locals(body: list[A.ASTNode]) -> set[str]:
+    dict_vars: set[str] = set()
 
-    def walk(stmts: List[A.ASTNode]) -> None:
+    def walk(stmts: list[A.ASTNode]) -> None:
         for stmt in stmts:
             if isinstance(stmt, A.Assign) and isinstance(stmt.value, A.DictLit):
                 dict_vars.add(stmt.var_name)
@@ -83,8 +84,9 @@ def _scan_dict_locals(body: List[A.ASTNode]) -> Set[str]:
     return dict_vars
 
 
-def _scan_unbounded_locals(body: List[A.ASTNode]) -> list[str]:
+def _scan_unbounded_locals(body: list[A.ASTNode]) -> list[str]:
     out: list[str] = []
+
     def walk(items) -> None:
         for stmt in items or []:
             if isinstance(stmt, A.VarDecl) and stmt.type_name is not None:
@@ -92,14 +94,19 @@ def _scan_unbounded_locals(body: List[A.ASTNode]) -> list[str]:
                     out.append(stmt.var_name)
             if isinstance(stmt, A.ASTNode):
                 for value in vars(stmt).values():
-                    if isinstance(value, list) and value and all(isinstance(x, A.ASTNode) for x in value):
+                    if (
+                        isinstance(value, list)
+                        and value
+                        and all(isinstance(x, A.ASTNode) for x in value)
+                    ):
                         walk(value)
+
     walk(body)
     return list(dict.fromkeys(out))
 
 
 def _prepare_owned_local_cleanup(
-    self, body: List[A.ASTNode], track_single_use_strings: bool = False
+    self, body: list[A.ASTNode], track_single_use_strings: bool = False
 ) -> None:
     class_locals = self._collect_class_locals(body)
     string_locals = self._collect_string_locals(body)
@@ -262,14 +269,20 @@ def _generate_class_method(self, class_name: str, method: A.Function) -> None:
         self.declared_vars.add(pname)
 
     self._bigint_params_for_cleanup = [
-        p[0] for p in (method.params or [])
-        if isinstance(p, tuple) and len(p) >= 2
+        p[0]
+        for p in (method.params or [])
+        if isinstance(p, tuple)
+        and len(p) >= 2
         and parsed_type_to_str(p[1]).strip().lower() == "unbounded"
     ]
 
     # Collect all variables
-    all_vars: Dict[str, str] = {}
+    all_vars: dict[str, str] = {}
     self._collect_vars_in_body(method.body, all_vars)
+    self._current_local_c_types = dict(all_vars)
+    for p in method.params or []:
+        if isinstance(p, tuple) and len(p) >= 2:
+            self._current_local_c_types[str(p[0])] = parsed_type_to_str(p[1])
 
     # Build parameter list with self pointer first
     params = f"{class_name} *self"
@@ -340,8 +353,9 @@ def _generate_class_method(self, class_name: str, method: A.Function) -> None:
     for stmt in method.body:
         self.visit(stmt)
 
-    # Implicit return
-    if not method.body or not isinstance(method.body[-1], A.Return):
+    # Match parser return-contract control flow instead of looking only at the
+    # last AST node; if/else, match, and try blocks can terminate on all paths.
+    if not body_terminates_with_value_or_throw(method.body):
         if method_name == "destructor":
             self._emit_owned_field_cleanup(class_name, "self")
         self._emit_class_cleanup(None)
@@ -367,3 +381,4 @@ def _generate_class_method(self, class_name: str, method: A.Function) -> None:
     self.current_function = None
     self._current_ret_type = ""
     self._current_ret_spec = None
+    self._current_local_c_types = {}

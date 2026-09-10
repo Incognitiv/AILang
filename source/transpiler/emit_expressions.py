@@ -6,7 +6,8 @@ all node-specific behavior to extracted service objects.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from llvmlite import ir
 from runtime.arena import ArenaGenerator
@@ -20,7 +21,7 @@ from transpiler.expr_calls import ExprCallEmitter
 from transpiler.expr_collections import ExprCollectionEmitter
 from transpiler.expr_common import ExprGenError
 from transpiler.expr_literals import ExprLiteralEmitter
-from transpiler.expr_ops import ExprOpsEmitter
+from transpiler.expr_ops_unbounded import UnboundedPowExprOpsEmitter
 from transpiler.expr_simd import _SimdBuiltinsMixin
 from transpiler.expr_system import ExprBuiltinSystemEmitter
 from transpiler.expr_threading import ExprBuiltinThreadingEmitter
@@ -39,8 +40,8 @@ class ExprGenerator(_SimdBuiltinsMixin):
 
     def __init__(self, codegen: CodeGen) -> None:
         self.codegen = codegen
-        self._pow_intrinsic: Optional[ir.Function] = None
-        self._call_dispatch: Optional[dict] = None
+        self._pow_intrinsic: ir.Function | None = None
+        self._call_dispatch: dict | None = None
         self.arena_gen = ArenaGenerator(codegen)
 
         # Cache of {NodeClass: bound visitor method}. Expressions are visited
@@ -49,7 +50,7 @@ class ExprGenerator(_SimdBuiltinsMixin):
 
         self.type_emitter: ExprTypeHelperEmitter = ExprTypeHelperEmitter(self)
         self.literal_emitter: ExprLiteralEmitter = ExprLiteralEmitter(self)
-        self.ops_emitter: ExprOpsEmitter = ExprOpsEmitter(self)
+        self.ops_emitter: UnboundedPowExprOpsEmitter = UnboundedPowExprOpsEmitter(self)
         self.meta_emitter: ExprBuiltinMetaEmitter = ExprBuiltinMetaEmitter(self)
         self.call_emitter: ExprCallEmitter = ExprCallEmitter(self)
         self.collection_emitter: ExprCollectionEmitter = ExprCollectionEmitter(self)

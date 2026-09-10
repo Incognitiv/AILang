@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from parser import ast as A
-from typing import Any, Dict, Iterable, Optional
+from typing import Any
 
 from ast_access import arg_at
 from transpiler.expr_string_fastpath import static_string_byte_length
@@ -17,6 +18,15 @@ _BASECONV_LEN_HELPERS = {
 
 def strlen_cache_var_name(var_name: str) -> str:
     return f"__ailang_strlen_{var_name}"
+
+
+def _emission_type_map(emitter: Any) -> dict[str, str]:
+    """Use the same function-local type facts during analysis and emission."""
+    local_types = getattr(emitter, "_current_local_c_types", None)
+    if isinstance(local_types, dict) and local_types:
+        return local_types
+    fallback = getattr(emitter, "_var_types", None)
+    return fallback if isinstance(fallback, dict) else {}
 
 
 def _is_integer_type_name(owner: Any, type_name: Any) -> bool:
@@ -40,7 +50,7 @@ def _is_integer_type_name(owner: Any, type_name: Any) -> bool:
 
 
 def _is_known_integer_expr(
-    owner: Any, node: A.ASTNode, vars_found: Optional[Dict[str, str]] = None
+    owner: Any, node: A.ASTNode, vars_found: dict[str, str] | None = None
 ) -> bool:
     if isinstance(node, A.Number):
         return not node.is_float
@@ -65,8 +75,8 @@ def _is_known_integer_expr(
 
 
 def str_known_integer_arg(
-    owner: Any, node: A.ASTNode, vars_found: Optional[Dict[str, str]] = None
-) -> Optional[A.ASTNode]:
+    owner: Any, node: A.ASTNode, vars_found: dict[str, str] | None = None
+) -> A.ASTNode | None:
     if not isinstance(node, A.Call) or node.name != "str" or len(node.args) != 1:
         return None
     arg = arg_at(node, 0)
@@ -76,8 +86,8 @@ def str_known_integer_arg(
 
 
 def baseconv_known_integer_arg(
-    owner: Any, node: A.ASTNode, vars_found: Optional[Dict[str, str]] = None
-) -> Optional[tuple[str, A.ASTNode]]:
+    owner: Any, node: A.ASTNode, vars_found: dict[str, str] | None = None
+) -> tuple[str, A.ASTNode] | None:
     if (
         not isinstance(node, A.Call)
         or node.name not in _BASECONV_LEN_HELPERS
@@ -97,8 +107,8 @@ def baseconv_len_expr(emitter: Any, kind: str, arg: A.ASTNode) -> str:
 
 
 def string_length_producer_arg(
-    owner: Any, node: A.ASTNode, vars_found: Optional[Dict[str, str]] = None
-) -> Optional[A.ASTNode]:
+    owner: Any, node: A.ASTNode, vars_found: dict[str, str] | None = None
+) -> A.ASTNode | None:
     str_arg = str_known_integer_arg(owner, node, vars_found)
     if str_arg is not None:
         return str_arg
@@ -109,14 +119,14 @@ def string_length_producer_arg(
     return None
 
 
-def _has_cached_strlen(var_name: str, vars_found: Optional[Dict[str, str]]) -> bool:
+def _has_cached_strlen(var_name: str, vars_found: dict[str, str] | None) -> bool:
     if vars_found is None:
         return False
     return strlen_cache_var_name(var_name) in vars_found
 
 
 def interpolation_known_length(
-    owner: Any, node: A.ASTNode, vars_found: Optional[Dict[str, str]] = None
+    owner: Any, node: A.ASTNode, vars_found: dict[str, str] | None = None
 ) -> bool:
     if not isinstance(node, A.InterpolatedString):
         return False
@@ -138,7 +148,7 @@ def interpolation_known_length(
 
 
 def is_length_only_string_producer(
-    owner: Any, node: Optional[A.ASTNode], vars_found: Optional[Dict[str, str]] = None
+    owner: Any, node: A.ASTNode | None, vars_found: dict[str, str] | None = None
 ) -> bool:
     if node is None:
         return False
@@ -148,7 +158,7 @@ def is_length_only_string_producer(
 
 
 def collect_strlen_cache_var(
-    owner: Any, var_name: str, value: A.ASTNode, vars_found: Dict[str, str]
+    owner: Any, var_name: str, value: A.ASTNode, vars_found: dict[str, str]
 ) -> None:
     if is_length_only_string_producer(owner, value, vars_found):
         vars_found.setdefault(strlen_cache_var_name(var_name), "int64_t")
@@ -160,7 +170,7 @@ def update_strlen_cache_after_assign(
     cache = getattr(emitter, "_c_strlen_cache", None)
     if not isinstance(cache, dict):
         cache = {}
-        setattr(emitter, "_c_strlen_cache", cache)
+        emitter._c_strlen_cache = cache
 
     static_len = static_string_byte_length(value)
     if static_len is not None:
@@ -168,7 +178,8 @@ def update_strlen_cache_after_assign(
         return
 
     cache_var = strlen_cache_var_name(var_name)
-    value_arg = str_known_integer_arg(emitter, value)
+    type_map = _emission_type_map(emitter)
+    value_arg = str_known_integer_arg(emitter, value, type_map)
     if value_arg is not None:
         emitter.used_helpers.add("i64_decimal_len")
         emitter.emit(
@@ -177,13 +188,13 @@ def update_strlen_cache_after_assign(
         cache[var_name] = cache_var
         return
 
-    base_arg = baseconv_known_integer_arg(emitter, value)
+    base_arg = baseconv_known_integer_arg(emitter, value, type_map)
     if base_arg is not None:
         kind, arg = base_arg
         emitter.emit(f"{cache_var} = {baseconv_len_expr(emitter, kind, arg)};")
         cache[var_name] = cache_var
         return
-    if interpolation_known_length(emitter, value, getattr(emitter, "_var_types", {})):
+    if interpolation_known_length(emitter, value, type_map):
         emitter.emit(f"{cache_var} = {emitter._emit_known_strlen(value)};")
         cache[var_name] = cache_var
         return
@@ -192,7 +203,7 @@ def update_strlen_cache_after_assign(
 
 
 def collect_length_only_string_locals(
-    owner: Any, body: Iterable[A.ASTNode], vars_found: Dict[str, str]
+    owner: Any, body: Iterable[A.ASTNode], vars_found: dict[str, str]
 ) -> set[str]:
     candidates: set[str] = set()
     rejected: set[str] = set()
@@ -200,7 +211,7 @@ def collect_length_only_string_locals(
     read_contexts: dict[str, set[int]] = {}
     deferred_assignments: list[tuple[str, A.ASTNode, int]] = []
 
-    def note_write(var_name: str, value: Optional[A.ASTNode], ctx: int) -> None:
+    def note_write(var_name: str, value: A.ASTNode | None, ctx: int) -> None:
         if is_length_only_string_producer(owner, value, vars_found):
             if var_name not in rejected:
                 candidates.add(var_name)
@@ -371,6 +382,4 @@ def emit_length_only_string_reassign(
 ) -> bool:
     if var_name not in (getattr(emitter, "_length_only_string_locals", None) or set()):
         return False
-    return is_length_only_string_producer(
-        emitter, value, getattr(emitter, "_var_types", {})
-    )
+    return is_length_only_string_producer(emitter, value, _emission_type_map(emitter))

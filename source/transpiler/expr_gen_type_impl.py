@@ -5,8 +5,12 @@ from __future__ import annotations
 from parser import ast as A
 
 from ast_access import arg_at
+from transpiler.fixed_int_types import (
+    c_name_for_fixed,
+    info_for_c_fixed,
+    promoted_fixed_info,
+)
 from transpiler.wide_int_types import info_for_c, promoted_info
-from transpiler.fixed_int_types import c_name_for_fixed, info_for_c_fixed, promoted_fixed_info
 
 
 def _infer_vec_call_type(self, node: A.Call) -> str:
@@ -91,6 +95,36 @@ def _infer_type(self, node: A.ASTNode) -> str:
             return var_name
     if isinstance(node, A.Variable):
         var_name = node.name
+        local_type = getattr(self, "_current_local_c_types", {}).get(var_name)
+        if isinstance(local_type, str):
+            text = local_type.strip()
+            lower = text.lower()
+            if lower == "string":
+                return "const char *"
+            if lower in {"array", "ailang_dyn_array"}:
+                return "ailang_dyn_array"
+            if lower in {"str_array", "ailang_str_array"}:
+                return "ailang_str_array"
+            if (
+                text.endswith("*")
+                or text.startswith("ailang_")
+                or text
+                in {
+                    "int64_t",
+                    "int32_t",
+                    "uint64_t",
+                    "uint32_t",
+                    "double",
+                    "float",
+                    "bool",
+                    "StringArray",
+                    "IntArray",
+                }
+            ):
+                return text
+            if text in self.classes:
+                return f"{text} *"
+            return self._ailang_type_to_c(text)
         # Check if variable has a tracked type (from parameter or declaration)
         if hasattr(self, "_var_types") and var_name in self._var_types:
             atype = self._var_types[var_name]
@@ -385,27 +419,42 @@ def _infer_type(self, node: A.ASTNode) -> str:
             return promoted.c_name
         lf = info_for_c_fixed(left_type)
         rf = info_for_c_fixed(right_type)
-        # Source integer literals are adaptable to the other fixed operand
-        # when their mathematical value fits, matching LLVM literal narrowing.
-        if lf is not None and isinstance(node.right, A.Number) and not isinstance(node.right.value, float):
+        # Source integer literals adapt to a fixed operand when they fit.
+        pf = promoted_fixed_info(lf, rf)
+        if (
+            lf is not None
+            and isinstance(node.right, A.Number)
+            and not isinstance(node.right.value, float)
+        ):
             v = int(node.right.value)
-            if (0 <= v <= (1 << lf.bits) - 1) if lf.unsigned else (-(1 << (lf.bits-1)) <= v <= (1 << (lf.bits-1)) - 1):
+            fits_left = (
+                (0 <= v <= (1 << lf.bits) - 1)
+                if lf.unsigned
+                else (-(1 << (lf.bits - 1)) <= v <= (1 << (lf.bits - 1)) - 1)
+            )
+            if fits_left:
                 pf = lf
-            else:
-                pf = promoted_fixed_info(lf, rf)
-        elif rf is not None and isinstance(node.left, A.Number) and not isinstance(node.left.value, float):
+        elif (
+            rf is not None
+            and isinstance(node.left, A.Number)
+            and not isinstance(node.left.value, float)
+        ):
             v = int(node.left.value)
-            if (0 <= v <= (1 << rf.bits) - 1) if rf.unsigned else (-(1 << (rf.bits-1)) <= v <= (1 << (rf.bits-1)) - 1):
+            fits_right = (
+                (0 <= v <= (1 << rf.bits) - 1)
+                if rf.unsigned
+                else (-(1 << (rf.bits - 1)) <= v <= (1 << (rf.bits - 1)) - 1)
+            )
+            if fits_right:
                 pf = rf
-            else:
-                pf = promoted_fixed_info(lf, rf)
-        else:
-            pf = promoted_fixed_info(lf, rf)
         if pf is not None:
             if node.op in ("==", "!=", "<", ">", "<=", ">=", "and", "or"):
                 return "bool"
             # Shift/power result follows the left/base type.
-            if node.op in ("<<", "shl", ">>", "shr", "ushr", "**", "^") and lf is not None:
+            if (
+                node.op in ("<<", "shl", ">>", "shr", "ushr", "**", "^")
+                and lf is not None
+            ):
                 pf = lf
             return c_name_for_fixed(pf)
     if isinstance(node, A.TernaryOp):

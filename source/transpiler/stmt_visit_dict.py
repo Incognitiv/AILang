@@ -20,7 +20,7 @@ def _emit_stack_dict_literal_assign(self, var_name: str, node: A.DictLit) -> boo
         return False
     var = self._mangle_var(var_name)
     counter = getattr(self, "_stack_dict_literal_counter", 0)
-    setattr(self, "_stack_dict_literal_counter", counter + 1)
+    self._stack_dict_literal_counter = counter + 1
     fixed = getattr(self, "_fixed_dict_literal_slots", {})
     if var_name in fixed:
         values = {}

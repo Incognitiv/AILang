@@ -92,7 +92,10 @@ class _CodeGenBigIntFormatMixin:
         builder.position_at_end(after_digits)
         count = builder.load(count_ptr, name="wide_dec_digits")
         sign_len = builder.select(
-            is_negative, ir.Constant(i32, 1), ir.Constant(i32, 0), name="wide_dec_sign_len"
+            is_negative,
+            ir.Constant(i32, 1),
+            ir.Constant(i32, 0),
+            name="wide_dec_sign_len",
         )
         with builder.if_then(is_negative):
             builder.store(ir.Constant(i8, ord("-")), out)
