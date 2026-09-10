@@ -74,7 +74,7 @@ def serialize_function_certificate(function: FunctionIR) -> str:
                     )
                 )
             )
-        else:  # pragma: no cover - the union is closed, keep serialization fail-closed.
+        else:
             raise TypeError(f"unsupported IR instruction {type(instruction).__name__}")
 
     return "\n".join(lines) + "\n"
