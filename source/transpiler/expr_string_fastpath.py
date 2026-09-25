@@ -5,13 +5,12 @@ from __future__ import annotations
 from parser import ast as A
 
 from ast_access import arg_at
+from string_literals import c_literal_bytes
 
 
 def _literal_bytes(value: str) -> bytes | None:
     """Return UTF-8 bytes when C-string comparison semantics are unambiguous."""
-    if "\0" in value:
-        return None
-    return value.encode("utf-8")
+    return c_literal_bytes(value)
 
 
 def _is_stable_expr(node: A.ASTNode) -> bool:
@@ -111,7 +110,6 @@ def literal_char_at_byte_value(
 def static_string_byte_length(node: A.ASTNode) -> int | None:
     """Return known UTF-8 byte length for compile-time string expressions."""
     if isinstance(node, A.StringLit):
-        if "\0" in node.value:
-            return None
-        return len(node.value.encode("utf-8"))
+        raw = _literal_bytes(node.value)
+        return None if raw is None else len(raw)
     return None

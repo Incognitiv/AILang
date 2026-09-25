@@ -38,6 +38,7 @@ class Module:
         # Public interface and implementation closure are separate.
         self.implementation: dict[str, ASTNode] = {}
         self.link_directives: list[LinkDirective] = []
+        self.dependencies: list[str] = []
         self.is_library = False
         self.library_name: str | None = None
 
@@ -208,7 +209,7 @@ class ModuleLoader:
         self.cache.start_loading(module_path)
         try:
             module = self._load_file(module_name, module_path)
-            self.cache.put(module_path, module)
+            self.cache.put(module_path, module, dependencies=tuple(module.dependencies))
             return module
         finally:
             self.cache.finish_loading(module_path)
@@ -236,6 +237,7 @@ class ModuleLoader:
                     continue
                 try:
                     imported_mod = self.load_module(node.module_path)
+                    module.dependencies.append(imported_mod.path)
                     requested_names = (
                         node.names if isinstance(node, FromImport) else None
                     )
@@ -336,7 +338,9 @@ def get_loader() -> ModuleLoader:
 
 def set_search_paths(paths: list[str]) -> None:
     """Set the module search paths"""
-    get_loader().search_paths = paths
+    loader = get_loader()
+    loader.search_paths = list(paths)
+    loader.cache.clear()
 
 
 def load_module(name: str) -> Module:
