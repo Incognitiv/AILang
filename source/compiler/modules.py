@@ -24,6 +24,8 @@ from parser.ast import (
 from parser.parser import Parser
 
 from compiler.module_cache import ModuleCache
+from compiler.module_loading import load_module_graph
+from compiler.module_symbols import ModuleSymbols
 from lexer.scan import tokenize
 
 
@@ -34,9 +36,9 @@ class Module:
         self.name = name
         self.path = path
         self.ast = ast
-        self.exports: dict[str, ASTNode] = {}
+        self.exports: ModuleSymbols[ASTNode] = ModuleSymbols()
         # Public interface and implementation closure are separate.
-        self.implementation: dict[str, ASTNode] = {}
+        self.implementation: ModuleSymbols[ASTNode] = ModuleSymbols()
         self.link_directives: list[LinkDirective] = []
         self.dependencies: list[str] = []
         self.is_library = False
@@ -187,82 +189,17 @@ class ModuleLoader:
         return None
 
     def load_module(self, module_name: str) -> Module:
-        """Load a module by name"""
-        # Resolve path first to check staleness
-        module_path = self.resolve_module_path(module_name)
-        if not module_path:
-            raise ImportError(f"Cannot find module '{module_name}'")
-
-        # Check cache first, but invalidate if stale (L13 fix)
-        if self.cache.is_stale(module_path):
-            self.cache.invalidate(module_path)
-
-        cached = self.cache.get(module_path)
-        if cached:
-            return cached
-
-        # Check for circular imports
-        if self.cache.is_loading(module_path):
-            raise ImportError(f"Circular import detected: '{module_name}'")
-
-        # Load the module
-        self.cache.start_loading(module_path)
-        try:
-            module = self._load_file(module_name, module_path)
-            self.cache.put(module_path, module, dependencies=tuple(module.dependencies))
-            return module
-        finally:
-            self.cache.finish_loading(module_path)
+        """Load a dependency graph without recursive calls or copied closures."""
+        return load_module_graph(self, module_name)
 
     def _load_file(self, name: str, path: str) -> Module:
-        """Load and parse an AILang file, recursively resolving its imports"""
-        with open(path, "r", encoding="utf-8") as f:
-            source = f.read()
-
-        # Tokenize and parse
+        """Read and parse one module; graph traversal is owned by the loader."""
+        with open(path, "r", encoding="utf-8") as source_file:
+            source = source_file.read()
         tokens = tokenize(source)
         parser = Parser(tokens)
         ast = parser.parse_program()
-
-        # Create the module
-        module = Module(name, path, ast)
-
-        # Recursively load this module's imports and add their exports
-        # This ensures transitive dependencies are available
-        old_file = self.current_file
-        self.current_file = path
-        try:
-            for node in ast:
-                if not isinstance(node, (Import, FromImport)):
-                    continue
-                try:
-                    imported_mod = self.load_module(node.module_path)
-                    module.dependencies.append(imported_mod.path)
-                    requested_names = (
-                        node.names if isinstance(node, FromImport) else None
-                    )
-                    self._merge_dependency_exports(
-                        module,
-                        imported_mod,
-                        node.module_path,
-                        requested_names=requested_names,
-                    )
-                except ImportError as exc:
-                    # A selective import names an explicit contract: a missing
-                    # symbol is an error, not an optional dependency. Preserve
-                    # the historical warning behavior for plain imports only.
-                    if isinstance(node, FromImport):
-                        raise
-                    import sys
-
-                    print(
-                        f"Warning: Failed to import '{node.module_path}': {exc}",
-                        file=sys.stderr,
-                    )
-        finally:
-            self.current_file = old_file
-
-        return module
+        return Module(name, path, ast)
 
     @staticmethod
     def _merge_dependency_exports(
@@ -274,15 +211,16 @@ class ModuleLoader:
     ) -> None:
         """Merge the symbol closure required by a nested module import."""
         exports = imported_module.exports
-        for name, node in imported_module.implementation.items():
-            if name not in module.implementation:
-                module.implementation[name] = node
-        names = list(exports) if requested_names is None else requested_names
-        for name in names:
-            if name not in exports:
-                raise ImportError(f"Cannot import '{name}' from '{module_path}'")
-            if name not in module.exports:
-                module.exports[name] = exports[name]
+        module.implementation.include(imported_module.implementation)
+        if requested_names is None:
+            module.exports.include(exports)
+        else:
+            selected: ModuleSymbols[ASTNode] = ModuleSymbols()
+            for name in requested_names:
+                if name not in exports:
+                    raise ImportError(f"Cannot import '{name}' from '{module_path}'")
+                selected[name] = exports[name]
+            module.exports.include(selected)
         for link_directive in imported_module.link_directives:
             if not _has_link_directive(module.link_directives, link_directive):
                 module.link_directives.append(link_directive)

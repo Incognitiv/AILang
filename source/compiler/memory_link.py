@@ -28,7 +28,7 @@ def memory_link_supported() -> bool:
 
 def link_object_in_memory(
     object_code: bytes,
-    linker: str,
+    linker: str | None = None,
     link_flags: tuple[str, ...] = (),
     *,
     timeout: float = 120,
@@ -39,9 +39,11 @@ def link_object_in_memory(
         raise RuntimeError("memory linking requires Linux memfd and /proc/self/fd")
     if not object_code or max_executable_bytes < 1 or timeout <= 0:
         raise ValueError("object, output limit, and timeout must be positive")
-    executable = shutil.which(linker)
+    executable = _resolve_link_driver(linker)
     if executable is None:
-        raise FileNotFoundError(f"native linker driver not found: {linker}")
+        raise FileNotFoundError(
+            f"native linker driver not found: {linker or 'clang, gcc, cc'}"
+        )
     for flag in link_flags:
         if not _memory_link_flag_allowed(flag):
             raise ValueError(f"unsupported memory-link option: {flag!r}")
@@ -80,6 +82,22 @@ def link_object_in_memory(
     if not image.startswith(b"\x7fELF"):
         raise RuntimeError("linker did not produce an ELF executable")
     return image
+
+
+def _resolve_link_driver(requested: str | None) -> str | None:
+    """Resolve the available native driver without exposing a linking step."""
+    if requested is not None:
+        return shutil.which(requested)
+    for name in ("clang", "gcc", "cc"):
+        executable = shutil.which(name)
+        if executable is not None:
+            return executable
+    return None
+
+
+def memory_link_flags_supported(flags: tuple[str, ...]) -> bool:
+    """Select a transport before building; never reinterpret specialist flags."""
+    return all(_memory_link_flag_allowed(flag) for flag in flags)
 
 
 def _memory_link_flag_allowed(flag: str) -> bool:
