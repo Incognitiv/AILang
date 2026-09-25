@@ -33,9 +33,7 @@ _BOOLEAN_VERDICTS = frozenset({"black", "isort", "ruff", "vulture", "nesting"})
 def perfect_score(value: object) -> bool:
     """Exactly 100; bool, strings, NaN, infinity and inflated scores are invalid."""
     return (
-        isinstance(value, (int, float))
-        and not isinstance(value, bool)
-        and value == 100
+        isinstance(value, (int, float)) and not isinstance(value, bool) and value == 100
     )
 
 
