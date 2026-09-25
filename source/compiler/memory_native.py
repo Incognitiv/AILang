@@ -13,6 +13,7 @@ def compile_ir_object(llvm_ir: str, opt_level: int = 3) -> bytes:
         raise ValueError("optimization level must be between 0 and 3")
     binding.initialize_native_target()
     binding.initialize_native_asmprinter()
+    binding.initialize_native_asmparser()
     target = binding.Target.from_default_triple()
     with target.create_target_machine(
         cpu=binding.get_host_cpu_name(),

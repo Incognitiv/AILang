@@ -85,9 +85,7 @@ def _advance(loader: ModuleLoader, frames: list[_LoadFrame]) -> Module | None:
     return None
 
 
-def _unwind(
-    loader: ModuleLoader, frames: list[_LoadFrame], error: ImportError
-) -> None:
+def _unwind(loader: ModuleLoader, frames: list[_LoadFrame], error: ImportError) -> None:
     """A failed selective import propagates until a plain import can warn."""
     while frames:
         frame = frames.pop()
