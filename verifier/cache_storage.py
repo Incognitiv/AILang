@@ -21,6 +21,24 @@ def _reject_nonfinite(value: str) -> NoReturn:
     raise ValueError(f"non-finite JSON number: {value}")
 
 
+def _finite_float(value: str) -> float:
+    """Exponent overflow is not a JSON constant and needs separate validation."""
+    result = float(value)
+    if not math.isfinite(result):
+        raise ValueError("JSON number is outside the finite float range")
+    return result
+
+
+def _unique_object(pairs: list[tuple[str, object]]) -> dict:
+    """Reject ambiguous duplicate fields, including nested result dictionaries."""
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON field: {key}")
+        result[key] = value
+    return result
+
+
 def _validated_results(
     cached: object, now: float, max_age_seconds: float
 ) -> dict | None:
@@ -46,7 +64,12 @@ def load_results(cache_file: Path, now: float, max_age_seconds: float) -> dict |
             data = source.read(MAX_CACHE_ENTRY_BYTES + 1)
         if len(data) > MAX_CACHE_ENTRY_BYTES:
             return None
-        cached = json.loads(data.decode("utf-8"), parse_constant=_reject_nonfinite)
+        cached = json.loads(
+            data.decode("utf-8"),
+            parse_constant=_reject_nonfinite,
+            parse_float=_finite_float,
+            object_pairs_hook=_unique_object,
+        )
         return _validated_results(cached, now, max_age_seconds)
     except (OSError, ValueError, RecursionError, OverflowError):
         return None
