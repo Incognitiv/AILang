@@ -7,7 +7,6 @@ Handles:
 - from module import x   → loads specific symbols
 """
 
-import contextlib
 import os
 from parser.ast import (
     Assign,
@@ -23,68 +22,9 @@ from parser.ast import (
     VarDecl,
 )
 from parser.parser import Parser
-from typing import Optional
 
+from compiler.module_cache import ModuleCache
 from lexer.scan import tokenize
-
-
-class ModuleCache:
-    """Caches loaded modules to avoid re-parsing"""
-
-    def __init__(self):
-        self.modules: dict[str, Module] = {}
-        self.loading: set[str] = set()  # Detect circular imports
-        self.mtimes: dict[str, float] = {}  # L13 fix: Track file modification times
-
-    @staticmethod
-    def _cache_key(path: str) -> str:
-        """Canonical filesystem identity for a module path."""
-        return os.path.normcase(os.path.realpath(os.path.abspath(path)))
-
-    def get(self, path: str) -> Optional["Module"]:
-        return self.modules.get(self._cache_key(path))
-
-    def put(self, path: str, module: "Module") -> None:
-        key = self._cache_key(path)
-        self.modules[key] = module
-        # Store modification time for cache invalidation
-        if module.path:
-            with contextlib.suppress(OSError):
-                self.mtimes[key] = os.path.getmtime(module.path)
-
-    def is_stale(self, file_path: str) -> bool:
-        """Check if cached module is stale (file was modified)."""
-        key = self._cache_key(file_path)
-        if key not in self.modules:
-            return True
-        if key not in self.mtimes:
-            return False  # No mtime recorded, assume fresh
-        try:
-            current_mtime = os.path.getmtime(file_path)
-            return current_mtime > self.mtimes[key]
-        except OSError:
-            return False
-
-    def invalidate(self, path: str) -> None:
-        """Remove a module from cache."""
-        key = self._cache_key(path)
-        self.modules.pop(key, None)
-        self.mtimes.pop(key, None)
-
-    def clear(self) -> None:
-        """Clear entire cache (useful for REPL reload)."""
-        self.modules.clear()
-        self.loading.clear()
-        self.mtimes.clear()
-
-    def is_loading(self, path: str) -> bool:
-        return self._cache_key(path) in self.loading
-
-    def start_loading(self, path: str) -> None:
-        self.loading.add(self._cache_key(path))
-
-    def finish_loading(self, path: str) -> None:
-        self.loading.discard(self._cache_key(path))
 
 
 class Module:
