@@ -28,18 +28,22 @@ def compile_ir_object(llvm_ir: str, opt_level: int = 3) -> bytes:
         if opt_level:
             _optimize_module(module, machine, opt_level)
         module.verify()
-        return machine.emit_object(module)
+        return bytes(machine.emit_object(module))
 
 
 def _optimize_module(module: Any, machine: Any, opt_level: int) -> None:
     """Promote locals before the normal optimization pipeline, as in JIT."""
     with binding.PipelineTuningOptions(speed_level=opt_level) as tuning:
         with binding.create_pass_builder(machine, tuning) as builder:
-            with binding.create_new_function_pass_manager() as functions:
-                functions.add_sroa_pass()
-                functions.add_instruction_combine_pass()
-                for function in module.functions:
-                    if not function.is_declaration:
-                        functions.run(function, builder)
+            _promote_allocas(module, builder)
             with builder.getModulePassManager() as passes:
                 passes.run(module, builder)
+
+
+def _promote_allocas(module: Any, builder: Any) -> None:
+    with binding.create_new_function_pass_manager() as functions:
+        functions.add_sroa_pass()
+        functions.add_instruction_combine_pass()
+        for function in module.functions:
+            if not function.is_declaration:
+                functions.run(function, builder)

@@ -29,6 +29,7 @@ def main() -> int:
         link_object_in_memory,
         memory_link_supported,
         publish_executable,
+        validate_output_paths,
     )
     from compiler.memory_native import compile_ir_object
 
@@ -38,6 +39,7 @@ def main() -> int:
             raise RuntimeError(
                 "this memory-build adapter requires Linux; no disk fallback"
             )
+        validate_output_paths(args.source, args.output, args.dump_ir_on_error)
         source_path = args.source.resolve()
         source = source_path.read_text(encoding="utf-8")
         ir_code = compile_to_ir_fast(source, source_file=str(source_path), debug=False)

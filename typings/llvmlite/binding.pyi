@@ -1,3 +1,4 @@
+from types import TracebackType
 from typing import Any
 
 def initialize() -> None: ...
@@ -21,6 +22,14 @@ class Target:
 
 class PipelineTuningOptions:
     def __init__(self, speed_level: int = ..., size_level: int = ...) -> None: ...
+    def __enter__(self) -> PipelineTuningOptions: ...
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None: ...
+    def close(self) -> None: ...
 
 class JITLibraryBuilder:
     def __init__(self) -> None: ...

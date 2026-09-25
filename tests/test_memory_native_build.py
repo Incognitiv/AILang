@@ -18,6 +18,7 @@ from compiler.memory_link import (
     link_object_in_memory,
     memory_link_supported,
     publish_executable,
+    validate_output_paths,
 )
 from compiler.memory_native import compile_ir_object
 
@@ -150,3 +151,36 @@ def test_foreign_target_is_rejected() -> None:
     with pytest.raises(ValueError, match="native target"):
         compile_ir_object('target triple = "aarch64-unknown-linux-gnu"\n'
                           'define i32 @main() { ret i32 0 }')
+
+
+@pytest.mark.parametrize("diagnostic", ["source.ail", "program"])
+def test_diagnostic_cannot_clobber_inputs_or_output(tmp_path: Path, diagnostic: str) -> None:
+    with pytest.raises(ValueError, match="diagnostic"):
+        validate_output_paths(tmp_path / "source.ail", tmp_path / "program", tmp_path / diagnostic)
+
+
+def test_output_cannot_overwrite_main_source(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="source file"):
+        validate_output_paths(tmp_path / "source.ail", tmp_path / "source.ail")
+
+
+def test_distinct_output_paths_are_accepted(tmp_path: Path) -> None:
+    validate_output_paths(tmp_path / "source.ail", tmp_path / "program", tmp_path / "failed.ll")
+
+
+def test_timeout_closes_memory_descriptors() -> None:
+    before = len(os.listdir("/proc/self/fd"))
+    with patch("subprocess.run", side_effect=subprocess.TimeoutExpired("linker", 1)):
+        with pytest.raises(subprocess.TimeoutExpired):
+            link_object_in_memory(b"unused object", LINKER)
+    assert len(os.listdir("/proc/self/fd")) == before
+
+
+def test_tuning_options_implements_the_declared_resource_protocol() -> None:
+    from llvmlite import binding
+
+    tuning = binding.PipelineTuningOptions(speed_level=1)
+    with tuning as entered:
+        assert entered is tuning
+        assert not tuning.closed
+    assert tuning.closed

@@ -116,3 +116,15 @@ def publish_executable(image: bytes, destination: Path) -> None:
     finally:
         if staged is not None:
             staged.unlink(missing_ok=True)
+
+
+def validate_output_paths(
+    source: Path, destination: Path, diagnostic: Path | None = None
+) -> None:
+    """Never overwrite the main source or a previous executable with diagnostics."""
+    source_path = source.resolve()
+    output_path = destination.resolve()
+    if source_path == output_path:
+        raise ValueError("output must not overwrite the source file")
+    if diagnostic is not None and diagnostic.resolve() in {source_path, output_path}:
+        raise ValueError("IR diagnostic must not overwrite the source or executable")
