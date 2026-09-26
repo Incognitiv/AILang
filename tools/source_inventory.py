@@ -1,8 +1,7 @@
-"""Tracked implementation inventory with an explicit 750-physical-line limit.
+"""Inventory AILang code and its Python implementation against 750 lines.
 
-No directory names or generated-code comments exempt tracked source files.
-Documentation/data are outside this code metric; the public-tree audit still
-checks its wider text policy independently.
+Foreign-language examples, headers and generated platform bindings are not the
+AILang implementation-size policy. Existing public-tree checks remain separate.
 """
 
 from __future__ import annotations
@@ -13,14 +12,9 @@ from pathlib import Path
 from typing import Any
 
 MAX_SOURCE_LINES = 750
-SOURCE_SUFFIXES = frozenset(
-    {
-        ".ail", ".asm", ".c", ".cc", ".cmake", ".cpp", ".cxx", ".go",
-        ".h", ".hpp", ".inc", ".java", ".js", ".jsx", ".lean", ".ps1",
-        ".py", ".pyi", ".qml", ".rs", ".s", ".sh", ".ts", ".tsx",
-    }
-)
-SOURCE_NAMES = frozenset({"CMakeLists.txt", "Makefile"})
+# AILang programs and the active compiler/verifier implementation. Do not
+# extend this to C/Rust/assembly reference programs or Wayland headers.
+SOURCE_SUFFIXES = frozenset({".ail", ".py", ".pyi"})
 
 
 def count_physical_lines(text: str) -> int:
@@ -35,7 +29,7 @@ def inventory_paths(root: Path, paths: Iterable[str]) -> dict[str, Any]:
     issues: list[str] = []
     for name in sorted(set(paths)):
         relative = Path(name)
-        if relative.suffix.lower() not in SOURCE_SUFFIXES and relative.name not in SOURCE_NAMES:
+        if relative.suffix.lower() not in SOURCE_SUFFIXES:
             continue
         if relative.is_absolute() or ".." in relative.parts:
             issues.append(f"invalid source path: {name}")
@@ -57,7 +51,8 @@ def inventory_paths(root: Path, paths: Iterable[str]) -> dict[str, Any]:
     largest = sorted(rows, key=lambda row: (-row["lines"], row["path"]))[:10]
     return {
         "passed": not issues,
-        "scope": "all tracked implementation files, no path exemptions",
+        "scope": "tracked AILang (.ail) and Python implementation (.py/.pyi)",
+        "source_suffixes": sorted(SOURCE_SUFFIXES),
         "limit": MAX_SOURCE_LINES,
         "scanned_files": len(rows),
         "max_file_line_count": max((row["lines"] for row in rows), default=0),

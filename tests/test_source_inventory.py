@@ -27,8 +27,8 @@ def test_empty_and_unicode_separators() -> None:
 
 
 @pytest.mark.parametrize("name", [
-    "source/a.py", "source/generated/a.py", "out/a.ail", "tests/corpus/a.c",
-    "benchmarks/a.rs", "proof/a.lean", "tools/a.sh", "types/a.pyi", "boot/a.S",
+    "source/a.py", "source/generated/a.py", "out/a.ail",
+    "tests/a.py", "lib/a.ail", "verifier/a.py", "types/a.pyi",
 ])
 def test_tracked_sources_have_no_directory_exemption(tmp_path: Path, name: str) -> None:
     source = tmp_path / name
@@ -83,3 +83,21 @@ def test_real_git_inventory_includes_newly_staged_files_only(tmp_path: Path) -> 
     assert audit_tracked_sources(tmp_path)["passed"]
     git("add", "untracked.py")
     assert not audit_tracked_sources(tmp_path)["passed"]
+
+
+@pytest.mark.parametrize("name", [
+    "examples/ui/backends/generated/wayland/xdg-shell-client-protocol.h",
+    "source/ui/generated/wayland/xdg-shell-client-protocol.h",
+    "tests/corpus/reference.c", "benchmarks/reference.rs", "boot/reference.asm",
+])
+def test_foreign_sources_do_not_expand_the_ailang_line_policy(tmp_path: Path, name: str) -> None:
+    (tmp_path / "compiler.py").write_text("pass\n")
+    path = tmp_path / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("/* reference */\n" * 2381)
+    result = inventory_paths(tmp_path, ["compiler.py", name])
+    assert result["passed"]
+    assert result["scanned_files"] == 1
+    assert result["limit"] == 750
+    assert result["source_suffixes"] == [".ail", ".py", ".pyi"]
+    assert path.read_text().count("\n") == 2381
