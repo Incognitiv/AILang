@@ -7,7 +7,6 @@ Handles:
 - from module import x   → loads specific symbols
 """
 
-import contextlib
 import os
 from parser.ast import (
     Assign,
@@ -23,68 +22,11 @@ from parser.ast import (
     VarDecl,
 )
 from parser.parser import Parser
-from typing import Optional
 
+from compiler.module_cache import ModuleCache
+from compiler.module_loading import load_module_graph
+from compiler.module_symbols import ModuleSymbols
 from lexer.scan import tokenize
-
-
-class ModuleCache:
-    """Caches loaded modules to avoid re-parsing"""
-
-    def __init__(self):
-        self.modules: dict[str, Module] = {}
-        self.loading: set[str] = set()  # Detect circular imports
-        self.mtimes: dict[str, float] = {}  # L13 fix: Track file modification times
-
-    @staticmethod
-    def _cache_key(path: str) -> str:
-        """Canonical filesystem identity for a module path."""
-        return os.path.normcase(os.path.realpath(os.path.abspath(path)))
-
-    def get(self, path: str) -> Optional["Module"]:
-        return self.modules.get(self._cache_key(path))
-
-    def put(self, path: str, module: "Module") -> None:
-        key = self._cache_key(path)
-        self.modules[key] = module
-        # Store modification time for cache invalidation
-        if module.path:
-            with contextlib.suppress(OSError):
-                self.mtimes[key] = os.path.getmtime(module.path)
-
-    def is_stale(self, file_path: str) -> bool:
-        """Check if cached module is stale (file was modified)."""
-        key = self._cache_key(file_path)
-        if key not in self.modules:
-            return True
-        if key not in self.mtimes:
-            return False  # No mtime recorded, assume fresh
-        try:
-            current_mtime = os.path.getmtime(file_path)
-            return current_mtime > self.mtimes[key]
-        except OSError:
-            return False
-
-    def invalidate(self, path: str) -> None:
-        """Remove a module from cache."""
-        key = self._cache_key(path)
-        self.modules.pop(key, None)
-        self.mtimes.pop(key, None)
-
-    def clear(self) -> None:
-        """Clear entire cache (useful for REPL reload)."""
-        self.modules.clear()
-        self.loading.clear()
-        self.mtimes.clear()
-
-    def is_loading(self, path: str) -> bool:
-        return self._cache_key(path) in self.loading
-
-    def start_loading(self, path: str) -> None:
-        self.loading.add(self._cache_key(path))
-
-    def finish_loading(self, path: str) -> None:
-        self.loading.discard(self._cache_key(path))
 
 
 class Module:
@@ -94,10 +36,11 @@ class Module:
         self.name = name
         self.path = path
         self.ast = ast
-        self.exports: dict[str, ASTNode] = {}
+        self.exports: ModuleSymbols[ASTNode] = ModuleSymbols()
         # Public interface and implementation closure are separate.
-        self.implementation: dict[str, ASTNode] = {}
+        self.implementation: ModuleSymbols[ASTNode] = ModuleSymbols()
         self.link_directives: list[LinkDirective] = []
+        self.dependencies: list[str] = []
         self.is_library = False
         self.library_name: str | None = None
 
@@ -246,81 +189,17 @@ class ModuleLoader:
         return None
 
     def load_module(self, module_name: str) -> Module:
-        """Load a module by name"""
-        # Resolve path first to check staleness
-        module_path = self.resolve_module_path(module_name)
-        if not module_path:
-            raise ImportError(f"Cannot find module '{module_name}'")
-
-        # Check cache first, but invalidate if stale (L13 fix)
-        if self.cache.is_stale(module_path):
-            self.cache.invalidate(module_path)
-
-        cached = self.cache.get(module_path)
-        if cached:
-            return cached
-
-        # Check for circular imports
-        if self.cache.is_loading(module_path):
-            raise ImportError(f"Circular import detected: '{module_name}'")
-
-        # Load the module
-        self.cache.start_loading(module_path)
-        try:
-            module = self._load_file(module_name, module_path)
-            self.cache.put(module_path, module)
-            return module
-        finally:
-            self.cache.finish_loading(module_path)
+        """Load a dependency graph without recursive calls or copied closures."""
+        return load_module_graph(self, module_name)
 
     def _load_file(self, name: str, path: str) -> Module:
-        """Load and parse an AILang file, recursively resolving its imports"""
-        with open(path, "r", encoding="utf-8") as f:
-            source = f.read()
-
-        # Tokenize and parse
+        """Read and parse one module; graph traversal is owned by the loader."""
+        with open(path, "r", encoding="utf-8") as source_file:
+            source = source_file.read()
         tokens = tokenize(source)
         parser = Parser(tokens)
         ast = parser.parse_program()
-
-        # Create the module
-        module = Module(name, path, ast)
-
-        # Recursively load this module's imports and add their exports
-        # This ensures transitive dependencies are available
-        old_file = self.current_file
-        self.current_file = path
-        try:
-            for node in ast:
-                if not isinstance(node, (Import, FromImport)):
-                    continue
-                try:
-                    imported_mod = self.load_module(node.module_path)
-                    requested_names = (
-                        node.names if isinstance(node, FromImport) else None
-                    )
-                    self._merge_dependency_exports(
-                        module,
-                        imported_mod,
-                        node.module_path,
-                        requested_names=requested_names,
-                    )
-                except ImportError as exc:
-                    # A selective import names an explicit contract: a missing
-                    # symbol is an error, not an optional dependency. Preserve
-                    # the historical warning behavior for plain imports only.
-                    if isinstance(node, FromImport):
-                        raise
-                    import sys
-
-                    print(
-                        f"Warning: Failed to import '{node.module_path}': {exc}",
-                        file=sys.stderr,
-                    )
-        finally:
-            self.current_file = old_file
-
-        return module
+        return Module(name, path, ast)
 
     @staticmethod
     def _merge_dependency_exports(
@@ -332,15 +211,16 @@ class ModuleLoader:
     ) -> None:
         """Merge the symbol closure required by a nested module import."""
         exports = imported_module.exports
-        for name, node in imported_module.implementation.items():
-            if name not in module.implementation:
-                module.implementation[name] = node
-        names = list(exports) if requested_names is None else requested_names
-        for name in names:
-            if name not in exports:
-                raise ImportError(f"Cannot import '{name}' from '{module_path}'")
-            if name not in module.exports:
-                module.exports[name] = exports[name]
+        module.implementation.include(imported_module.implementation)
+        if requested_names is None:
+            module.exports.include(exports)
+        else:
+            selected: ModuleSymbols[ASTNode] = ModuleSymbols()
+            for name in requested_names:
+                if name not in exports:
+                    raise ImportError(f"Cannot import '{name}' from '{module_path}'")
+                selected[name] = exports[name]
+            module.exports.include(selected)
         for link_directive in imported_module.link_directives:
             if not _has_link_directive(module.link_directives, link_directive):
                 module.link_directives.append(link_directive)
@@ -396,7 +276,9 @@ def get_loader() -> ModuleLoader:
 
 def set_search_paths(paths: list[str]) -> None:
     """Set the module search paths"""
-    get_loader().search_paths = paths
+    loader = get_loader()
+    loader.search_paths = list(paths)
+    loader.cache.clear()
 
 
 def load_module(name: str) -> Module:

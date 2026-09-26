@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from lexer.string_escapes import decode_string_literal
+
 from .ast_base import ASTNode
 
 
@@ -96,18 +98,7 @@ class Null(ASTNode):
 
 class StringLit(ASTNode):
     def __init__(self, value: str) -> None:
-        # Remove quotes and handle ALL escape sequences
-        s = value[1:-1]
-        # Process escapes in correct order (backslash-backslash first)
-        s = s.replace("\\\\", "\x00BACKSLASH\x00")  # Temp placeholder
-        s = s.replace("\\n", "\n")
-        s = s.replace("\\t", "\t")
-        s = s.replace("\\r", "\r")
-        s = s.replace("\\0", "\0")
-        s = s.replace('\\"', '"')
-        s = s.replace("\\'", "'")
-        s = s.replace("\x00BACKSLASH\x00", "\\")  # Restore backslash
-        self.value: str = s
+        self.value: str = decode_string_literal(value)
 
 
 class InterpolatedString(ASTNode):

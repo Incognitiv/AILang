@@ -1,31 +1,29 @@
 name: AILang Lean Proof
 
 on:
-  push:
-    branches:
-      - agent/unbounded-field-semantics
-    paths:
-      - "proof/**"
-      - "source/type_semantics.py"
-      - "source/ir/**"
-      - "source/parser/**"
-      - "source/lexer/**"
-      - ".github/workflows/ailang-lean-proof.yml"
-  pull_request:
-    paths:
-      - "proof/**"
-      - "source/type_semantics.py"
-      - "source/ir/**"
-      - "source/parser/**"
-      - "source/lexer/**"
-      - ".github/workflows/ailang-lean-proof.yml"
+  workflow_call:
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   lean-proof:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install native toolchains and AILang backend
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang gcc
+          python -m pip install -e ".[llvm]"
 
       - name: Build and independently check Lean proofs
         uses: leanprover/lean-action@v1
@@ -51,3 +49,19 @@ jobs:
 
       - name: Verify real Typed IR certificates with Lean
         run: python proof/check_ir_certificate.py
+
+      - name: Prove actual frontend and executable literal observations
+        run: python proof/check_literal_semantics.py
+
+      - name: Upload semantic proof evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ailang-semantic-proof-evidence
+          path: |
+            out/proof_semantics/literal_semantics.json
+            out/proof_semantics/*.lean
+            out/proof_semantics/*.log
+            out/proof_semantics/*-stdout.txt
+            out/proof_semantics/literal_semantics.ail
+          if-no-files-found: warn

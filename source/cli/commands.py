@@ -5,7 +5,6 @@ from __future__ import annotations
 from cli.builtins import _print_builtins
 from cli.compilation import (
     _resolve_tool,
-    compile_to_native,
     compile_via_c,
     default_emit_c_output_path,
     default_emit_llvm_output_path,
@@ -20,6 +19,7 @@ from cli.diagnostics import (
     run_prepass,
     run_static_analysis,
 )
+from cli.native_build import compile_to_native
 from cli.optimizer_report import report_optimizer
 from cli.reports import (
     report_checks,

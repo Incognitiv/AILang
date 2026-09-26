@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from .cache import VerificationCache
+from .result_integrity import perfect_score, tool_result_errors
 from .tools import (
     check_nesting_depth,
     check_syntax,
@@ -48,6 +49,7 @@ class EnhancedPythonVerifier:
     """
 
     def __init__(self):
+        self._cache_warning_shown = False
         self.available_tools = self._check_available_tools()
         self._check_missing_dependencies()
 
@@ -149,6 +151,8 @@ class EnhancedPythonVerifier:
     ) -> dict[str, Any]:
         results: dict[str, Any] = {}
         tools = self.available_tools
+        if not jobs:
+            return results
         with ThreadPoolExecutor(max_workers=min(8, len(jobs))) as pool:
             task_futures = {}
             for tool_name, runner, needs_filename in jobs:
@@ -168,7 +172,7 @@ class EnhancedPythonVerifier:
                 tool_name = task_futures[task]
                 try:
                     results[tool_name] = task.result()
-                except (OSError, TimeoutError) as exc:
+                except (OSError, TimeoutError, ValueError, RuntimeError) as exc:
                     results[tool_name] = {"error": f"Tool crashed: {exc}"}
         return results
 
@@ -182,11 +186,18 @@ class EnhancedPythonVerifier:
         result_cache: VerificationCache | None,
     ) -> dict:
         """Core verification logic shared by verify_code and verify_file."""
-        if result_cache:
-            cached = result_cache.get(code, preset)
-            if cached:
-                cached["from_cache"] = True
-                return cached
+        # Code plus preset cannot certify tool/configuration/import context.
+        # Keep the storage API, but never let an unbound old verdict skip checks.
+        cache_status = "disabled"
+        if result_cache is not None:
+            cache_status = "bypassed-incomplete-context"
+            if not self._cache_warning_shown:
+                print(
+                    "Warning: full-result cache bypassed: verification context "
+                    "is not fingerprinted; all checks will run.",
+                    file=sys.stderr,
+                )
+                self._cache_warning_shown = True
 
         syntax_result = check_syntax(code)
         if not syntax_result["valid"]:
@@ -195,6 +206,8 @@ class EnhancedPythonVerifier:
                 "overall_score": 0.0,
                 "passed": False,
                 "fail_reasons": ["syntax invalid"],
+                "from_cache": False,
+                "cache_status": cache_status,
                 "summary": "[SYNTAX] INVALID - Code has syntax errors",
             }
 
@@ -218,13 +231,23 @@ class EnhancedPythonVerifier:
         }
         results["syntax"] = syntax_result
         results["suppressions"] = suppressions
+        errors = tool_result_errors(results, (name for name, _, _ in jobs))
+        if errors:
+            # Do not feed malformed tool payloads into numeric scoring/reporting.
+            return {
+                "syntax": syntax_result,
+                "overall_score": 0.0,
+                "passed": False,
+                "fail_reasons": errors,
+                "summary": "[ERROR] Verification incomplete: " + "; ".join(errors),
+                "from_cache": False,
+                "cache_status": cache_status,
+            }
         results["overall_score"] = self._calculate_score(results, preset=base_preset)
         results["passed"], results["fail_reasons"] = self._determine_pass(results)
         results["summary"] = generate_summary(results)
         results["from_cache"] = False
-
-        if result_cache:
-            result_cache.set(code, preset, results)
+        results["cache_status"] = cache_status
         return results
 
     def verify_code(
@@ -424,12 +447,14 @@ class EnhancedPythonVerifier:
 
     def _determine_pass(self, results: dict) -> tuple[bool, list[str]]:
         """Enforce absolute pass criteria - must achieve 100/100 score."""
-        reasons: list[str] = []
+        reasons = tool_result_errors(results)
+        if reasons:
+            return False, reasons
 
-        # Strict score requirement: must be exactly 100
+        # Equality also rejects NaN, infinity and accidental scores above 100.
         score = results.get("overall_score", 0.0)
-        if score < 100.0:
-            reasons.append(f"score {score:.0f}/100 (must be 100)")
+        if not perfect_score(score):
+            reasons.append(f"score {score!r}/100 (must be 100)")
 
         if not results.get("syntax", {}).get("valid", False):
             reasons.append("syntax invalid")

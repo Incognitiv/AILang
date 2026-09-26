@@ -7,7 +7,9 @@ import argparse
 import json
 import os
 import platform
+import re
 import sys
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Optional
 
@@ -16,6 +18,7 @@ if str(BENCHMARK_DIR) not in sys.path:
     sys.path.insert(0, str(BENCHMARK_DIR))
 
 from benchmark_cases import define_cases
+from benchmark_evidence import matrix_errors, measurement_errors
 from benchmark_report import generate_report
 from benchmark_support import (
     AILEXEC,
@@ -28,6 +31,7 @@ from benchmark_support import (
     _coerce_optional_int,
     _ensure_dir,
     _extract_result_int,
+    _median,
     _parse_leak_report,
     _run_cmd,
     command_exists,
@@ -237,6 +241,14 @@ def _build_measurements_from_json(
             note=f"Failed to parse JIT result JSON: {exc}",
         )
 
+    if not isinstance(obj, dict):
+        return Measurement(status="fail", note="JIT result must be a JSON object.")
+    if obj.get("checksum") is None and parsed_checksum is not None:
+        obj["checksum"] = parsed_checksum
+    problems = measurement_errors(obj, run_count, check_output=True)
+    if problems:
+        return Measurement(status="fail", note="; ".join(problems))
+
     status = obj.get("status", "fail")
     compile_ms = obj.get("compile_ms")
     runs_ms = obj.get("runs_ms")
@@ -276,6 +288,9 @@ def run_benchmarks(
     leak_threshold: int,
     sample_memory: bool,
 ) -> dict[str, dict[str, Measurement]]:
+    if run_count < 1 or warmup_count < 0:
+        raise ValueError("runs must be positive and warmup must be nonnegative")
+    implementations = tuple(implementations)
     _ensure_dir(OUT_DIR)
     results: dict[str, dict[str, Measurement]] = {}
 
@@ -545,7 +560,14 @@ def parse_args() -> argparse.Namespace:
         help="Exit non-zero if any selected implementation fails to build, run, "
         "match output, or satisfy an enabled leak check.",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.runs < 1:
+        parser.error("--runs must be at least 1")
+    if args.warmup < 0:
+        parser.error("--warmup must not be negative")
+    if args.leak_threshold < 0:
+        parser.error("--leak-threshold must not be negative")
+    return args
 
 
 def main() -> int:
@@ -603,7 +625,19 @@ def main() -> int:
         for impl, measurement in impls.items()
         if measurement.status != "ok"
     ]
-    if args.fail_on_error and failures:
+    evidence_failures = matrix_errors(
+        {
+            case: {impl: vars(row) for impl, row in rows.items()}
+            for case, rows in results.items()
+        },
+        (case.name for case in selected_cases),
+        selected_impls,
+        args.runs,
+        check_output=args.check_output,
+    )
+    if args.fail_on_error and (failures or evidence_failures):
+        for failure in evidence_failures:
+            print(f"benchmark evidence failure: {failure}")
         for case, impl, measurement in failures:
             print(
                 f"benchmark gate failure: {case}/{impl}: "
@@ -611,3 +645,7 @@ def main() -> int:
             )
         return 1
     return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

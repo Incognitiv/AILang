@@ -9,6 +9,7 @@ from re import Pattern
 
 from token_access import token_type_at
 
+from .string_escapes import decode_string_literal
 from .unicode_security import check_unicode_security
 
 # Contextual keywords: These are only treated as keywords when followed by '('
@@ -275,7 +276,7 @@ TOKEN_PATTERNS = [
     # Pattern matches: text with one or more #{...} blocks
     ("INTERP_STRLIT", r'"(?:[^"#]|#(?!\{))*(?:#\{[^}]*\}(?:[^"#]|#(?!\{))*)+\"'),
     ("STRLIT", r'"([^"\\]|\\.)*"'),  # String with escape sequences
-    ("CHARLIT", r"'([^'\\]|\\.)?'"),  # Character literal: 'a', '\n', '\x41'
+    ("CHARLIT", r"'(?:[^'\\]|\\(?:x[0-9A-Fa-f]{2}|[0-7]{1,3}|.))?'"),
     ("TILDE", r"~"),  # For destructors: ~ClassName
     # Symbol-based operators
     ("LSHIFT", r"<<"),  # Left shift
@@ -520,18 +521,21 @@ def tokenize(code: str) -> list[tuple[str, str, int, int]]:
             match = regex.match(code, pos)
             if match:
                 text = match.group(0)
-                if token_type == "NEWLINE":
-                    line += 1
-                    line_start = match.end()
-                elif token_type == "COMMENT_BLOCK":
-                    # Count newlines in block comment
-                    nl_count = text.count("\n")
-                    line += nl_count
-                    if nl_count > 0:
-                        line_start = pos + text.rfind("\n") + 1
-                elif token_type not in ("SKIP", "COMMENT", "HASH_COMMENT"):
+                if token_type not in (
+                    "NEWLINE",
+                    "COMMENT_BLOCK",
+                    "SKIP",
+                    "COMMENT",
+                    "HASH_COMMENT",
+                ):
                     col = pos - line_start + 1
                     tokens.append((token_type, text, line, col))
+                # Tokens keep their start position; subsequent tokens must use
+                # the end position of multiline strings as well as comments.
+                nl_count = text.count("\n")
+                if nl_count:
+                    line += nl_count
+                    line_start = pos + text.rfind("\n") + 1
                 pos = match.end()
                 break
         if not match:
@@ -657,42 +661,8 @@ def _apply_contextual_keywords(
 
 
 def unescape_string(s: str) -> str:
-    """
-    Process escape sequences in a string literal.
-    Converts \\n to newline, \\t to tab, \\xNN to hex byte, \\uXXXX to unicode.
-    """
-    import re
-
-    # Remove surrounding quotes
-    if s.startswith('"') and s.endswith('"'):
-        s = s[1:-1]
-
-    # L2 fix: Process hex escapes \xNN -> byte
-    def hex_escape(match: re.Match[str]) -> str:
-        return chr(int(match.group(1), 16))
-
-    s = re.sub(r"\\x([0-9A-Fa-f]{2})", hex_escape, s)
-
-    # L2 fix: Process unicode escapes \uXXXX -> unicode char
-    def unicode_escape(match: re.Match[str]) -> str:
-        return chr(int(match.group(1), 16))
-
-    s = re.sub(r"\\u([0-9A-Fa-f]{4})", unicode_escape, s)
-
-    # Process simple escape sequences
-    escape_map = {
-        "\\n": "\n",
-        "\\t": "\t",
-        "\\r": "\r",
-        "\\\\": "\\",
-        '\\"': '"',
-        "\\0": "\0",
-    }
-
-    for escaped, unescaped in escape_map.items():
-        s = s.replace(escaped, unescaped)
-
-    return s
+    """Decode escapes once, preserving literal backslashes and source values."""
+    return decode_string_literal(s)
 
 
 def char_literal_to_int(s: str) -> int:

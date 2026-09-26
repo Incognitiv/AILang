@@ -13,6 +13,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from source_inventory import audit_tracked_sources
 from verifier.tools.clone import run_project_clone_audit
 
 AUDIT_ROOTS = ("source", "verifier", "tools")
@@ -68,7 +69,10 @@ def audit_repository() -> dict[str, object]:
                         f"absolute_library_path:{rel}:{line_no}: {line.strip()}"
                     )
 
+    source_inventory = audit_tracked_sources(REPO_ROOT)
+    issues.extend(source_inventory["issues"])
     return {
+        "source_inventory": source_inventory,
         "passed": not issues,
         "scanned_files": scanned_files,
         "clone_roots": {
@@ -96,6 +100,13 @@ def main() -> int:
         f"files={payload['scanned_files']} clones={payload['clone_roots']} "
         f"issues={len(payload['issues'])}"
     )
+    inventory = payload["source_inventory"]
+    print(
+        "source limits: "
+        f"files={inventory['scanned_files']} max={inventory['max_file_line_count']} "
+        f"limit=750 oversized={len(inventory['oversized_files'])}"
+    )
+    print("largest source files: " + json.dumps(inventory["largest_files"]))
     for issue in payload["issues"]:
         print(f"FAIL {issue}")
     return 0 if payload["passed"] else 1
