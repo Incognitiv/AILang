@@ -10,16 +10,19 @@ _SIMPLE_ESCAPES = {
     "r": "\r",
     "\\": "\\",
     '"': '"',
+    "'": "'",
     "0": "\0",
 }
-_STRING_ESCAPE = re.compile(r'\\(x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|[ntr\\"0])')
+_STRING_ESCAPE = re.compile(r"\\(x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|.)")
 
 
 def _decode_escape(match: re.Match[str]) -> str:
     escape = match.group(1)
     if escape in _SIMPLE_ESCAPES:
         return _SIMPLE_ESCAPES[escape]
-    return chr(int(escape[1:], 16))
+    if len(escape) > 1:
+        return chr(int(escape[1:], 16))
+    return match.group(0)
 
 
 def decode_string_literal(text: str) -> str:
