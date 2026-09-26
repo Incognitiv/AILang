@@ -106,3 +106,9 @@ def test_golden_gate_requires_real_semantic_workflow() -> None:
     assert "python proof/check_ir_certificate.py" in proof
     assert "python proof/check_python_conformance.py" in proof
     assert "paths:" not in proof
+
+
+def test_native_probe_uses_the_existing_loop_syntax() -> None:
+    source = BRIDGE.native_source([case()])
+    assert "while cursor_0 < strlen(value_0) then" in source
+    assert "while cursor_0 < strlen(value_0):" not in source

@@ -95,7 +95,7 @@ def native_source(cases: list[LiteralCase]) -> str:
             f'    print("AILANG_LITERAL_PROOF_{index}")',
             f"    print(strlen({name}))",
             f"    int {cursor} = 0",
-            f"    while {cursor} < strlen({name}):",
+            f"    while {cursor} < strlen({name}) then",
             f"        print(char_at({name}, {cursor}))",
             f"        {cursor} = {cursor} + 1",
             "    end",
